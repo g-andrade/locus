@@ -1,0 +1,32 @@
+@title locus
+@doc
+
+[![Build Status](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)
+[![Hex pm](http://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
+
+== locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoLite2 ==
+
+<pre lang="erlang">
+% locus:lookup("85.246.84.33").
+{ok,#{autonomous_system_number =&gt; 3243,
+      autonomous_system_organization =&gt;
+          &lt;&lt;"Servicos De Comunicacoes E Multimedia S.A."&gt;&gt;,
+      city =&gt; #{geoname_id =&gt; 2267057,name =&gt; &lt;&lt;"Lisbon"&gt;&gt;},
+      continent =&gt;
+          #{code =&gt; &lt;&lt;"EU"&gt;&gt;,geoname_id =&gt; 6255148,name =&gt; &lt;&lt;"Europe"&gt;&gt;},
+      country =&gt;
+          #{geoname_id =&gt; 2264397,iso_code =&gt; &lt;&lt;"PT"&gt;&gt;,
+            name =&gt; &lt;&lt;"Portugal"&gt;&gt;},
+      location =&gt;
+          #{accuracy_radius =&gt; 200,latitude =&gt; 38.7167,
+            longitude =&gt; -9.1333,time_zone =&gt; &lt;&lt;"Europe/Lisbon"&gt;&gt;},
+      postal =&gt; #{code =&gt; &lt;&lt;"1099-091"&gt;&gt;},
+      registered_country =&gt;
+          #{geoname_id =&gt; 2264397,iso_code =&gt; &lt;&lt;"PT"&gt;&gt;,
+            name =&gt; &lt;&lt;"Portugal"&gt;&gt;},
+      subdivisions =&gt;
+          [#{geoname_id =&gt; 2267056,iso_code =&gt; &lt;&lt;"11"&gt;&gt;,
+             name =&gt; &lt;&lt;"Lisbon"&gt;&gt;}]}}
+</pre>
+
+@end

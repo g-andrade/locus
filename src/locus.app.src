@@ -1,0 +1,26 @@
+{application, locus,
+ [{description, "Geolocation and ASN lookup of IP addresses using MaxMind GeoLite2"},
+  {vsn, git},
+  {registered, []},
+  {mod, {locus_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    inets,
+    ssl
+   ]},
+  {modules, []},
+
+  {env,
+   [{databases,
+     [{country, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz"}
+      %{city, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz"}
+      %{asn, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz"}
+     ]},
+    {log_level, error} % info | warning | error
+   ]},
+
+  {maintainers, ["Guilherme Andrade"]},
+  {licenses, ["MIT"]},
+  {links, [{"Github", "https://github.com/g-andrade/locus"}]}
+ ]}.
