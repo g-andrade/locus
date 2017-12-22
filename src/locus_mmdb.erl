@@ -123,7 +123,8 @@ database_type(Id) ->
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
         -> {ok, metadata(), #{}} |
-           {error, not_found | invalid_address | database_unknown | database_not_loaded}.
+           {error, (not_found | invalid_address | ipv4_database |
+                    database_unknown | database_not_loaded)}.
 lookup(Id, Address) when ?is_ip_address(Address) ->
     Table = table_name(Id),
     DatabaseLookup = (ets:info(Table, name) =:= Table andalso

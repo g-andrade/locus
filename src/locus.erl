@@ -38,7 +38,8 @@
             when Address :: inet:ip_address() | nonempty_string() | binary(),
                  Entry :: #{ atom() => term() | Entry },
                  Error :: (not_found | invalid_address | no_databases_configured |
-                           {database_not_loaded, DatabaseId}),
+                           {database_not_loaded, DatabaseId} |
+                           {ipv4_database, DatabaseId}),
                  DatabaseId :: atom().
 lookup(Address) ->
     lookup_(Address, en).
@@ -49,7 +50,9 @@ lookup(Address) ->
                  Language :: binary(),
                  Entry :: #{ atom() => term() | Entry },
                  Error :: (not_found | invalid_address | no_databases_configured |
-                           {database_not_loaded, DatabaseId} | unknown_language),
+                           {database_not_loaded, DatabaseId} |
+                           {ipv4_database, DatabaseId} |
+                           unknown_language),
                  DatabaseId :: atom().
 lookup(Address, LanguageBin) ->
     try binary_to_existing_atom(LanguageBin, utf8) of
@@ -91,6 +94,8 @@ lookup_recur([DatabaseId | NextDatabaseIds], Address, Language, Acc) ->
             lookup_recur(NextDatabaseIds, Address, Language, Acc);
         {error, invalid_address} ->
             {error, invalid_address};
+        {error, ipv4_database} ->
+            {error, {ipv4_database, DatabaseId}};
         {error, database_not_loaded} ->
             {error, {database_not_loaded, DatabaseId}};
         {error, database_unknown} -> % race condition?
