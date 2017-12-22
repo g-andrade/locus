@@ -245,7 +245,7 @@ decode_data_payload(Type, Size, Data, Index)
   when Type =:= ?map ->
     lists:foldl(
       fun (_Counter, {MapAcc1, IndexAcc1}) ->
-              {<<BinKey/binary>>, IndexAcc2} = decode_data(Data, IndexAcc1), 
+              {<<BinKey/binary>>, IndexAcc2} = decode_data(Data, IndexAcc1),
               Key = binary_to_atom(BinKey, utf8),
               {Value, IndexAcc3} = decode_data(Data, IndexAcc2),
               false = maps:is_key(Key, MapAcc1),
@@ -314,10 +314,10 @@ lookup_([{database, DatabaseParts}] = _DatabaseLookup, Address) ->
             NodeCount = metadata_get(node_count, DatabaseParts),
             RecordSize = metadata_get(record_size, DatabaseParts),
             NodeSize = (RecordSize * 2) div 8,
-            case lookup_recur(BitAddress, Tree, DataSection, 
+            case lookup_recur(BitAddress, Tree, DataSection,
                               NodeSize, RecordSize, 0, NodeCount)
             of
-                {ok, Entry} -> 
+                {ok, Entry} ->
                     Metadata = maps:get(metadata, DatabaseParts),
                     {ok, Metadata, Entry};
                 Other -> Other
@@ -326,20 +326,20 @@ lookup_([{database, DatabaseParts}] = _DatabaseLookup, Address) ->
             {error, Error}
     end.
 
-lookup_recur(<<Bit:1,NextBits/bits>>, Tree, DataSection, NodeSize, RecordSize, 
+lookup_recur(<<Bit:1,NextBits/bits>>, Tree, DataSection, NodeSize, RecordSize,
              NodeIndex, NodeCount)
   when NodeIndex < NodeCount ->
     % regular node
     Node = binary:part(Tree, {NodeIndex * NodeSize, NodeSize}),
     ChildNodeIndex = extract_node_record(Bit, Node, RecordSize),
-    lookup_recur(NextBits, Tree, DataSection, NodeSize, RecordSize, 
+    lookup_recur(NextBits, Tree, DataSection, NodeSize, RecordSize,
                  ChildNodeIndex, NodeCount);
-lookup_recur(_BitAddress, _Tree, _DataSection, _NodeSize, _RecordSize, 
+lookup_recur(_BitAddress, _Tree, _DataSection, _NodeSize, _RecordSize,
              NodeIndex, NodeCount)
   when NodeIndex =:= NodeCount ->
     % end of the line
     {error, not_found};
-lookup_recur(_BitAddress, _Tree, DataSection, _NodeSize, _RecordSize, 
+lookup_recur(_BitAddress, _Tree, DataSection, _NodeSize, _RecordSize,
              NodeIndex, NodeCount) ->
     % pointer to the data section
     DataIndex = (NodeIndex - NodeCount) - 16,
