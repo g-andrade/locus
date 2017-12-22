@@ -287,8 +287,8 @@ handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName,
             StateData
     end;
 handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
-    ?log_error("failure loading ~p database from cache file ~p: ~p",
-               [maps:get(id, StateData), CachedTarballName, Error]),
+    ?log_warning("failure loading ~p database from cache file ~p: ~p",
+                 [maps:get(id, StateData), CachedTarballName, Error]),
     StateData.
 
 -spec load_database_from_tarball(atom(), binary()) 
