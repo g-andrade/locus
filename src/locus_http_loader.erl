@@ -142,8 +142,7 @@ waiting_stream_start(enter, _PrevState, _StateData) ->
 waiting_stream_start(info, {http, {RequestId, stream_start, Headers}},
                      #{ request_id := RequestId } = StateData) ->
     ?log_info("~p database download has started", [maps:get(id, StateData)]),
-    CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
-    UpdatedStateData = StateData#{ last_response_headers => CiHeaders },
+    UpdatedStateData = StateData#{ last_response_headers => Headers },
     {next_state, waiting_stream_end, UpdatedStateData};
 waiting_stream_start(info,
                      {http, {RequestId, {{_HttpVersion, StatusCode, _StatusDesc}, _Headers, _Body}}},
