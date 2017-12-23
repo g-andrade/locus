@@ -27,12 +27,28 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
+-export([languages/0]).
 -export([lookup/1]).
 -export([lookup/2]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
+
+-spec languages() -> {ok, LanguagesPerDatabase} | {error, Error}
+            when LanguagesPerDatabase :: #{ DatabaseId => Languages },
+                 DatabaseId :: atom(),
+                 Languages :: [binary()],
+                 Error :: (no_databases_configured |
+                           {database_not_loaded, DatabaseId} |
+                           {ipv4_database, DatabaseId}).
+languages() ->
+    case locus_sup:database_ids() of
+        [] ->
+            {error, no_databases_configured};
+        DatabaseIds ->
+            languages_recur(DatabaseIds, #{})
+    end.
 
 -spec lookup(Address) -> {ok, Entry} | {error, Error}
             when Address :: inet:ip_address() | nonempty_string() | binary(),
@@ -42,7 +58,7 @@
                            {ipv4_database, DatabaseId}),
                  DatabaseId :: atom().
 lookup(Address) ->
-    lookup_(Address, en).
+    lookup(Address, <<"en">>).
 
 
 -spec lookup(Address, Language) -> {ok, Entry} | {error, Error}
@@ -54,20 +70,7 @@ lookup(Address) ->
                            {ipv4_database, DatabaseId} |
                            unknown_language),
                  DatabaseId :: atom().
-lookup(Address, LanguageBin) ->
-    try binary_to_existing_atom(LanguageBin, utf8) of
-        Language ->
-            lookup_(Address, Language)
-    catch
-        error:badarg ->
-            {error, unknown_language}
-    end.
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions
-%% ------------------------------------------------------------------
-
-lookup_(Address, Language) ->
+lookup(Address, Language) ->
     case locus_sup:database_ids() of
         [] ->
             {error, no_databases_configured};
@@ -75,11 +78,30 @@ lookup_(Address, Language) ->
             lookup_recur(DatabaseIds, Address, Language, #{})
     end.
 
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+languages_recur([DatabaseId | NextDatabaseIds], Acc) ->
+    case locus_mmdb:get_metadata(DatabaseId) of
+        {ok, #{ <<"languages">> := Languages }} ->
+            languages_recur(NextDatabaseIds, Acc#{ DatabaseId => lists:usort(Languages) });
+        {ok, #{}} ->
+            % not applicable
+            languages_recur(NextDatabaseIds, Acc#{ DatabaseId => not_applicable });
+        {error, database_unknown} ->
+            {error, {database_unknown, DatabaseId}};
+        {error, database_not_loaded} ->
+            {error, {database_not_loaded, DatabaseId}}
+    end;
+languages_recur([], Acc) ->
+    {ok, Acc}.
+
 lookup_recur([DatabaseId | NextDatabaseIds], Address, Language, Acc) ->
     case locus_mmdb:lookup(DatabaseId, Address) of
         {ok, Metadata, Entry} ->
-            DatabaseType = maps:get(database_type, Metadata),
-            BuildEpoch = maps:get(build_epoch, Metadata),
+            DatabaseType = maps:get(<<"database_type">>, Metadata),
+            BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
             Acc2 =
                 maps:update_with(
                   DatabaseType,
@@ -122,9 +144,9 @@ select_asn_entry(#{}) ->
     #{}.
 
 localize_entry(Entry, Language) when is_map(Entry) ->
-    case maps:take(names, Entry) of
+    case maps:take(<<"names">>, Entry) of
         {#{ Language := Name }, Entry2} ->
-            Entry2#{ name => Name };
+            Entry2#{ <<"name">> => Name };
         {_MissingLanguage, Entry2} ->
             Entry2;
         error ->

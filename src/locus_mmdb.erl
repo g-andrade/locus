@@ -37,6 +37,7 @@
 -export([decode_and_update/2]).
 -export([database_type/1]).
 -export([lookup/2]).
+-export([get_metadata/1]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -74,6 +75,8 @@
 -define(boolean, 14).
 -define(float, 15).
 
+-define(assert(Cond, Error), ((Cond) orelse error((Error)))).
+
 %% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
@@ -89,7 +92,7 @@
 -export_type([parts/0]).
 
 -type metadata() ::
-        #{ atom() => term() }.
+        #{ binary() => term() }.
 -export_type([metadata/0]).
 
 %% ------------------------------------------------------------------
@@ -118,7 +121,7 @@ database_type(Id) ->
         false -> {error, database_unknown};
         [] -> {error, database_not_loaded};
         [{database, #{ metadata := Metadata }}] ->
-            {ok, maps:get(database_type, Metadata)}
+            {ok, maps:get(<<"database_type">>, Metadata)}
     end.
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
@@ -143,6 +146,22 @@ lookup(Id, String) when is_list(String) ->
 lookup(_Id, _Other) ->
     {error, invalid_address}.
 
+-spec get_metadata(atom())
+        -> {ok, metadata()} |
+           {error, database_unknown | database_not_loaded}.
+get_metadata(Id) ->
+    Table = table_name(Id),
+    case ets:info(Table, name) =:= Table andalso
+         ets:lookup(Table, database)
+    of
+        false ->
+            {error, database_unknown};
+        [] ->
+            {error, database_not_loaded};
+        [{database, #{ metadata := Metadata }}] ->
+            {ok, Metadata}
+    end.
+
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Initialization
 %% ------------------------------------------------------------------
@@ -158,9 +177,13 @@ decode_database_parts(BinDatabase) ->
     <<TreeAndDataSection:BinMetadataStart/binary, ?METADATA_MARKER, BinMetadata/binary>>
         = BinDatabase,
     Metadata = decode_metadata(BinMetadata),
-    RecordSize = maps:get(record_size, Metadata),
-    NodeCount = maps:get(node_count, Metadata),
-    BuildEpoch = maps:get(build_epoch, Metadata),
+    RecordSize = maps:get(<<"record_size">>, Metadata),
+    NodeCount = maps:get(<<"node_count">>, Metadata),
+    BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
+    FmtMajorVersion = maps:get(<<"binary_format_major_version">>, Metadata),
+    FmtMinorVersion = maps:get(<<"binary_format_minor_version">>, Metadata),
+    ?assert(is_known_database_format(FmtMajorVersion, FmtMinorVersion),
+            {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
     TreeSize = ((RecordSize * 2) div 8) * NodeCount,
     <<Tree:TreeSize/binary, 0:128, DataSection/binary>> = TreeAndDataSection,
     DatabaseParts = #{ tree => Tree, data_section => DataSection, metadata => Metadata },
@@ -171,6 +194,10 @@ decode_database_parts(BinDatabase) ->
 decode_metadata(BinMetadata) ->
     {Metadata, _FinalIndex} = decode_data(BinMetadata, 0),
     Metadata.
+
+is_known_database_format(FmtMajorVersion, FmtMinorVersion) ->
+    lists:member({FmtMajorVersion, FmtMinorVersion},
+                 [{2,0}]).
 
 -spec epoch_to_datetime(integer()) -> calendar:datetime().
 epoch_to_datetime(Epoch) ->
@@ -218,8 +245,8 @@ decode_data_payload(Type, Size, Data, Index)
   when Type =:= ?utf8_string ->
     Text = binary:part(Data, {Index, Size}),
     CopiedText = binary:copy(Text),
-    ValidatedText = unicode:characters_to_binary(CopiedText, utf8),
-    {ValidatedText, Index + Size};
+    ?assert(is_utf8_text(CopiedText), {not_utf8_text, CopiedText}),
+    {CopiedText, Index + Size};
 decode_data_payload(Type, Size, Data, Index)
   when (Type =:= ?double andalso Size =:= 8);
        (Type =:= ?float andalso Size =:= 4) ->
@@ -245,10 +272,10 @@ decode_data_payload(Type, Size, Data, Index)
   when Type =:= ?map ->
     lists:foldl(
       fun (_Counter, {MapAcc1, IndexAcc1}) ->
-              {<<BinKey/binary>>, IndexAcc2} = decode_data(Data, IndexAcc1),
-              Key = binary_to_atom(BinKey, utf8),
+              {Key, IndexAcc2} = decode_data(Data, IndexAcc1),
+              ?assert(is_utf8_text(Key), {invalid_map_key, Key}),
+              ?assert(not maps:is_key(Key, MapAcc1), {repeated_map_key, Key}),
               {Value, IndexAcc3} = decode_data(Data, IndexAcc2),
-              false = maps:is_key(Key, MapAcc1),
               MapAcc2 = MapAcc1#{ Key => Value },
               {MapAcc2, IndexAcc3}
       end,
@@ -307,12 +334,12 @@ lookup_(false, _Address) ->
 lookup_([] = _DatabaseLookup, _Address) ->
     {error, database_not_loaded};
 lookup_([{database, DatabaseParts}] = _DatabaseLookup, Address) ->
-    IpVersion = metadata_get(ip_version, DatabaseParts),
+    IpVersion = metadata_get(<<"ip_version">>, DatabaseParts),
     case ip_address_to_bitstring(Address, IpVersion) of
         {ok, BitAddress} ->
             #{ tree := Tree, data_section := DataSection } = DatabaseParts,
-            NodeCount = metadata_get(node_count, DatabaseParts),
-            RecordSize = metadata_get(record_size, DatabaseParts),
+            NodeCount = metadata_get(<<"node_count">>, DatabaseParts),
+            RecordSize = metadata_get(<<"record_size">>, DatabaseParts),
             NodeSize = (RecordSize * 2) div 8,
             case lookup_recur(BitAddress, Tree, DataSection,
                               NodeSize, RecordSize, 0, NodeCount)
@@ -357,3 +384,13 @@ extract_node_record(0 = _Bit, Node, RecordSize) ->
 extract_node_record(1 = _Bit, Node, RecordSize) ->
     <<_:RecordSize, Right:RecordSize>> = Node,
     Right.
+
+is_utf8_text(<<Binary/binary>>) ->
+    case unicode:characters_to_list(Binary, utf8) of
+        String when is_list(String) ->
+            io_lib:printable_unicode_list(String);
+        _Failure ->
+            false
+    end;
+is_utf8_text(_Value) ->
+    false.
