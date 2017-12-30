@@ -98,20 +98,25 @@ supported_languages(DatabaseId) ->
                            database_unknown | database_not_loaded |
                            ipv4_database).
 lookup(DatabaseId, Address) ->
-    lookup(DatabaseId, Address, ?DEFAULT_LANGUAGE).
+    case locus_mmdb:lookup(DatabaseId, Address) of
+        {ok, Entry} ->
+            localize_entry(Entry, ?DEFAULT_LANGUAGE, false);
+        {error, Error} ->
+            {error, Error}
+    end.
 
 -spec lookup(DatabaseId, Address, Language) -> {ok, Entry} | {error, Error}
             when DatabaseId :: atom(),
                  Address :: inet:ip_address() | nonempty_string() | binary(),
                  Language :: binary(),
                  Entry :: #{ binary() => term() | Entry },
-                 Error :: (not_found | invalid_address |
+                 Error :: (not_found | invalid_address | unsupported_language |
                            database_unknown | database_not_loaded |
                            ipv4_database).
 lookup(DatabaseId, Address, Language) ->
     case locus_mmdb:lookup(DatabaseId, Address) of
         {ok, Entry} ->
-            {ok, localize_entry(Entry, Language)};
+            localize_entry(Entry, Language, true);
         {error, Error} ->
             {error, Error}
     end.
@@ -120,20 +125,31 @@ lookup(DatabaseId, Address, Language) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-localize_entry(Entry, Language) when is_map(Entry) ->
+localize_entry(Entry, Language, CatchFailure) ->
+    try localize_entry_recur(Entry, Language) of
+        LocalizedEntry ->
+            {ok, LocalizedEntry}
+    catch
+        error:unsupported_language when CatchFailure ->
+            {error, unsupported_language}
+    end.
+
+localize_entry_recur(Entry, Language) when is_map(Entry) ->
     case maps:take(<<"names">>, Entry) of
         {#{ Language := Name }, Entry2} ->
             Entry2#{ <<"name">> => Name };
-        {_MissingLanguage, Entry2} ->
-            Entry2;
+        {#{} = _MissingLanguage, _Entry2} ->
+            error(unsupported_language);
+        {_NotLocalization, _Entry2} ->
+            Entry;
         error ->
             maps:map(
               fun (_Key, ChildEntry) ->
-                      localize_entry(ChildEntry, Language)
+                      localize_entry_recur(ChildEntry, Language)
               end,
               Entry)
     end;
-localize_entry(Entry, Language) when is_list(Entry) ->
-    [localize_entry(ChildEntry, Language) || ChildEntry <- Entry];
-localize_entry(Entry, _Language) ->
+localize_entry_recur(Entry, Language) when is_list(Entry) ->
+    [localize_entry_recur(ChildEntry, Language) || ChildEntry <- Entry];
+localize_entry_recur(Entry, _Language) ->
     Entry.
