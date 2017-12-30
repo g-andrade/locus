@@ -9,12 +9,31 @@
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#lookup-3">lookup/3</a></td><td>Looks-up localized info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#supported_languages-1">supported_languages/1</a></td><td>Returns the localization languages supported by the database.</td></tr><tr><td valign="top"><a href="#wait_until_ready-1">wait_until_ready/1</a></td><td>Blocks caller execution until the database has been loaded.</td></tr><tr><td valign="top"><a href="#wait_until_ready-2">wait_until_ready/2</a></td><td>Like <code>wait_until_ready/1</code> but it can time-out.</td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#loaded_version-1">loaded_version/1</a></td><td>Consult the currently loaded database version.</td></tr><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#lookup-3">lookup/3</a></td><td>Looks-up localized info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#supported_languages-1">supported_languages/1</a></td><td>Returns the localization languages supported by the database.</td></tr><tr><td valign="top"><a href="#wait_until_ready-1">wait_until_ready/1</a></td><td>Blocks caller execution until the database has been loaded.</td></tr><tr><td valign="top"><a href="#wait_until_ready-2">wait_until_ready/2</a></td><td>Like <code>wait_until_ready/1</code> but it can time-out.</td></tr></table>
 
 
 <a name="functions"></a>
 
 ## Function Details ##
+
+<a name="loaded_version-1"></a>
+
+### loaded_version/1 ###
+
+<pre><code>
+loaded_version(DatabaseId) -&gt; {ok, LoadedVersion} | {error, Error}
+</code></pre>
+
+<ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>LoadedVersion = <a href="calendar.md#type-datetime">calendar:datetime()</a></code></li><li><code>Error = database_unknown | database_not_loaded</code></li></ul>
+
+Consult the currently loaded database version
+
+- `DatabaseId` must be an atom and refer to a started database loader.
+
+Returns:
+- `{ok, LoadedVersion}` in case of success
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
 
 <a name="lookup-2"></a>
 
@@ -148,7 +167,7 @@ Blocks caller execution until the database has been loaded
 - `DatabaseId` must be an atom and refer to a started database loader.
 
 Returns:
-- `ok` when the database is ready to use.
+- `{ok, LoadedVersion}` when the database is ready to use.
 - `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
 - `{error, {loading, term()}}` if loading the database failed for some reason.
 
@@ -170,7 +189,7 @@ Like `wait_until_ready/1` but it can time-out
 - `Timeout` must be either a non-negative integer (milliseconds) or `infinity`.
 
 Returns:
-- `ok` when the database is ready to use.
+- `{ok, LoadedVersion}` when the database is ready to use.
 - `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
 - `{error, timeout}` if we've given up on waiting.
 - `{error, {loading, term()}}` if loading the database failed for some reason.
