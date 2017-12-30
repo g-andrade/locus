@@ -33,7 +33,7 @@ xref:
 	@$(REBAR3) xref
 
 test:
-	@$(REBAR3) as test eunit
+	@$(REBAR3) as test ct
 
 cover: test
 	@$(REBAR3) as test cover
