@@ -87,10 +87,10 @@
 -export_type([bin_database/0]).
 
 -type parts() ::
-        #{ tree => binary(),
-           data_section => binary(),
-           metadata => metadata(),
-           ipv4_root_index => non_neg_integer()
+        #{ tree := binary(),
+           data_section := binary(),
+           metadata := metadata(),
+           ipv4_root_index := non_neg_integer()
          }.
 -export_type([parts/0]).
 
