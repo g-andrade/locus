@@ -77,7 +77,7 @@ stop(DatabaseId) ->
 %% - `DatabaseId' must be an atom and refer to a started database loader.
 %%
 %% Returns:
-%% - `ok' when the database is ready to use.
+%% - `{ok, LoadedVersion}' when the database is ready to use.
 %% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
 %% - `{error, {loading, term()}}' if loading the database failed for some reason.
 %%
@@ -97,7 +97,7 @@ wait_until_ready(DatabaseId) ->
 %% - `Timeout' must be either a non-negative integer (milliseconds) or `infinity'.
 %%
 %% Returns:
-%% - `ok' when the database is ready to use.
+%% - `{ok, LoadedVersion}' when the database is ready to use.
 %% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
 %% - `{error, timeout}' if we've given up on waiting.
 %% - `{error, {loading, term()}}' if loading the database failed for some reason.
