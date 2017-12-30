@@ -101,4 +101,4 @@ child_spec(DatabaseId, DatabaseURL) ->
      }.
 
 child_id(DatabaseId) ->
-    {http_loaded, DatabaseId}.
+    {http_loader, DatabaseId}.
