@@ -62,7 +62,7 @@ stop(DatabaseId) ->
 -spec wait_until_ready(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
             when DatabaseId :: atom(),
                  LoadedVersion :: calendar:datetime(),
-                 Error :: database_unknown | timeout | {loading, LoadingError},
+                 Error :: database_unknown | {loading, LoadingError},
                  LoadingError :: term().
 wait_until_ready(DatabaseId) ->
     wait_until_ready(DatabaseId, ?DEFAULT_WAIT_TIMEOUT).
