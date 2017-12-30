@@ -27,7 +27,6 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start/1]).                              -ignore_xref({start,1}).
 -export([start/2]).                              -ignore_xref({start,2}).
 -export([stop/1]).                               -ignore_xref({stop,1}).
 -export([wait_until_ready/1]).                   -ignore_xref({wait_until_ready,1}).
@@ -40,20 +39,11 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
--define(DEFAULT_DATABASE_URL,
-        "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz").
-
 -define(DEFAULT_WAIT_TIMEOUT, infinity).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
-
--spec start(DatabaseId) -> ok | {error, Error}
-            when DatabaseId :: atom(),
-                 Error :: already_started.
-start(DatabaseId) ->
-    start(DatabaseId, ?DEFAULT_DATABASE_URL).
 
 -spec start(DatabaseId, DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
