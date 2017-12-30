@@ -40,6 +40,7 @@
 %% ------------------------------------------------------------------
 
 -define(DEFAULT_WAIT_TIMEOUT, infinity).
+-define(DEFAULT_LANGUAGE, <<"en">>).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -97,7 +98,7 @@ supported_languages(DatabaseId) ->
                            database_unknown | database_not_loaded |
                            ipv4_database).
 lookup(DatabaseId, Address) ->
-    lookup(DatabaseId, Address, <<"en">>).
+    lookup(DatabaseId, Address, ?DEFAULT_LANGUAGE).
 
 -spec lookup(DatabaseId, Address, Language) -> {ok, Entry} | {error, Error}
             when DatabaseId :: atom(),
