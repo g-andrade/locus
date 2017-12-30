@@ -314,9 +314,8 @@ server_name(Id) ->
 
 -spec cached_tarball_name(state_data()) -> nonempty_string().
 cached_tarball_name(StateData) ->
-    #{ id := Id, url := URL } = StateData,
-    StrId = atom_to_list(Id),
-    Hash = crypto:hash(sha256, [StrId, $0, URL]),
+    #{ url := URL } = StateData,
+    Hash = crypto:hash(sha256, URL),
     HexHash = bin_to_hex_str(Hash),
     Filename = HexHash ++ ".tgz",
     UserCachePath = filename:basedir(user_cache, "locus_erlang"),
