@@ -37,6 +37,7 @@
 -export([decode_and_update/2]).
 -export([lookup/2]).
 -export([get_metadata/1]).
+-export([get_version/1]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -90,7 +91,8 @@
         #{ tree := binary(),
            data_section := binary(),
            metadata := metadata(),
-           ipv4_root_index := non_neg_integer()
+           ipv4_root_index := non_neg_integer(),
+           version := calendar:datetime()
          }.
 -export_type([parts/0]).
 
@@ -153,6 +155,22 @@ get_metadata(Id) ->
             {ok, Metadata}
     end.
 
+-spec get_version(atom())
+        -> {ok, calendar:datetime()} |
+           {error, database_unknown | database_not_loaded}.
+get_version(Id) ->
+    Table = table_name(Id),
+    case ets:info(Table, name) =:= Table andalso
+         ets:lookup(Table, database)
+    of
+        false ->
+            {error, database_unknown};
+        [] ->
+            {error, database_not_loaded};
+        [{database, #{ version := LoadedVersion }}] ->
+            {ok, LoadedVersion}
+    end.
+
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Initialization
 %% ------------------------------------------------------------------
@@ -178,9 +196,10 @@ decode_database_parts(BinDatabase) ->
     TreeSize = ((RecordSize * 2) div 8) * NodeCount,
     <<Tree:TreeSize/binary, 0:128, DataSection/binary>> = TreeAndDataSection,
     IPv4RootIndex = find_ipv4_root_index(Tree, Metadata),
-    DatabaseParts = #{ tree => Tree, data_section => DataSection,
-                       metadata => Metadata, ipv4_root_index => IPv4RootIndex },
     Version = epoch_to_datetime(BuildEpoch),
+    DatabaseParts = #{ tree => Tree, data_section => DataSection,
+                       metadata => Metadata, ipv4_root_index => IPv4RootIndex,
+                       version => Version },
     {DatabaseParts, Version}.
 
 -spec decode_metadata(binary()) -> metadata().

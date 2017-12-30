@@ -31,6 +31,7 @@
 -export([stop/1]).                               -ignore_xref({stop,1}).
 -export([wait_until_ready/1]).                   -ignore_xref({wait_until_ready,1}).
 -export([wait_until_ready/2]).                   -ignore_xref({wait_until_ready,2}).
+-export([loaded_version/1]).                     -ignore_xref({loaded_version,1}).
 -export([supported_languages/1]).                -ignore_xref({supported_languages,1}).
 -export([lookup/2]).                             -ignore_xref({lookup,2}).
 -export([lookup/3]).                             -ignore_xref({lookup,3}).
@@ -111,6 +112,21 @@ wait_until_ready(DatabaseId) ->
                  LoadingError :: term().
 wait_until_ready(DatabaseId, Timeout) ->
     locus_http_loader:wait_until_database_is_loaded(DatabaseId, Timeout).
+
+%% @doc Consult the currently loaded database version
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%%
+%% Returns:
+%% - `{ok, LoadedVersion}' in case of success
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+-spec loaded_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
+            when DatabaseId :: atom(),
+                 LoadedVersion :: calendar:datetime(),
+                 Error :: database_unknown | database_not_loaded.
+loaded_version(DatabaseId) ->
+    locus_mmdb:get_version(DatabaseId).
 
 %% @doc Returns the localization languages supported by the database
 %%
