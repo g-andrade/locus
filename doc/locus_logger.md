@@ -1,0 +1,27 @@
+
+
+# Module locus_logger #
+* [Function Index](#index)
+* [Function Details](#functions)
+
+<a name="index"></a>
+
+## Function Index ##
+
+
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#set_loglevel-1">set_loglevel/1</a></td><td></td></tr></table>
+
+
+<a name="functions"></a>
+
+## Function Details ##
+
+<a name="set_loglevel-1"></a>
+
+### set_loglevel/1 ###
+
+<pre><code>
+set_loglevel(Level::info | warning | error) -&gt; ok
+</code></pre>
+<br />
+

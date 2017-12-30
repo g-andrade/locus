@@ -7,26 +7,17 @@
 == locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoLite2 ==
 
 <pre lang="erlang">
-% locus:lookup("85.246.84.33").
-{ok,#{autonomous_system_number =&gt; 3243,
-      autonomous_system_organization =&gt;
-          &lt;&lt;"Servicos De Comunicacoes E Multimedia S.A."&gt;&gt;,
-      city =&gt; #{geoname_id =&gt; 2267057,name =&gt; &lt;&lt;"Lisbon"&gt;&gt;},
-      continent =&gt;
-          #{code =&gt; &lt;&lt;"EU"&gt;&gt;,geoname_id =&gt; 6255148,name =&gt; &lt;&lt;"Europe"&gt;&gt;},
-      country =&gt;
-          #{geoname_id =&gt; 2264397,iso_code =&gt; &lt;&lt;"PT"&gt;&gt;,
-            name =&gt; &lt;&lt;"Portugal"&gt;&gt;},
-      location =&gt;
-          #{accuracy_radius =&gt; 200,latitude =&gt; 38.7167,
-            longitude =&gt; -9.1333,time_zone =&gt; &lt;&lt;"Europe/Lisbon"&gt;&gt;},
-      postal =&gt; #{code =&gt; &lt;&lt;"1099-091"&gt;&gt;},
-      registered_country =&gt;
-          #{geoname_id =&gt; 2264397,iso_code =&gt; &lt;&lt;"PT"&gt;&gt;,
-            name =&gt; &lt;&lt;"Portugal"&gt;&gt;},
-      subdivisions =&gt;
-          [#{geoname_id =&gt; 2267056,iso_code =&gt; &lt;&lt;"11"&gt;&gt;,
-             name =&gt; &lt;&lt;"Lisbon"&gt;&gt;}]}}
+% locus:start(city).
+% locus:lookup(city, "85.246.84.33").
+{ok,#{&lt;&lt;"continent"&gt;&gt; =&gt;
+          #{&lt;&lt;"code"&gt;&gt; =&gt; &lt;&lt;"EU"&gt;&gt;,&lt;&lt;"geoname_id"&gt;&gt; =&gt; 6255148,
+            &lt;&lt;"name"&gt;&gt; =&gt; &lt;&lt;"Europe"&gt;&gt;},
+      &lt;&lt;"country"&gt;&gt; =&gt;
+          #{&lt;&lt;"geoname_id"&gt;&gt; =&gt; 2264397,&lt;&lt;"iso_code"&gt;&gt; =&gt; &lt;&lt;"PT"&gt;&gt;,
+            &lt;&lt;"name"&gt;&gt; =&gt; &lt;&lt;"Portugal"&gt;&gt;},
+      &lt;&lt;"registered_country"&gt;&gt; =&gt;
+          #{&lt;&lt;"geoname_id"&gt;&gt; =&gt; 2264397,&lt;&lt;"iso_code"&gt;&gt; =&gt; &lt;&lt;"PT"&gt;&gt;,
+            &lt;&lt;"name"&gt;&gt; =&gt; &lt;&lt;"Portugal"&gt;&gt;}}}
 </pre>
 
 @end

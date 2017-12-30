@@ -10,25 +10,12 @@
 
 ```erlang
 
-% locus:lookup("85.246.84.33").
-{ok,#{autonomous_system_number => 3243,
-      autonomous_system_organization =><<"Servicos De Comunicacoes E Multimedia S.A.">>,
-      city => #{geoname_id => 2267057,name => <<"Lisbon">>},
-      continent =>
-          #{code => <<"EU">>,geoname_id => 6255148,name => <<"Europe">>},
-      country =>
-          #{geoname_id => 2264397,iso_code => <<"PT">>,
-            name => <<"Portugal">>},
-      location =>
-          #{accuracy_radius => 200,latitude => 38.7167,
-            longitude => -9.1333,time_zone => <<"Europe/Lisbon">>},
-      postal => #{code => <<"1099-091">>},
-      registered_country =>
-          #{geoname_id => 2264397,iso_code => <<"PT">>,
-            name => <<"Portugal">>},
-      subdivisions =>
-          [#{geoname_id => 2267056,iso_code => <<"11">>,
-             name => <<"Lisbon">>}]}}
+% locus:start(city).
+% locus:lookup(city, "85.246.84.33").
+{ok,#{<<"continent">> =>
+          #{<<"code">> => <<"EU">>,<<"geoname_id">> => 6255148,<<"name">> => <<"Europe">>},<<"country">> =>
+          #{<<"geoname_id">> => 2264397,<<"iso_code">> => <<"PT">>,<<"name">> => <<"Portugal">>},<<"registered_country">> =>
+          #{<<"geoname_id">> => 2264397,<<"iso_code">> => <<"PT">>,<<"name">> => <<"Portugal">>}}}
 
 ```
 
@@ -38,5 +25,6 @@
 
 
 <table width="100%" border="0" summary="list of modules">
-<tr><td><a href="locus.md" class="module">locus</a></td></tr></table>
+<tr><td><a href="locus.md" class="module">locus</a></td></tr>
+<tr><td><a href="locus_logger.md" class="module">locus_logger</a></td></tr></table>
 
