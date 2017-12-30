@@ -9,7 +9,7 @@
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#set_loglevel-1">set_loglevel/1</a></td><td></td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#set_loglevel-1">set_loglevel/1</a></td><td>Changes the logging verbosity in runtime.</td></tr></table>
 
 
 <a name="functions"></a>
@@ -24,4 +24,8 @@
 set_loglevel(Level::info | warning | error) -&gt; ok
 </code></pre>
 <br />
+
+Changes the logging verbosity in runtime
+
+`Level` must be either `info`, `warning`, `error` or `none`.
 

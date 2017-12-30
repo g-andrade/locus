@@ -47,8 +47,10 @@
 %% ------------------------------------------------------------------
 
 %% @doc Starts a database loader under id `DatabaseId'
+%%
 %% `DatabaseId' must be an atom.
 %% `DatabaseURL' must be a non-empty string containing a HTTP(S) URL.
+%%
 %% Returns `ok' in case of success, `{error, already_started}' otherwise.
 %% @see wait_until_ready/1
 %% @see wait_until_ready/2
@@ -60,7 +62,9 @@ start(DatabaseId, DatabaseURL) ->
     locus_sup:start_child(DatabaseId, DatabaseURL).
 
 %% @doc Stops the database loader under id `DatabaseId'
+%%
 %% `DatabaseId' must be an atom and refer to a started database loader.
+%%
 %% Returns `ok' in case of success, `{error, not_found}' otherwise.
 -spec stop(DatabaseId) -> ok | {error, Error}
             when DatabaseId :: atom(),
@@ -69,10 +73,14 @@ stop(DatabaseId) ->
     locus_sup:stop_child(DatabaseId).
 
 %% @doc Blocks caller execution until the database has been loaded
-%% `DatabaseId' must be an atom and refer to a started database loader.
-%% Returns `ok' when the database is ready to use.
-%% Returns `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% Returns `{error, {loading, term()}}' if loading the database failed for some reason.
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%%
+%% Returns:
+%% - `ok' when the database is ready to use.
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, {loading, term()}}' if loading the database failed for some reason.
+%%
 %% @see wait_until_ready/2
 %% @see start/2
 -spec wait_until_ready(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
@@ -83,13 +91,16 @@ stop(DatabaseId) ->
 wait_until_ready(DatabaseId) ->
     wait_until_ready(DatabaseId, ?DEFAULT_WAIT_TIMEOUT).
 
-%% @doc Like `wait_until_ready/1' but it can time-out.
-%% `DatabaseId' must be an atom and refer to a started database loader.
-%% `Timeout' must be either a non-negative integer (milliseconds) or `infinity'.
-%% Returns `ok' when the database is ready to use.
-%% Returns `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% Returns `{error, timeout}' if we've given up on waiting.
-%% Returns `{error, {loading, term()}}' if loading the database failed for some reason.
+%% @doc Like `wait_until_ready/1' but it can time-out
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%% - `Timeout' must be either a non-negative integer (milliseconds) or `infinity'.
+%%
+%% Returns:
+%% - `ok' when the database is ready to use.
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, timeout}' if we've given up on waiting.
+%% - `{error, {loading, term()}}' if loading the database failed for some reason.
 %% @see wait_until_ready/1
 %% @see start/2
 -spec wait_until_ready(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Error}
@@ -101,12 +112,16 @@ wait_until_ready(DatabaseId) ->
 wait_until_ready(DatabaseId, Timeout) ->
     locus_http_loader:wait_until_database_is_loaded(DatabaseId, Timeout).
 
-%% @doc Returns the localizations supported by the database (when applicable.)
+%% @doc Returns the localization languages supported by the database
+%%
 %% `DatabaseId' must be an atom and refer to a started database loader.
-%% Returns `{ok, Languages}', with `Languages' a list of binaries, in case of success.
-%% Returns `{error, not_applicable}' if the database doesn't support localization.
-%% Returns `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% Returns `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%%
+%% Returns:
+%% - `{ok, Languages}', with `Languages' a list of binaries, in case of success.
+%% - `{error, not_applicable}' if the database doesn't support localization.
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% @see lookup/3
 -spec supported_languages(DatabaseId) -> {ok, Languages} | {error, Error}
             when DatabaseId :: atom(),
                  Languages :: [binary()],
@@ -121,18 +136,21 @@ supported_languages(DatabaseId) ->
             {error, Error}
     end.
 
-%% @doc Looks-up info on IPv4 and IPv6 addresses.
-%% `DatabaseId' must be an atom and refer to a started database loader.
-%% `Address' must be either an `inet:ip_address()' tuple, or a string/binary
-%% containing a valid representation of the address.
-%% Returns `{ok, Entry}' in case of success, with `Entry' being a map containing
-%% the relevant data and with place names localized in English (when applicable.)
-%% Returns `{error, not_found}' if no data was found for this `Address'.
-%% Returns `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
-%% tuple or a valid text representation of an IP address.
-%% Returns `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% Returns `{error, database_not_loaded}' if the database hasn't yet been loaded.
-%% Returns `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
+%% @doc Looks-up info on IPv4 and IPv6 addresses
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%% - `Address' must be either an `inet:ip_address()' tuple, or a string/binary
+%%    containing a valid representation of the address.
+%%
+%% Returns:
+%% - `{ok, Entry}' in case of success, with `Entry' being a map containing
+%%    the relevant data and with place names localized in English (when applicable.)
+%% - `{error, not_found}' if no data was found for this `Address'.
+%% - `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
+%%    tuple or a valid text representation of an IP address.
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% - `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
 %% only supports IPv4 addresses.
 %% @see lookup/3
 -spec lookup(DatabaseId, Address) -> {ok, Entry} | {error, Error}
@@ -150,21 +168,26 @@ lookup(DatabaseId, Address) ->
             {error, Error}
     end.
 
-%% @doc Looks-up localized info on IPv4 and IPv6 addresses.
-%% `DatabaseId' must be an atom and refer to a started database loader.
-%% `Address' must be either an `inet:ip_address()' tuple, or a string/binary
-%% `Language' must be a non-empty binary containing a language code.
-%% Returns `{ok, Entry}' in case of success, with `Entry' being a map containing
-%% the relevant data and with place names localized in `Language' (when applicable.)
-%% Returns `{error, not_found}' if no data was found for this `Address'.
-%% Returns `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
-%% tuple or a valid text representation of an IP address.
-%% Returns `{error, unsupported_language}' if the chosen `Language' isn't supported
-%% by this particular database.
-%% Returns `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% Returns `{error, database_not_loaded}' if the database hasn't yet been loaded.
-%% Returns `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
-%% only supports IPv4 addresses.
+%% @doc Looks-up localized info on IPv4 and IPv6 addresses
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%% - `Address' must be either an `inet:ip_address()' tuple, or a string/binary
+%% - `Language' must be a non-empty binary containing a language code.
+%%
+%% Returns:
+%% - `{ok, Entry}' in case of success, with `Entry' being a map containing
+%%    the relevant data and with place names localized in `Language' (when applicable.)
+%% - `{error, not_found}' if no data was found for this `Address'.
+%% - `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
+%%    tuple or a valid text representation of an IP address.
+%% - `{error, unsupported_language}' if the chosen `Language' isn't supported
+%%    by this particular database.
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% - `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
+%%    only supports IPv4 addresses.
+%% @see lookup/2
+%% @see supported_languages/1
 -spec lookup(DatabaseId, Address, Language) -> {ok, Entry} | {error, Error}
             when DatabaseId :: atom(),
                  Address :: inet:ip_address() | nonempty_string() | binary(),
