@@ -27,121 +27,107 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([languages/0]).
--export([lookup/1]).
--export([lookup/2]).
+-export([start/1]).                              -ignore_xref({start,1}).
+-export([start/2]).                              -ignore_xref({start,2}).
+-export([stop/1]).                               -ignore_xref({stop,1}).
+-export([wait_until_ready/1]).                   -ignore_xref({wait_until_ready,1}).
+-export([wait_until_ready/2]).                   -ignore_xref({wait_until_ready,2}).
+-export([supported_languages/1]).                -ignore_xref({supported_languages,1}).
+-export([lookup/2]).                             -ignore_xref({lookup,2}).
+-export([lookup/3]).                             -ignore_xref({lookup,3}).
+
+%% ------------------------------------------------------------------
+%% Macro Definitions
+%% ------------------------------------------------------------------
+
+-define(DEFAULT_DATABASE_URL,
+        "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz").
+
+-define(DEFAULT_WAIT_TIMEOUT, infinity).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec languages() -> {ok, LanguagesPerDatabase} | {error, Error}
-            when LanguagesPerDatabase :: #{ DatabaseId => Languages },
-                 DatabaseId :: atom(),
+-spec start(DatabaseId) -> ok | {error, Error}
+            when DatabaseId :: atom(),
+                 Error :: already_started.
+start(DatabaseId) ->
+    start(DatabaseId, ?DEFAULT_DATABASE_URL).
+
+-spec start(DatabaseId, DatabaseURL) -> ok | {error, Error}
+            when DatabaseId :: atom(),
+                 DatabaseURL :: nonempty_string(),
+                 Error :: already_started.
+start(DatabaseId, DatabaseURL) ->
+    locus_sup:start_child(DatabaseId, DatabaseURL).
+
+-spec stop(DatabaseId) -> ok | {error, Error}
+            when DatabaseId :: atom(),
+                 Error :: not_found.
+stop(DatabaseId) ->
+    locus_sup:stop_child(DatabaseId).
+
+-spec wait_until_ready(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
+            when DatabaseId :: atom(),
+                 LoadedVersion :: calendar:datetime(),
+                 Error :: database_unknown | timeout | {loading, LoadingError},
+                 LoadingError :: term().
+wait_until_ready(DatabaseId) ->
+    wait_until_ready(DatabaseId, ?DEFAULT_WAIT_TIMEOUT).
+
+-spec wait_until_ready(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Error}
+            when DatabaseId :: atom(),
+                 Timeout :: timeout(),
+                 LoadedVersion :: calendar:datetime(),
+                 Error :: database_unknown | timeout | {loading, LoadingError},
+                 LoadingError :: term().
+wait_until_ready(DatabaseId, Timeout) ->
+    locus_http_loader:wait_until_database_is_loaded(DatabaseId, Timeout).
+
+-spec supported_languages(DatabaseId) -> {ok, Languages} | {error, Error}
+            when DatabaseId :: atom(),
                  Languages :: [binary()],
-                 Error :: (no_databases_configured |
-                           {database_not_loaded, DatabaseId} |
-                           {ipv4_database, DatabaseId}).
-languages() ->
-    case locus_sup:database_ids() of
-        [] ->
-            {error, no_databases_configured};
-        DatabaseIds ->
-            languages_recur(DatabaseIds, #{})
+                 Error :: not_applicable | database_unknown | database_not_loaded.
+supported_languages(DatabaseId) ->
+    case locus_mmdb:get_metadata(DatabaseId) of
+        {ok, #{ <<"languages">> := Languages }} ->
+            {ok, lists:usort(Languages)};
+        {ok, #{}} ->
+            {error, not_applicable};
+        {error, Error} ->
+            {error, Error}
     end.
 
--spec lookup(Address) -> {ok, Entry} | {error, Error}
-            when Address :: inet:ip_address() | nonempty_string() | binary(),
-                 Entry :: #{ atom() => term() | Entry },
-                 Error :: (not_found | invalid_address | no_databases_configured |
-                           {database_not_loaded, DatabaseId} |
-                           {ipv4_database, DatabaseId}),
-                 DatabaseId :: atom().
-lookup(Address) ->
-    lookup(Address, <<"en">>).
+-spec lookup(DatabaseId, Address) -> {ok, Entry} | {error, Error}
+            when DatabaseId :: atom(),
+                 Address :: inet:ip_address() | nonempty_string() | binary(),
+                 Entry :: #{ binary() => term() | Entry },
+                 Error :: (not_found | invalid_address |
+                           database_unknown | database_not_loaded |
+                           ipv4_database).
+lookup(DatabaseId, Address) ->
+    lookup(DatabaseId, Address, <<"en">>).
 
-
--spec lookup(Address, Language) -> {ok, Entry} | {error, Error}
-            when Address :: inet:ip_address() | nonempty_string() | binary(),
+-spec lookup(DatabaseId, Address, Language) -> {ok, Entry} | {error, Error}
+            when DatabaseId :: atom(),
+                 Address :: inet:ip_address() | nonempty_string() | binary(),
                  Language :: binary(),
-                 Entry :: #{ atom() => term() | Entry },
-                 Error :: (not_found | invalid_address | no_databases_configured |
-                           {database_not_loaded, DatabaseId} |
-                           {ipv4_database, DatabaseId} |
-                           unknown_language),
-                 DatabaseId :: atom().
-lookup(Address, Language) ->
-    case locus_sup:database_ids() of
-        [] ->
-            {error, no_databases_configured};
-        DatabaseIds ->
-            lookup_recur(DatabaseIds, Address, Language, #{})
+                 Entry :: #{ binary() => term() | Entry },
+                 Error :: (not_found | invalid_address |
+                           database_unknown | database_not_loaded |
+                           ipv4_database).
+lookup(DatabaseId, Address, Language) ->
+    case locus_mmdb:lookup(DatabaseId, Address) of
+        {ok, Entry} ->
+            {ok, localize_entry(Entry, Language)};
+        {error, Error} ->
+            {error, Error}
     end.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
-
-languages_recur([DatabaseId | NextDatabaseIds], Acc) ->
-    case locus_mmdb:get_metadata(DatabaseId) of
-        {ok, #{ <<"languages">> := Languages }} ->
-            languages_recur(NextDatabaseIds, Acc#{ DatabaseId => lists:usort(Languages) });
-        {ok, #{}} ->
-            % not applicable
-            languages_recur(NextDatabaseIds, Acc#{ DatabaseId => not_applicable });
-        {error, database_unknown} ->
-            {error, {database_unknown, DatabaseId}};
-        {error, database_not_loaded} ->
-            {error, {database_not_loaded, DatabaseId}}
-    end;
-languages_recur([], Acc) ->
-    {ok, Acc}.
-
-lookup_recur([DatabaseId | NextDatabaseIds], Address, Language, Acc) ->
-    case locus_mmdb:lookup(DatabaseId, Address) of
-        {ok, Metadata, Entry} ->
-            DatabaseType = maps:get(<<"database_type">>, Metadata),
-            BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
-            Acc2 =
-                maps:update_with(
-                  DatabaseType,
-                  fun ({OlderBuildEpoch, _OlderEntry}) when OlderBuildEpoch < BuildEpoch ->
-                          {BuildEpoch, Entry};
-                      (Other) ->
-                          Other
-                  end,
-                  {BuildEpoch, Entry}, Acc),
-            lookup_recur(NextDatabaseIds, Address, Language, Acc2);
-        {error, not_found} ->
-            lookup_recur(NextDatabaseIds, Address, Language, Acc);
-        {error, invalid_address} ->
-            {error, invalid_address};
-        {error, ipv4_database} ->
-            {error, {ipv4_database, DatabaseId}};
-        {error, database_not_loaded} ->
-            {error, {database_not_loaded, DatabaseId}};
-        {error, database_unknown} -> % race condition?
-            lookup_recur(NextDatabaseIds, Address, Language, Acc)
-    end;
-lookup_recur([], _Address, _Language, Acc) when map_size(Acc) =:= 0 ->
-    {error, not_found};
-lookup_recur([], _Address, Language, Acc) ->
-    GeoEntry = select_geo_entry(Acc),
-    AsnEntry = select_asn_entry(Acc),
-    Entry = maps:merge(GeoEntry, AsnEntry),
-    {ok, localize_entry(Entry, Language)}.
-
-select_geo_entry(#{ <<"GeoLite2-City">> := {_BuildEpoch, CityEntry} }) ->
-    CityEntry;
-select_geo_entry(#{ <<"GeoLite2-Country">> := {_BuildEpoch, CountryEntry} }) ->
-    CountryEntry;
-select_geo_entry(#{}) ->
-    #{}.
-
-select_asn_entry(#{ <<"GeoLite2-ASN">> := {_BuildEpoch, AsnEntry} }) ->
-    AsnEntry;
-select_asn_entry(#{}) ->
-    #{}.
 
 localize_entry(Entry, Language) when is_map(Entry) ->
     case maps:take(<<"names">>, Entry) of

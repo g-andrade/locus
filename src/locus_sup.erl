@@ -30,7 +30,8 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/0]).                      -ignore_xref({start_link,0}).
--export([database_ids/0]).
+-export([start_child/2]).
+-export([stop_child/1]).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
@@ -53,40 +54,51 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
--spec database_ids() -> [atom()].
-database_ids() ->
-    lists:map(
-      fun ({Id, _Url}) ->
-              Id
-      end,
-      application:get_env(locus, databases, [])).
+-spec start_child(atom(), nonempty_string())
+        -> ok | {error, already_started}.
+start_child(DatabaseId, DatabaseURL) when is_atom(DatabaseId) ->
+    ChildSpec = child_spec(DatabaseId, DatabaseURL),
+    case supervisor:start_child(?SERVER, ChildSpec) of
+        {ok, _Pid} ->
+            ok;
+        {error, already_present} ->
+            {error, already_started};
+        {error, {already_started, _Pid}} ->
+            {error, already_started}
+    end.
+
+-spec stop_child(atom()) -> ok | {error, not_found}.
+stop_child(DatabaseId) when is_atom(DatabaseId) ->
+    ChildId = child_id(DatabaseId),
+    case supervisor:terminate_child(?SERVER, ChildId) of
+        ok ->
+            case supervisor:delete_child(?SERVER, ChildId) of
+                ok -> ok;
+                {error, not_found} ->
+                    {error, not_found}
+            end;
+        {error, not_found} ->
+            {error, not_found}
+    end.
 
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {#{ strategy := one_for_all },
-                        [#{ id := atom(),
-                            start := {locus_http_loader, start_link,
-                                      [atom() | nonempty_string(), ...]}
-                          }
-                        ]}}.
+-spec init([]) -> {ok, {#{ strategy := one_for_one }, []}}.
 init([]) ->
-    SupFlags = #{ strategy => one_for_all },
-    {ok, {SupFlags, children()}}.
+    SupFlags = #{ strategy => one_for_one },
+    {ok, {SupFlags, []}}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-children() ->
-    lists:map(
-      fun ({Id, ("http" ++ _) = URL}) ->
-              #{ id => Id,
-                 start => {locus_http_loader, start_link, [Id, URL]}
-               }
-      end,
-      databases_conf()).
+child_spec(DatabaseId, DatabaseURL) ->
+    Args = [DatabaseId, DatabaseURL],
+    #{ id => child_id(DatabaseId),
+       start => {locus_http_loader, start_link, Args}
+     }.
 
-databases_conf() ->
-    application:get_env(locus, databases, []).
+child_id(DatabaseId) ->
+    {http_loaded, DatabaseId}.

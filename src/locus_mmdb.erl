@@ -35,7 +35,6 @@
 
 -export([create_table/1]).
 -export([decode_and_update/2]).
--export([database_type/1]).
 -export([lookup/2]).
 -export([get_metadata/1]).
 
@@ -112,20 +111,8 @@ decode_and_update(Id, BinDatabase) ->
     ets:insert(Table, {database, DatabaseParts}),
     Version.
 
--spec database_type(atom()) -> {ok, binary()} | {error, database_unknown | database_not_loaded}.
-database_type(Id) ->
-    Table = table_name(Id),
-    case ets:info(Table, name) =:= Table andalso
-         ets:lookup(Table, database)
-    of
-        false -> {error, database_unknown};
-        [] -> {error, database_not_loaded};
-        [{database, #{ metadata := Metadata }}] ->
-            {ok, maps:get(<<"database_type">>, Metadata)}
-    end.
-
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
-        -> {ok, metadata(), #{}} |
+        -> {ok, #{}} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
 lookup(Id, Address) when ?is_ip_address(Address) ->
@@ -341,14 +328,8 @@ lookup_([{database, DatabaseParts}] = _DatabaseLookup, Address) ->
             NodeCount = metadata_get(<<"node_count">>, DatabaseParts),
             RecordSize = metadata_get(<<"record_size">>, DatabaseParts),
             NodeSize = (RecordSize * 2) div 8,
-            case lookup_recur(BitAddress, Tree, DataSection,
-                              NodeSize, RecordSize, 0, NodeCount)
-            of
-                {ok, Entry} ->
-                    Metadata = maps:get(metadata, DatabaseParts),
-                    {ok, Metadata, Entry};
-                Other -> Other
-            end;
+            lookup_recur(BitAddress, Tree, DataSection,
+                         NodeSize, RecordSize, 0, NodeCount);
         {error, Error} ->
             {error, Error}
     end.

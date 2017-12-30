@@ -13,12 +13,7 @@
   {modules, []},
 
   {env,
-   [{databases,
-     [{country, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz"}
-      %{city, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz"}
-      %{asn, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz"}
-     ]},
-    {log_level, error} % info | warning | error
+   [{log_level, error} % info | warning | error
    ]},
 
   {maintainers, ["Guilherme Andrade"]},

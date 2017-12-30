@@ -21,7 +21,6 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @private
 -module(locus_logger).
 
 %% ------------------------------------------------------------------
@@ -29,6 +28,7 @@
 %% ------------------------------------------------------------------
 
 -export([should_log/1]).
+-export([set_loglevel/1]).              -ignore_xref({set_loglevel,1}).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -50,8 +50,16 @@
 %% ------------------------------------------------------------------
 
 -spec should_log(info | warning | error) -> boolean().
+%% @private
 should_log(Level) ->
     Weight = maps:get(Level, ?LOGGING_LEVELS),
     MinimumLevel = application:get_env(locus, log_level, undefined),
-    MinimumWeight = maps:get(MinimumLevel, ?LOGGING_LEVELS, infinity),
+    MinimumWeight = maps:get(MinimumLevel, ?LOGGING_LEVELS, none),
     Weight >= MinimumWeight.
+
+-spec set_loglevel(info | warning | error) -> ok.
+set_loglevel(Level) when Level =:= info;
+                         Level =:= warning;
+                         Level =:= error;
+                         Level =:= none ->
+    application:set_env(locus, log_level, Level).
