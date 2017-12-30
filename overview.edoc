@@ -4,20 +4,104 @@
 <!--[![Build Status](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)-->
 [![Hex pm](http://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 
-== locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoLite2 ==
+== locus - Geolocation and ASN lookup of IP addresses using GeoLite2 ==
+
+`locus' is library for Erlang/OTP and Elixir that allows you to pinpoint the country,
+city or ASN of IPv4 and IPv6 addresses.
+
+The <a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">MaxMind databases</a> you choose
+are downloaded on-demand, cached on the filesystem and updated automatically.
+
+Entries are localized in English by default; other languages can be chosen from among
+the supported ones (when applicable.)
+
+You're encouraged to host your own copies of the databases when using this library in production,
+both for reliability and netiquette towards MaxMind.
+
+=== Usage ===
+
+Run `make console' to bring up a shell.
+
+==== 1. Start the database loader ====
 
 <pre lang="erlang">
-% locus:start(city).
-% locus:lookup(city, "85.246.84.33").
-{ok,#{&lt;&lt;"continent"&gt;&gt; =&gt;
-          #{&lt;&lt;"code"&gt;&gt; =&gt; &lt;&lt;"EU"&gt;&gt;,&lt;&lt;"geoname_id"&gt;&gt; =&gt; 6255148,
-            &lt;&lt;"name"&gt;&gt; =&gt; &lt;&lt;"Europe"&gt;&gt;},
-      &lt;&lt;"country"&gt;&gt; =&gt;
-          #{&lt;&lt;"geoname_id"&gt;&gt; =&gt; 2264397,&lt;&lt;"iso_code"&gt;&gt; =&gt; &lt;&lt;"PT"&gt;&gt;,
-            &lt;&lt;"name"&gt;&gt; =&gt; &lt;&lt;"Portugal"&gt;&gt;},
-      &lt;&lt;"registered_country"&gt;&gt; =&gt;
-          #{&lt;&lt;"geoname_id"&gt;&gt; =&gt; 2264397,&lt;&lt;"iso_code"&gt;&gt; =&gt; &lt;&lt;"PT"&gt;&gt;,
-            &lt;&lt;"name"&gt;&gt; =&gt; &lt;&lt;"Portugal"&gt;&gt;}}}
+URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
+ok = locus:start(country, URL).
 </pre>
+
+==== 2. Wait for the database to load (optional) ====
+
+<pre lang="erlang">
+% Either block indefinitely
+{ok, _DatabaseVersion} = locus:wait_until_ready(country).
+</pre>
+
+<pre lang="erlang">
+% ... or give-up after 30 seconds
+{ok, _DatabaseVersion} = locus:wait_until_ready(country, 30000). % {error,timeout}
+</pre>
+
+==== 3. Lookup IP Addresses ====
+
+<pre lang="erlang">
+<![CDATA[
+% > locus:lookup(country, "93.184.216.34").
+% > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
+
+{ok,#{<<"continent">> =>
+          #{<<"code">> => <<"NA">>,<<"geoname_id">> => 6255149,
+            <<"name">> => <<"North America">>},
+      <<"country">> =>
+          #{<<"geoname_id">> => 6252001,<<"iso_code">> => <<"US">>,
+            <<"name">> => <<"United States">>},
+      <<"registered_country">> =>
+          #{<<"geoname_id">> => 6252001,<<"iso_code">> => <<"US">>,
+            <<"name">> => <<"United States">>}
+]]>
+</pre>
+
+Check the <a href="#modules">function reference</a> for an overview on everything you can do.
+
+=== Details ===
+
+==== Requirements ====
+
+* Erlang/OTP 19.3 or higher
+* rebar3
+
+==== On databases ====
+
+* The free GeoLite2 <a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">Country, City and ASN databases</a>
+  were all successfully tested; presumibly `locus' can deal with any MaxMind DB -formatted database that maps
+  IP address prefixes to arbitrary data, but no <a href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
+  commercial databases</a> have yet been tested
+
+==== On formats ====
+
+* Only gzip-compressed tarballs are supported at this moment
+* The first file to be found, within the tarball, with an .mmdb extension, is the one that's chosen for loading
+* The implementation of <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a> is mostly complete
+
+==== On downloading and updating ====
+
+* The downloaded tarballs are uncompressed in memory
+* The 'last-modified' response header, if present, is used to condition subsequent download
+  attempts (using 'if-modified-since' request headers) in order to save bandwidth
+* The downloaded tarballs are cached on the filesystem in order to more quickly achieve readiness
+  on future launches of the database loader
+* Until the database loader achieves readiness, download attempts are made every minute;
+  once readiness is achieved (either from cache or network), this interval increases to every 6 hours
+
+==== On caching ====
+
+* Caching is a best-effort; the system falls back to relying exclusively on the network if needed
+* A caching directory named 'locus_erlang' is created under the <a href="http://erlang.org/doc/man/filename#basedir-3">'user_cache' basedir</a>
+* Cached tarballs are named after the SHA256 hash of their source URL
+* Modification time of the tarballs is extracted from 'last-modified' response header (when present)
+  and used to condition downloads on subsequent boots and save bandwidth
+
+=== Disclosure ===
+
+`locus' is an independent project and has not been authorized, sponsored, or otherwise approved by MaxMind.
 
 @end
