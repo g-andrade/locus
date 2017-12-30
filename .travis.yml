@@ -5,4 +5,4 @@ otp_release:
     - 20.0
     - 20.1
     - 20.2
-script: make test
+script: make build
