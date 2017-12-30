@@ -76,6 +76,9 @@
 
 -define(assert(Cond, Error), ((Cond) orelse error((Error)))).
 
+% https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
+-define(IPV4_IPV6_PREFIX, <<0:80, 16#FFFF:16>>).
+
 %% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
@@ -86,7 +89,8 @@
 -type parts() ::
         #{ tree => binary(),
            data_section => binary(),
-           metadata => metadata()
+           metadata => metadata(),
+           ipv4_root_index => non_neg_integer()
          }.
 -export_type([parts/0]).
 
@@ -173,7 +177,9 @@ decode_database_parts(BinDatabase) ->
             {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
     TreeSize = ((RecordSize * 2) div 8) * NodeCount,
     <<Tree:TreeSize/binary, 0:128, DataSection/binary>> = TreeAndDataSection,
-    DatabaseParts = #{ tree => Tree, data_section => DataSection, metadata => Metadata },
+    IPv4RootIndex = find_ipv4_root_index(Tree, Metadata),
+    DatabaseParts = #{ tree => Tree, data_section => DataSection,
+                       metadata => Metadata, ipv4_root_index => IPv4RootIndex },
     Version = epoch_to_datetime(BuildEpoch),
     {DatabaseParts, Version}.
 
@@ -299,6 +305,27 @@ decode_pointer_index(SS, _VV, Data, Index) when SS =:= 3 ->
     <<Offset:32>> = binary:part(Data, {Index,4}),
     {Offset, Index + 4}.
 
+find_ipv4_root_index(_Tree, #{ <<"ip_version">> := 4 } = _Metadata) ->
+    0;
+find_ipv4_root_index(Tree, #{ <<"ip_version">> := 6 } = Metadata) ->
+    find_node_index_for_prefix(?IPV4_IPV6_PREFIX, Tree, Metadata).
+
+find_node_index_for_prefix(Bitstring, Tree, Metadata) ->
+    NodeCount = maps:get(<<"node_count">>, Metadata),
+    RecordSize = maps:get(<<"record_size">>, Metadata),
+    NodeSize = (RecordSize * 2) div 8,
+    find_node_index_for_prefix_recur(Bitstring, Tree, NodeSize, RecordSize, 0, NodeCount).
+
+find_node_index_for_prefix_recur(<<Bit:1,NextBits/bits>>, Tree, NodeSize, RecordSize, NodeIndex, NodeCount)
+  when NodeIndex < NodeCount ->
+    % regular node
+    Node = binary:part(Tree, {NodeIndex * NodeSize, NodeSize}),
+    ChildNodeIndex = extract_node_record(Bit, Node, RecordSize),
+    find_node_index_for_prefix_recur(NextBits, Tree, NodeSize, RecordSize, ChildNodeIndex, NodeCount);
+find_node_index_for_prefix_recur(<<>>, _Tree, _NodeSize, _RecordSize, NodeIndex, _NodeCount) ->
+    % the end of the line
+    NodeIndex.
+
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Looking Up
 %% ------------------------------------------------------------------
@@ -306,30 +333,28 @@ decode_pointer_index(SS, _VV, Data, Index) when SS =:= 3 ->
 metadata_get(Key, #{ metadata := Metadata } = _DatabaseParts) ->
     maps:get(Key, Metadata).
 
-ip_address_to_bitstring({A,B,C,D}, 4 = _IpVersion) ->
-    {ok, <<A,B,C,D>>};
-ip_address_to_bitstring({A,B,C,D}, 6 = _IpVersion) ->
-    % https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
-    {ok, <<0:80, 16#FFFF:16, A,B,C,D>>};
-ip_address_to_bitstring({_,_,_,_,_,_,_,_}, 4 = _IpVersion) ->
-    {error, ipv4_database};
-ip_address_to_bitstring({A,B,C,D,E,F,G,H}, 6 = _IpVersion) ->
-    {ok,<<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>>}.
+ip_address_to_bitstring({A,B,C,D}, DatabaseParts) ->
+    RootNodeIndex = maps:get(ipv4_root_index, DatabaseParts),
+    {ok, <<A,B,C,D>>, RootNodeIndex};
+ip_address_to_bitstring({A,B,C,D,E,F,G,H}, DatabaseParts) ->
+    case metadata_get(<<"ip_version">>, DatabaseParts) of
+        4 -> {error, ipv4_database};
+        6 -> {ok, <<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>>, 0}
+    end.
 
 lookup_(false, _Address) ->
     {error, database_unknown};
 lookup_([] = _DatabaseLookup, _Address) ->
     {error, database_not_loaded};
 lookup_([{database, DatabaseParts}] = _DatabaseLookup, Address) ->
-    IpVersion = metadata_get(<<"ip_version">>, DatabaseParts),
-    case ip_address_to_bitstring(Address, IpVersion) of
-        {ok, BitAddress} ->
+    case ip_address_to_bitstring(Address, DatabaseParts) of
+        {ok, BitAddress, RootNodeIndex} ->
             #{ tree := Tree, data_section := DataSection } = DatabaseParts,
             NodeCount = metadata_get(<<"node_count">>, DatabaseParts),
             RecordSize = metadata_get(<<"record_size">>, DatabaseParts),
             NodeSize = (RecordSize * 2) div 8,
             lookup_recur(BitAddress, Tree, DataSection,
-                         NodeSize, RecordSize, 0, NodeCount);
+                         NodeSize, RecordSize, RootNodeIndex, NodeCount);
         {error, Error} ->
             {error, Error}
     end.
