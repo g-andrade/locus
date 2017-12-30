@@ -57,6 +57,8 @@ should_log(Level) ->
     MinimumWeight = maps:get(MinimumLevel, ?LOGGING_LEVELS, none),
     Weight >= MinimumWeight.
 
+%% @doc Changes the logging verbosity in runtime.
+%% `Level' must be either `info', `warning', `error' or `none'.
 -spec set_loglevel(info | warning | error) -> ok.
 set_loglevel(Level) when Level =:= info;
                          Level =:= warning;
