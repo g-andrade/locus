@@ -21,7 +21,7 @@
 ### set_loglevel/1 ###
 
 <pre><code>
-set_loglevel(Level::info | warning | error) -&gt; ok
+set_loglevel(Level::info | warning | error | none) -&gt; ok
 </code></pre>
 <br />
 

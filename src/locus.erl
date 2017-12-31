@@ -81,7 +81,7 @@ start(DatabaseId, DatabaseURL) ->
 stop(DatabaseId) ->
     locus_sup:stop_child(DatabaseId).
 
-%% @doc Blocks caller execution until the database is ready to use
+%% @doc Blocks caller execution until either the database has been loaded or the current attempt at loading has failed.
 %%
 %% - `DatabaseId' must be an atom and refer to a started database loader.
 %%

@@ -103,6 +103,13 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
 * Modification time of the tarballs is extracted from 'last-modified' response header (when present)
   and used to condition downloads on subsequent boots and save bandwidth
 
+==== On logging ====
+
+* Four logging levels are supported: `info', `warning', `error' and `none'
+* The backend is <a href="http://erlang.org/doc/man/error_logger.html">error_logger</a>; this usually plays nicely with `lager'
+* The default log level is `error'; it can be changed in the application's `env' config
+* To tweak the log level in runtime, use `locus_logger:set_loglevel/1'
+
 === Disclosure ===
 
 `locus' is an independent project and has not been authorized, sponsored, or otherwise approved by MaxMind.

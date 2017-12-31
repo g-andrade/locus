@@ -60,7 +60,7 @@ should_log(Level) ->
 %% @doc Changes the logging verbosity in runtime
 %%
 %% `Level' must be either `info', `warning', `error' or `none'.
--spec set_loglevel(info | warning | error) -> ok.
+-spec set_loglevel(info | warning | error | none) -> ok.
 set_loglevel(Level) when Level =:= info;
                          Level =:= warning;
                          Level =:= error;

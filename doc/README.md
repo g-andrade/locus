@@ -86,6 +86,9 @@ Check the [function reference](#modules) for an overview on everything you can d
   were all successfully tested; presumibly `locus` can deal with any MaxMind DB -formatted database that maps
   IP address prefixes to arbitrary data, but no [
   commercial databases](https://dev.maxmind.com/geoip/geoip2/downloadable/) have yet been tested
+* The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the
+application callers using ETS tables, and the original binary search tree is used to lookup addresses.
+The data for each entry is decoded on the fly upon successful lookups.
 
 <h5><a name="On_formats">On formats</a></h5>
 
@@ -110,6 +113,13 @@ once readiness is achieved (either from cache or network), this interval increas
 * Cached tarballs are named after the SHA256 hash of their source URL
 * Modification time of the tarballs is extracted from 'last-modified' response header (when present)
 and used to condition downloads on subsequent boots and save bandwidth
+
+<h5><a name="On_logging">On logging</a></h5>
+
+* Four logging levels are supported: `info`, `warning`, `error` and `none`
+* The backend is [error_logger](http://erlang.org/doc/man/error_logger.md); this usually plays nicely with `lager`
+* The default log level is `error`; it can be changed in the application's `env` config
+* To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
 
 
 #### <a name="Disclosure">Disclosure</a> ####
