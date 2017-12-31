@@ -46,11 +46,12 @@ all_individual_tests() ->
 
 init_per_group(individual_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
-    ok = locus:start(tests, ?COUNTRY_URL),
-    {ok, _LoadedVersion} = locus:wait_until_ready(tests, timer:seconds(60)),
+    ok = locus:start_loader(tests, ?COUNTRY_URL),
+    {ok, _LoadedVersion} = locus:wait_for_loader(tests, timer:seconds(60)),
     Config.
 
 end_per_group(individual_tests, Config) ->
+    ok = locus:stop_loader(tests),
     ok = application:stop(locus),
     Config.
 

@@ -26,19 +26,19 @@ Run `make console' to bring up a shell.
 
 <pre lang="erlang">
 URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
-ok = locus:start(country, URL).
+ok = locus:start_loader(country, URL).
 </pre>
 
 ==== 2. Wait for the database to load (optional) ====
 
 <pre lang="erlang">
 % Either block indefinitely
-{ok, _DatabaseVersion} = locus:wait_until_ready(country).
+{ok, _DatabaseVersion} = locus:wait_for_loader(country).
 </pre>
 
 <pre lang="erlang">
 % ... or give-up after 30 seconds
-{ok, _DatabaseVersion} = locus:wait_until_ready(country, 30000). % {error,timeout}
+{ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 </pre>
 
 ==== 3. Lookup IP Addresses ====

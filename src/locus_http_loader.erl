@@ -33,7 +33,7 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/2]).                    -ignore_xref({start_link, 2}).
--export([wait_until_database_is_loaded/2]).
+-export([wait/2]).
 
 %% ------------------------------------------------------------------
 %% gen_statem Function Exports
@@ -86,12 +86,12 @@ start_link(Id, URL) ->
     ServerName = server_name(Id),
     gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL], []).
 
--spec wait_until_database_is_loaded(atom(), timeout())
+-spec wait(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
            {error, database_unknown | timeout | {loading, term()}}.
-wait_until_database_is_loaded(Id, Timeout) ->
+wait(Id, Timeout) ->
     ServerName = server_name(Id),
-    try gen_statem:call(ServerName, wait_until_database_is_loaded, Timeout) of
+    try gen_statem:call(ServerName, wait, Timeout) of
         {ok, LoadedVersion} ->
             {ok, LoadedVersion};
         {error, LoadingError} ->
@@ -141,7 +141,7 @@ initializing(internal, load_from_cache, StateData) ->
 
 -spec ready(enter, atom(), state_data())
             -> {keep_state_and_data, {state_timeout, pos_integer(), update_database}};
-           ({call,gen_statem:from()}, wait_until_database_is_loaded, state_data())
+           ({call,gen_statem:from()}, wait, state_data())
            -> {keep_state, state_data(), [gen_statem:reply_action()]};
            (internal, update_database, state_data())
             -> {next_state, waiting_stream_start, state_data()};
@@ -149,7 +149,7 @@ initializing(internal, load_from_cache, StateData) ->
             -> {repeat_state_and_data, {next_event, internal, update_database}}.
 ready(enter, _PrevState, StateData) ->
     {keep_state_and_data, {state_timeout, update_period(StateData), update_database}};
-ready({call,From}, wait_until_database_is_loaded, StateData) ->
+ready({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
 ready(internal, update_database, StateData) ->
@@ -169,7 +169,7 @@ ready(state_timeout, update_database, _StateData) ->
 
 -spec waiting_stream_start(enter, atom(), state_data())
                             -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
-                          ({call,gen_statem:from()}, wait_until_database_is_loaded, state_data())
+                          ({call,gen_statem:from()}, wait, state_data())
                             -> {keep_state, state_data(), [gen_statem:reply_action()]};
                           (info, {http, {reference(), stream_start, headers()}}, state_data())
                             -> {next_state, waiting_stream_end, state_data()};
@@ -183,7 +183,7 @@ ready(state_timeout, update_database, _StateData) ->
                             -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
 waiting_stream_start(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
-waiting_stream_start({call,From}, wait_until_database_is_loaded, StateData) ->
+waiting_stream_start({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
 waiting_stream_start(info, {http, {RequestId, stream_start, Headers}},
@@ -227,7 +227,7 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
 
 -spec waiting_stream_end(enter, atom(), state_data())
                         -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
-                        ({call,gen_statem:from()}, wait_until_database_is_loaded, state_data())
+                        ({call,gen_statem:from()}, wait, state_data())
                         -> {keep_state, state_data(), [gen_statem:reply_action()]};
                         (info, {http, {reference(), stream, binary()}}, state_data())
                         -> {keep_state, state_data(), {state_timeout, pos_integer(), timeout}};
@@ -240,7 +240,7 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                         -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
 waiting_stream_end(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
-waiting_stream_end({call,From}, wait_until_database_is_loaded, StateData) ->
+waiting_stream_end({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
 waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},

@@ -9,19 +9,41 @@
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#loaded_version-1">loaded_version/1</a></td><td>Returns the currently loaded database version.</td></tr><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#lookup-3">lookup/3</a></td><td>Looks-up localized info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#supported_languages-1">supported_languages/1</a></td><td>Returns the localization languages supported by the database.</td></tr><tr><td valign="top"><a href="#wait_until_ready-1">wait_until_ready/1</a></td><td>Blocks caller execution until either the database has been loaded or the current attempt at loading has failed.</td></tr><tr><td valign="top"><a href="#wait_until_ready-2">wait_until_ready/2</a></td><td>Like <code>wait_until_ready/1</code> but it can time-out.</td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#get_languages-1">get_languages/1</a></td><td>Returns the localization languages supported by the database.</td></tr><tr><td valign="top"><a href="#get_version-1">get_version/1</a></td><td>Returns the currently loaded database version.</td></tr><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#lookup-3">lookup/3</a></td><td>Looks-up localized info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start_loader-2">start_loader/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#stop_loader-1">stop_loader/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#wait_for_loader-1">wait_for_loader/1</a></td><td>Blocks caller execution until either readiness is achieved or a database load attempt fails.</td></tr><tr><td valign="top"><a href="#wait_for_loader-2">wait_for_loader/2</a></td><td>Like <code>wait_for_loader/1</code> but it can time-out.</td></tr></table>
 
 
 <a name="functions"></a>
 
 ## Function Details ##
 
-<a name="loaded_version-1"></a>
+<a name="get_languages-1"></a>
 
-### loaded_version/1 ###
+### get_languages/1 ###
 
 <pre><code>
-loaded_version(DatabaseId) -&gt; {ok, LoadedVersion} | {error, Error}
+get_languages(DatabaseId) -&gt; {ok, Languages} | {error, Error}
+</code></pre>
+
+<ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>Languages = [binary()]</code></li><li><code>Error = not_applicable | database_unknown | database_not_loaded</code></li></ul>
+
+Returns the localization languages supported by the database
+
+`DatabaseId` must be an atom and refer to a started database loader.
+
+Returns:
+- `{ok, Languages}`, with `Languages` a list of binaries, in case of success.
+- `{error, not_applicable}` if the database doesn't support localization.
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
+
+__See also:__ [lookup/3](#lookup-3).
+
+<a name="get_version-1"></a>
+
+### get_version/1 ###
+
+<pre><code>
+get_version(DatabaseId) -&gt; {ok, LoadedVersion} | {error, Error}
 </code></pre>
 
 <ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>LoadedVersion = <a href="calendar.md#type-datetime">calendar:datetime()</a></code></li><li><code>Error = database_unknown | database_not_loaded</code></li></ul>
@@ -93,14 +115,14 @@ by this particular database.
 - `{error, ipv4_database}` if `Address` represents an IPv6 address and the database
 only supports IPv4 addresses.
 
-__See also:__ [lookup/2](#lookup-2), [supported_languages/1](#supported_languages-1).
+__See also:__ [get_languages/1](#get_languages-1), [lookup/2](#lookup-2).
 
-<a name="start-2"></a>
+<a name="start_loader-2"></a>
 
-### start/2 ###
+### start_loader/2 ###
 
 <pre><code>
-start(DatabaseId, DatabaseURL) -&gt; ok | {error, Error}
+start_loader(DatabaseId, DatabaseURL) -&gt; ok | {error, Error}
 </code></pre>
 
 <ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>DatabaseURL = string() | binary()</code></li><li><code>Error = invalid_url | already_started</code></li></ul>
@@ -115,14 +137,14 @@ Returns:
 - `{error, invalid_url}` if the URL is invalid.
 - `{error, already_started}` if the loader under `DatabaseId` has already been started.
 
-__See also:__ [wait_until_ready/1](#wait_until_ready-1), [wait_until_ready/2](#wait_until_ready-2).
+__See also:__ [wait_for_loader/1](#wait_for_loader-1), [wait_for_loader/2](#wait_for_loader-2).
 
-<a name="stop-1"></a>
+<a name="stop_loader-1"></a>
 
-### stop/1 ###
+### stop_loader/1 ###
 
 <pre><code>
-stop(DatabaseId) -&gt; ok | {error, Error}
+stop_loader(DatabaseId) -&gt; ok | {error, Error}
 </code></pre>
 
 <ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>Error = not_found</code></li></ul>
@@ -133,39 +155,17 @@ Stops the database loader under id `DatabaseId`
 
 Returns `ok` in case of success, `{error, not_found}` otherwise.
 
-<a name="supported_languages-1"></a>
+<a name="wait_for_loader-1"></a>
 
-### supported_languages/1 ###
-
-<pre><code>
-supported_languages(DatabaseId) -&gt; {ok, Languages} | {error, Error}
-</code></pre>
-
-<ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>Languages = [binary()]</code></li><li><code>Error = not_applicable | database_unknown | database_not_loaded</code></li></ul>
-
-Returns the localization languages supported by the database
-
-`DatabaseId` must be an atom and refer to a started database loader.
-
-Returns:
-- `{ok, Languages}`, with `Languages` a list of binaries, in case of success.
-- `{error, not_applicable}` if the database doesn't support localization.
-- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
-- `{error, database_not_loaded}` if the database hasn't yet been loaded.
-
-__See also:__ [lookup/3](#lookup-3).
-
-<a name="wait_until_ready-1"></a>
-
-### wait_until_ready/1 ###
+### wait_for_loader/1 ###
 
 <pre><code>
-wait_until_ready(DatabaseId) -&gt; {ok, LoadedVersion} | {error, Error}
+wait_for_loader(DatabaseId) -&gt; {ok, LoadedVersion} | {error, Error}
 </code></pre>
 
 <ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>LoadedVersion = <a href="calendar.md#type-datetime">calendar:datetime()</a></code></li><li><code>Error = database_unknown | {loading, LoadingError}</code></li><li><code>LoadingError = term()</code></li></ul>
 
-Blocks caller execution until either the database has been loaded or the current attempt at loading has failed.
+Blocks caller execution until either readiness is achieved or a database load attempt fails
 
 - `DatabaseId` must be an atom and refer to a started database loader.
 
@@ -174,19 +174,19 @@ Returns:
 - `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
 - `{error, {loading, term()}}` if loading the database failed for some reason.
 
-__See also:__ [start/2](#start-2), [wait_until_ready/2](#wait_until_ready-2).
+__See also:__ [start_loader/2](#start_loader-2), [wait_for_loader/2](#wait_for_loader-2).
 
-<a name="wait_until_ready-2"></a>
+<a name="wait_for_loader-2"></a>
 
-### wait_until_ready/2 ###
+### wait_for_loader/2 ###
 
 <pre><code>
-wait_until_ready(DatabaseId, Timeout) -&gt; {ok, LoadedVersion} | {error, Error}
+wait_for_loader(DatabaseId, Timeout) -&gt; {ok, LoadedVersion} | {error, Error}
 </code></pre>
 
 <ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>Timeout = timeout()</code></li><li><code>LoadedVersion = <a href="calendar.md#type-datetime">calendar:datetime()</a></code></li><li><code>Error = database_unknown | timeout | {loading, LoadingError}</code></li><li><code>LoadingError = term()</code></li></ul>
 
-Like `wait_until_ready/1` but it can time-out
+Like `wait_for_loader/1` but it can time-out
 
 - `DatabaseId` must be an atom and refer to a started database loader.
 - `Timeout` must be either a non-negative integer (milliseconds) or `infinity`.
@@ -197,5 +197,5 @@ Returns:
 - `{error, timeout}` if we've given up on waiting.
 - `{error, {loading, term()}}` if loading the database failed for some reason.
 
-__See also:__ [start/2](#start-2), [wait_until_ready/1](#wait_until_ready-1).
+__See also:__ [start_loader/2](#start_loader-2), [wait_for_loader/1](#wait_for_loader-1).
 

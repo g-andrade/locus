@@ -29,7 +29,7 @@ Run `make console` to bring up a shell.
 ```erlang
 
 URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
-ok = locus:start(country, URL).
+ok = locus:start_loader(country, URL).
 
 ```
 
@@ -38,14 +38,14 @@ ok = locus:start(country, URL).
 ```erlang
 
 % Either block indefinitely
-{ok, _DatabaseVersion} = locus:wait_until_ready(country).
+{ok, _DatabaseVersion} = locus:wait_for_loader(country).
 
 ```
 
 ```erlang
 
 % ... or give-up after 30 seconds
-{ok, _DatabaseVersion} = locus:wait_until_ready(country, 30000). % {error,timeout}
+{ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 
 ```
 

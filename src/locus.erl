@@ -27,14 +27,14 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start/2]).                              -ignore_xref({start,2}).
--export([stop/1]).                               -ignore_xref({stop,1}).
--export([wait_until_ready/1]).                   -ignore_xref({wait_until_ready,1}).
--export([wait_until_ready/2]).                   -ignore_xref({wait_until_ready,2}).
--export([loaded_version/1]).                     -ignore_xref({loaded_version,1}).
--export([supported_languages/1]).                -ignore_xref({supported_languages,1}).
--export([lookup/2]).                             -ignore_xref({lookup,2}).
--export([lookup/3]).                             -ignore_xref({lookup,3}).
+-export([start_loader/2]).                -ignore_xref({start_loader,2}).
+-export([stop_loader/1]).                 -ignore_xref({stop_loader,1}).
+-export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
+-export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
+-export([lookup/2]).                      -ignore_xref({lookup,2}).
+-export([lookup/3]).                      -ignore_xref({lookup,3}).
+-export([get_version/1]).                 -ignore_xref({get_version,1}).
+-export([get_languages/1]).               -ignore_xref({get_languages,1}).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -55,16 +55,16 @@
 %% - `ok' in case of success.
 %% - `{error, invalid_url}' if the URL is invalid.
 %% - `{error, already_started}' if the loader under `DatabaseId' has already been started.
-%% @see wait_until_ready/1
-%% @see wait_until_ready/2
--spec start(DatabaseId, DatabaseURL) -> ok | {error, Error}
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+-spec start_loader(DatabaseId, DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseURL :: string() | binary(),
                  Error :: invalid_url | already_started.
-start(DatabaseId, BinDatabaseURL) when is_binary(BinDatabaseURL) ->
+start_loader(DatabaseId, BinDatabaseURL) when is_binary(BinDatabaseURL) ->
     DatabaseURL = binary_to_list(BinDatabaseURL),
-    start(DatabaseId, DatabaseURL);
-start(DatabaseId, DatabaseURL) ->
+    start_loader(DatabaseId, DatabaseURL);
+start_loader(DatabaseId, DatabaseURL) ->
     case is_url(DatabaseURL) of
         true -> locus_sup:start_child(DatabaseId, DatabaseURL);
         false -> {error, invalid_url}
@@ -75,13 +75,13 @@ start(DatabaseId, DatabaseURL) ->
 %% `DatabaseId' must be an atom and refer to a started database loader.
 %%
 %% Returns `ok' in case of success, `{error, not_found}' otherwise.
--spec stop(DatabaseId) -> ok | {error, Error}
+-spec stop_loader(DatabaseId) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  Error :: not_found.
-stop(DatabaseId) ->
+stop_loader(DatabaseId) ->
     locus_sup:stop_child(DatabaseId).
 
-%% @doc Blocks caller execution until either the database has been loaded or the current attempt at loading has failed.
+%% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails
 %%
 %% - `DatabaseId' must be an atom and refer to a started database loader.
 %%
@@ -90,17 +90,17 @@ stop(DatabaseId) ->
 %% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
 %% - `{error, {loading, term()}}' if loading the database failed for some reason.
 %%
-%% @see wait_until_ready/2
-%% @see start/2
--spec wait_until_ready(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
+%% @see wait_for_loader/2
+%% @see start_loader/2
+-spec wait_for_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
             when DatabaseId :: atom(),
                  LoadedVersion :: calendar:datetime(),
                  Error :: database_unknown | {loading, LoadingError},
                  LoadingError :: term().
-wait_until_ready(DatabaseId) ->
-    wait_until_ready(DatabaseId, infinity).
+wait_for_loader(DatabaseId) ->
+    wait_for_loader(DatabaseId, infinity).
 
-%% @doc Like `wait_until_ready/1' but it can time-out
+%% @doc Like `wait_for_loader/1' but it can time-out
 %%
 %% - `DatabaseId' must be an atom and refer to a started database loader.
 %% - `Timeout' must be either a non-negative integer (milliseconds) or `infinity'.
@@ -110,55 +110,16 @@ wait_until_ready(DatabaseId) ->
 %% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
 %% - `{error, timeout}' if we've given up on waiting.
 %% - `{error, {loading, term()}}' if loading the database failed for some reason.
-%% @see wait_until_ready/1
-%% @see start/2
--spec wait_until_ready(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Error}
+%% @see wait_for_loader/1
+%% @see start_loader/2
+-spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Error}
             when DatabaseId :: atom(),
                  Timeout :: timeout(),
                  LoadedVersion :: calendar:datetime(),
                  Error :: database_unknown | timeout | {loading, LoadingError},
                  LoadingError :: term().
-wait_until_ready(DatabaseId, Timeout) ->
-    locus_http_loader:wait_until_database_is_loaded(DatabaseId, Timeout).
-
-%% @doc Returns the currently loaded database version
-%%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
-%%
-%% Returns:
-%% - `{ok, LoadedVersion}' in case of success
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
--spec loaded_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadedVersion :: calendar:datetime(),
-                 Error :: database_unknown | database_not_loaded.
-loaded_version(DatabaseId) ->
-    locus_mmdb:get_version(DatabaseId).
-
-%% @doc Returns the localization languages supported by the database
-%%
-%% `DatabaseId' must be an atom and refer to a started database loader.
-%%
-%% Returns:
-%% - `{ok, Languages}', with `Languages' a list of binaries, in case of success.
-%% - `{error, not_applicable}' if the database doesn't support localization.
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
-%% @see lookup/3
--spec supported_languages(DatabaseId) -> {ok, Languages} | {error, Error}
-            when DatabaseId :: atom(),
-                 Languages :: [binary()],
-                 Error :: not_applicable | database_unknown | database_not_loaded.
-supported_languages(DatabaseId) ->
-    case locus_mmdb:get_metadata(DatabaseId) of
-        {ok, #{ <<"languages">> := Languages }} ->
-            {ok, lists:usort(Languages)};
-        {ok, #{}} ->
-            {error, not_applicable};
-        {error, Error} ->
-            {error, Error}
-    end.
+wait_for_loader(DatabaseId, Timeout) ->
+    locus_http_loader:wait(DatabaseId, Timeout).
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses
 %%
@@ -211,7 +172,7 @@ lookup(DatabaseId, Address) ->
 %% - `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
 %%    only supports IPv4 addresses.
 %% @see lookup/2
-%% @see supported_languages/1
+%% @see get_languages/1
 -spec lookup(DatabaseId, Address, Language) -> {ok, Entry} | {error, Error}
             when DatabaseId :: atom(),
                  Address :: inet:ip_address() | nonempty_string() | binary(),
@@ -224,6 +185,45 @@ lookup(DatabaseId, Address, Language) ->
     case locus_mmdb:lookup(DatabaseId, Address) of
         {ok, Entry} ->
             localize_entry(Entry, Language, true);
+        {error, Error} ->
+            {error, Error}
+    end.
+
+%% @doc Returns the currently loaded database version
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%%
+%% Returns:
+%% - `{ok, LoadedVersion}' in case of success
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+-spec get_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
+            when DatabaseId :: atom(),
+                 LoadedVersion :: calendar:datetime(),
+                 Error :: database_unknown | database_not_loaded.
+get_version(DatabaseId) ->
+    locus_mmdb:get_version(DatabaseId).
+
+%% @doc Returns the localization languages supported by the database
+%%
+%% `DatabaseId' must be an atom and refer to a started database loader.
+%%
+%% Returns:
+%% - `{ok, Languages}', with `Languages' a list of binaries, in case of success.
+%% - `{error, not_applicable}' if the database doesn't support localization.
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% @see lookup/3
+-spec get_languages(DatabaseId) -> {ok, Languages} | {error, Error}
+            when DatabaseId :: atom(),
+                 Languages :: [binary()],
+                 Error :: not_applicable | database_unknown | database_not_loaded.
+get_languages(DatabaseId) ->
+    case locus_mmdb:get_metadata(DatabaseId) of
+        {ok, #{ <<"languages">> := Languages }} ->
+            {ok, lists:usort(Languages)};
+        {ok, #{}} ->
+            {error, not_applicable};
         {error, Error} ->
             {error, Error}
     end.
