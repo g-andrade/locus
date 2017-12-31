@@ -124,7 +124,6 @@ callback_mode() -> [state_functions, state_enter].
 init([Id, URL]) ->
     locus_mmdb:create_table(Id),
     StateData = #{ id => Id, url => URL, waiters => [] },
-    %{ok, ready, StateData, {next_event, internal, update_database}}.
     {ok, initializing, StateData, {next_event, internal, load_from_cache}}.
 
 -spec initializing(enter, atom(), state_data())
