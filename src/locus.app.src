@@ -1,5 +1,5 @@
 {application, locus,
- [{description, "Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2 / GeoLite2"},
+ [{description, "Geolocation and ASN lookup of IP addresses using MaxMind GeoIP / GeoIP2 / GeoLite2"},
   {vsn, git},
   {registered, []},
   {mod, {locus_app, []}},
