@@ -121,6 +121,5 @@ and used to condition downloads on subsequent boots and save bandwidth
 
 <table width="100%" border="0" summary="list of modules">
 <tr><td><a href="https://github.com/g-andrade/locus/blob/master/doc/locus.md" class="module">locus</a></td></tr>
-<tr><td><a href="https://github.com/g-andrade/locus/blob/master/doc/locus_http_loader.md" class="module">locus_http_loader</a></td></tr>
 <tr><td><a href="https://github.com/g-andrade/locus/blob/master/doc/locus_logger.md" class="module">locus_logger</a></td></tr></table>
 

@@ -121,6 +121,5 @@ and used to condition downloads on subsequent boots and save bandwidth
 
 <table width="100%" border="0" summary="list of modules">
 <tr><td><a href="locus.md" class="module">locus</a></td></tr>
-<tr><td><a href="locus_http_loader.md" class="module">locus_http_loader</a></td></tr>
 <tr><td><a href="locus_logger.md" class="module">locus_logger</a></td></tr></table>
 

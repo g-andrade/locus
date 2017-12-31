@@ -52,15 +52,24 @@
 %% `DatabaseId' must be an atom.
 %% `DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.
 %%
-%% Returns `ok' in case of success, `{error, already_started}' otherwise.
+%% Returns:
+%% - `ok' in case of success.
+%% - `{error, invalid_url}' if the URL is invalid.
+%% - `{error, already_started}' if the loader under `DatabaseId' has already been started.
 %% @see wait_until_ready/1
 %% @see wait_until_ready/2
 -spec start(DatabaseId, DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
-                 DatabaseURL :: locus_http_loader:url(),
-                 Error :: already_started.
+                 DatabaseURL :: string() | binary(),
+                 Error :: invalid_url | already_started.
+start(DatabaseId, BinDatabaseURL) when is_binary(BinDatabaseURL) ->
+    DatabaseURL = binary_to_list(BinDatabaseURL),
+    start(DatabaseId, DatabaseURL);
 start(DatabaseId, DatabaseURL) ->
-    locus_sup:start_child(DatabaseId, DatabaseURL).
+    case is_url(DatabaseURL) of
+        true -> locus_sup:start_child(DatabaseId, DatabaseURL);
+        false -> {error, invalid_url}
+    end.
 
 %% @doc Stops the database loader under id `DatabaseId'
 %%
@@ -223,6 +232,17 @@ lookup(DatabaseId, Address, Language) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
+
+is_url(String) ->
+    try io_lib:printable_latin1_list(String) andalso
+        http_uri:parse(String)
+    of
+        false -> false;
+        {ok, _Result} -> true;
+        {error, _Reason} -> false
+    catch
+        error:badarg -> false
+    end.
 
 localize_entry(Entry, Language, CatchFailure) ->
     try localize_entry_recur(Entry, Language) of
