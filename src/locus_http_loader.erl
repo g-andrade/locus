@@ -21,7 +21,6 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @private
 -module(locus_http_loader).
 -behaviour(gen_statem).
 
@@ -41,6 +40,7 @@
 
 -export([callback_mode/0]).
 -export([init/1]).
+%% states
 -export([initializing/3]).                  -ignore_xref({initializing,3}).
 -export([ready/3]).                         -ignore_xref({ready,3}).
 -export([waiting_stream_start/3]).          -ignore_xref({waiting_stream_start,3}).
@@ -59,7 +59,7 @@
 
 -type state_data() ::
     #{ id := atom(),
-       url := nonempty_string(),
+       url := url(),
        request_id => reference(),
        last_response_headers => [{string(), string()}],
        last_response_body => binary(),
@@ -70,11 +70,17 @@
 
 -type headers() :: [{string(), string()}].
 
+-type url() :: (unicode:latin1_chardata() |
+                unicode:chardata() |
+                unicode:external_chardata()).
+-export_type([url/0]).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start_link(atom(), nonempty_string()) -> {ok, pid()}.
+-spec start_link(atom(), url()) -> {ok, pid()}.
+%% @private
 start_link(Id, URL) ->
     ServerName = server_name(Id),
     gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL], []).
@@ -82,6 +88,7 @@ start_link(Id, URL) ->
 -spec wait_until_database_is_loaded(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
            {error, database_unknown | timeout | {loading, term()}}.
+%% @private
 wait_until_database_is_loaded(Id, Timeout) ->
     ServerName = server_name(Id),
     try gen_statem:call(ServerName, wait_until_database_is_loaded, Timeout) of
@@ -110,10 +117,12 @@ wait_until_database_is_loaded(Id, Timeout) ->
 %% ------------------------------------------------------------------
 
 -spec callback_mode() -> [state_functions | state_enter, ...].
+%% @private
 callback_mode() -> [state_functions, state_enter].
 
--spec init([atom() | nonempty_string(), ...])
+-spec init([atom() | url(), ...])
         -> gen_statem:init_result(initializing).
+%% @private
 init([Id, URL]) ->
     locus_mmdb:create_table(Id),
     StateData = #{ id => Id, url => URL, waiters => [] },
@@ -124,6 +133,7 @@ init([Id, URL]) ->
                    -> keep_state_and_data;
                   (internal, load_from_cache, state_data())
                    -> {next_state, ready, state_data(), {next_event, internal, update_database}}.
+%% @private
 initializing(enter, _PrevState, _StateData) ->
     keep_state_and_data;
 initializing(internal, load_from_cache, StateData) ->
@@ -140,6 +150,7 @@ initializing(internal, load_from_cache, StateData) ->
             -> {next_state, waiting_stream_start, state_data()};
            (state_timeout, update_database, state_data())
             -> {repeat_state_and_data, {next_event, internal, update_database}}.
+%% @private
 ready(enter, _PrevState, StateData) ->
     {keep_state_and_data, {state_timeout, update_period(StateData), update_database}};
 ready({call,From}, wait_until_database_is_loaded, StateData) ->
@@ -149,8 +160,10 @@ ready(internal, update_database, StateData) ->
     ?log_info("sending request to download database ~p",
               [maps:get(id, StateData)]),
     URL = maps:get(url, StateData),
+    URLData = unicode:characters_to_binary(URL),
+    URLDataString = binary_to_list(URLData),
     Headers = request_headers(StateData),
-    Request = {URL, Headers},
+    Request = {URLDataString, Headers},
     HTTPOptions = [{connect_timeout, 8000}],
     Options = [{sync, false}, {stream, self}],
     {ok, RequestId} = httpc:request(get, Request, HTTPOptions, Options),
@@ -174,6 +187,7 @@ ready(state_timeout, update_database, _StateData) ->
                             -> {next_state, ready, state_data(), [gen_statem:reply_action()]};
                           (state_timeout, timeout, state_data())
                             -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
+%% @private
 waiting_stream_start(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, 5000, timeout}};
 waiting_stream_start({call,From}, wait_until_database_is_loaded, StateData) ->
@@ -231,6 +245,7 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                         -> {next_state, ready, state_data(), [gen_statem:reply_action()]};
                         (state_timeout, timeout, state_data())
                         -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
+%% @private
 waiting_stream_end(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, 5000, timeout}};
 waiting_stream_end({call,From}, wait_until_database_is_loaded, StateData) ->
@@ -281,6 +296,7 @@ waiting_stream_end(state_timeout, timeout, StateData) ->
                         -> keep_state_and_data;
                        (internal, execute, state_data())
                        -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
+%% @private
 processing_update(enter, _PrevState, _StateData) ->
     keep_state_and_data;
 processing_update(internal, execute, StateData) ->
@@ -315,7 +331,8 @@ server_name(Id) ->
 -spec cached_tarball_name(state_data()) -> nonempty_string().
 cached_tarball_name(StateData) ->
     #{ url := URL } = StateData,
-    Hash = crypto:hash(sha256, URL),
+    URLData = unicode:characters_to_binary(URL),
+    Hash = crypto:hash(sha256, URLData),
     HexHash = bin_to_hex_str(Hash),
     Filename = HexHash ++ ".tgz",
     UserCachePath = filename:basedir(user_cache, "locus_erlang"),

@@ -50,14 +50,14 @@
 %% @doc Starts a database loader under id `DatabaseId'
 %%
 %% `DatabaseId' must be an atom.
-%% `DatabaseURL' must be a non-empty string containing a HTTP(S) URL.
+%% `DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.
 %%
 %% Returns `ok' in case of success, `{error, already_started}' otherwise.
 %% @see wait_until_ready/1
 %% @see wait_until_ready/2
 -spec start(DatabaseId, DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
-                 DatabaseURL :: nonempty_string(),
+                 DatabaseURL :: locus_http_loader:url(),
                  Error :: already_started.
 start(DatabaseId, DatabaseURL) ->
     locus_sup:start_child(DatabaseId, DatabaseURL).

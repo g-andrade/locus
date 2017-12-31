@@ -54,7 +54,7 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
--spec start_child(atom(), nonempty_string())
+-spec start_child(atom(), locus_http_loader:url())
         -> ok | {error, already_started}.
 start_child(DatabaseId, DatabaseURL) when is_atom(DatabaseId) ->
     ChildSpec = child_spec(DatabaseId, DatabaseURL),

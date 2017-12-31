@@ -103,12 +103,12 @@ __See also:__ [lookup/2](#lookup-2), [supported_languages/1](#supported_language
 start(DatabaseId, DatabaseURL) -&gt; ok | {error, Error}
 </code></pre>
 
-<ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>DatabaseURL = nonempty_string()</code></li><li><code>Error = already_started</code></li></ul>
+<ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>DatabaseURL = <a href="locus_http_loader.md#type-url">locus_http_loader:url()</a></code></li><li><code>Error = already_started</code></li></ul>
 
 Starts a database loader under id `DatabaseId`
 
 `DatabaseId` must be an atom.
-`DatabaseURL` must be a non-empty string containing a HTTP(S) URL.
+`DatabaseURL` must be either a string or a binary containing a HTTP(S) URL.
 
 Returns `ok` in case of success, `{error, already_started}` otherwise.
 
