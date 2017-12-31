@@ -73,7 +73,7 @@ start(DatabaseId, DatabaseURL) ->
 stop(DatabaseId) ->
     locus_sup:stop_child(DatabaseId).
 
-%% @doc Blocks caller execution until the database has been loaded
+%% @doc Blocks caller execution until the database is ready to use
 %%
 %% - `DatabaseId' must be an atom and refer to a started database loader.
 %%
@@ -113,7 +113,7 @@ wait_until_ready(DatabaseId) ->
 wait_until_ready(DatabaseId, Timeout) ->
     locus_http_loader:wait_until_database_is_loaded(DatabaseId, Timeout).
 
-%% @doc Consult the currently loaded database version
+%% @doc Returns the currently loaded database version
 %%
 %% - `DatabaseId' must be an atom and refer to a started database loader.
 %%
@@ -163,7 +163,7 @@ supported_languages(DatabaseId) ->
 %%    the relevant data and with place names localized in English (when applicable.)
 %% - `{error, not_found}' if no data was found for this `Address'.
 %% - `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
-%%    tuple or a valid text representation of an IP address.
+%%    tuple or a valid textual representation of an IP address.
 %% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
 %% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
 %% - `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
@@ -195,7 +195,7 @@ lookup(DatabaseId, Address) ->
 %%    the relevant data and with place names localized in `Language' (when applicable.)
 %% - `{error, not_found}' if no data was found for this `Address'.
 %% - `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
-%%    tuple or a valid text representation of an IP address.
+%%    tuple or a valid textual representation of an IP address.
 %% - `{error, unsupported_language}' if the chosen `Language' isn't supported
 %%    by this particular database.
 %% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
