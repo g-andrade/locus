@@ -70,7 +70,8 @@ ok = locus:start_loader(country, URL).
           #{<<"geoname_id">> => 6252001,
             <<"iso_code">> => <<"US">>,
             <<"names">> =>
-                #{<<"de">> => <<"USA">>,<<"en">> => <<"United States">>,
+                #{<<"de">> => <<"USA">>,
+                  <<"en">> => <<"United States">>,
                   <<"es">> => <<"Estados Unidos">>,
                   <<"fr">> => <<"États-Unis"/utf8>>,
                   <<"ja">> => <<"アメリカ合衆国"/utf8>>,
@@ -81,7 +82,8 @@ ok = locus:start_loader(country, URL).
           #{<<"geoname_id">> => 6252001,
             <<"iso_code">> => <<"US">>,
             <<"names">> =>
-                #{<<"de">> => <<"USA">>,<<"en">> => <<"United States">>,
+                #{<<"de">> => <<"USA">>,
+                  <<"en">> => <<"United States">>,
                   <<"es">> => <<"Estados Unidos">>,
                   <<"fr">> => <<"États-Unis"/utf8>>,
                   <<"ja">> => <<"アメリカ合衆国"/utf8>>,
