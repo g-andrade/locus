@@ -110,7 +110,7 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
 * The default log level is `error'; it can be changed in the application's `env' config
 * To tweak the log level in runtime, use `locus_logger:set_loglevel/1'
 
-==== Alternatives (Erlang) ====
+=== Alternatives (Erlang) ===
 
 * <a href="https://github.com/mochi/egeoip">egeoip</a>: IP Geolocation module, currently supporting the MaxMind GeoLite City Database
 * <a href="https://github.com/brigadier/geodata2">geodata2</a>: Application for working with MaxMind geoip2 (.mmdb) databases
@@ -118,7 +118,7 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
 * <a href="https://hex.pm/packages/geolite2data">geolite2data</a>: Periodically fetches the free MaxMind GeoLite2 databases
 * <a href="https://github.com/ip2location/ip2location-erlang">ip2location-erlang</a>: Uses IP2Location geolocation database
 
-==== Alternatives (Elixir) ====
+=== Alternatives (Elixir) ===
 
 * <a href="https://hex.pm/packages/asn">asn</a>: IP-to-AS-to-ASname lookup
 * <a href="https://hex.pm/packages/freegeoip">freegeoip</a>: Simple wrapper for freegeoip.net HTTP API
