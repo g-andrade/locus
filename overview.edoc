@@ -4,7 +4,7 @@
 <!--[![Build Status](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)-->
 [![Hex pm](http://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 
-== locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP ==
+== locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2 ==
 
 `locus' is library for Erlang/OTP and Elixir that allows you to pinpoint the country,
 city or ASN of IPv4 and IPv6 addresses.

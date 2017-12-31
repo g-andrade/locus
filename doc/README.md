@@ -5,7 +5,7 @@
 [![Hex pm](http://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 
 
-### <a name="locus_-_Geolocation_and_ASN_lookup_of_IP_addresses_using_MaxMind_GeoIP">locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP</a> ###
+### <a name="locus_-_Geolocation_and_ASN_lookup_of_IP_addresses_using_MaxMind_GeoIP2">locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2</a> ###
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint the country,
 city or ASN of IPv4 and IPv6 addresses.
