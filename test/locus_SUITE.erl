@@ -60,9 +60,6 @@ end_per_group(individual_tests, Config) ->
 ipv4_country_lookup_test(_Config) ->
     country_lookup_test_(?IPV4_STR_ADDR).
 
-ipv4_country_localized_lookup_test(_Config) ->
-    country_localized_lookup_test_(?IPV4_STR_ADDR).
-
 ipv4_invalid_addr_test(_Config) ->
     invalid_addr_test_("256.0.1.2").
 
@@ -70,9 +67,6 @@ ipv4_invalid_addr_test(_Config) ->
 
 ipv6_country_lookup_test(_Config) ->
     country_lookup_test_(?IPV6_STR_ADDR).
-
-ipv6_country_localized_lookup_test(_Config) ->
-    country_localized_lookup_test_(?IPV6_STR_ADDR).
 
 ipv6_invalid_addr_test(_Config) ->
     invalid_addr_test_("22606:2800:220:1:248:1893:25c8:1946").
@@ -84,12 +78,6 @@ country_lookup_test_(StrAddr) ->
     ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, StrAddr)),
     ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, BinAddr)),
     ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, Addr)).
-
-country_localized_lookup_test_(StrAddr) ->
-    {StrAddr, BinAddr, Addr} = address_forms(StrAddr),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, StrAddr, <<"fr">>)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, BinAddr, <<"fr">>)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, Addr, <<"fr">>)).
 
 invalid_addr_test_(StrAddr) ->
     ?assertMatch({error, invalid_address}, locus:lookup(tests, StrAddr)).

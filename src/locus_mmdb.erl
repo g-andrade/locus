@@ -36,7 +36,6 @@
 -export([create_table/1]).
 -export([decode_and_update/2]).
 -export([lookup/2]).
--export([get_metadata/1]).
 -export([get_version/1]).
 
 %% ------------------------------------------------------------------
@@ -118,7 +117,7 @@ decode_and_update(Id, BinDatabase) ->
     Version.
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
-        -> {ok, #{}} |
+        -> {ok, #{ binary() => term() }} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
 lookup(Id, Address) when ?is_ip_address(Address) ->
@@ -138,22 +137,6 @@ lookup(Id, String) when is_list(String) ->
     end;
 lookup(_Id, _Other) ->
     {error, invalid_address}.
-
--spec get_metadata(atom())
-        -> {ok, metadata()} |
-           {error, database_unknown | database_not_loaded}.
-get_metadata(Id) ->
-    Table = table_name(Id),
-    case ets:info(Table, name) =:= Table andalso
-         ets:lookup(Table, database)
-    of
-        false ->
-            {error, database_unknown};
-        [] ->
-            {error, database_not_loaded};
-        [{database, #{ metadata := Metadata }}] ->
-            {ok, Metadata}
-    end.
 
 -spec get_version(atom())
         -> {ok, calendar:datetime()} |

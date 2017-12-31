@@ -32,15 +32,7 @@
 -export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
 -export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
 -export([lookup/2]).                      -ignore_xref({lookup,2}).
--export([lookup/3]).                      -ignore_xref({lookup,3}).
 -export([get_version/1]).                 -ignore_xref({get_version,1}).
--export([get_languages/1]).               -ignore_xref({get_languages,1}).
-
-%% ------------------------------------------------------------------
-%% Macro Definitions
-%% ------------------------------------------------------------------
-
--define(DEFAULT_LANGUAGE, <<"en">>).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -128,8 +120,7 @@ wait_for_loader(DatabaseId, Timeout) ->
 %%    containing a valid representation of the address.
 %%
 %% Returns:
-%% - `{ok, Entry}' in case of success, with `Entry' being a map containing
-%%    the relevant data and with place names localized in English (when applicable.)
+%% - `{ok, Entry}' in case of success
 %% - `{error, not_found}' if no data was found for this `Address'.
 %% - `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
 %%    tuple or a valid textual representation of an IP address.
@@ -146,48 +137,7 @@ wait_for_loader(DatabaseId, Timeout) ->
                            database_unknown | database_not_loaded |
                            ipv4_database).
 lookup(DatabaseId, Address) ->
-    case locus_mmdb:lookup(DatabaseId, Address) of
-        {ok, Entry} ->
-            localize_entry(Entry, ?DEFAULT_LANGUAGE, false);
-        {error, Error} ->
-            {error, Error}
-    end.
-
-%% @doc Looks-up localized info on IPv4 and IPv6 addresses
-%%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
-%% - `Address' must be either an `inet:ip_address()' tuple, or a string/binary
-%% - `Language' must be a non-empty binary containing a language code.
-%%
-%% Returns:
-%% - `{ok, Entry}' in case of success, with `Entry' being a map containing
-%%    the relevant data and with place names localized in `Language' (when applicable.)
-%% - `{error, not_found}' if no data was found for this `Address'.
-%% - `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
-%%    tuple or a valid textual representation of an IP address.
-%% - `{error, unsupported_language}' if the chosen `Language' isn't supported
-%%    by this particular database.
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
-%% - `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
-%%    only supports IPv4 addresses.
-%% @see lookup/2
-%% @see get_languages/1
--spec lookup(DatabaseId, Address, Language) -> {ok, Entry} | {error, Error}
-            when DatabaseId :: atom(),
-                 Address :: inet:ip_address() | nonempty_string() | binary(),
-                 Language :: binary(),
-                 Entry :: #{ binary() => term() | Entry },
-                 Error :: (not_found | invalid_address | unsupported_language |
-                           database_unknown | database_not_loaded |
-                           ipv4_database).
-lookup(DatabaseId, Address, Language) ->
-    case locus_mmdb:lookup(DatabaseId, Address) of
-        {ok, Entry} ->
-            localize_entry(Entry, Language, true);
-        {error, Error} ->
-            {error, Error}
-    end.
+    locus_mmdb:lookup(DatabaseId, Address).
 
 %% @doc Returns the currently loaded database version
 %%
@@ -204,30 +154,6 @@ lookup(DatabaseId, Address, Language) ->
 get_version(DatabaseId) ->
     locus_mmdb:get_version(DatabaseId).
 
-%% @doc Returns the localization languages supported by the database
-%%
-%% `DatabaseId' must be an atom and refer to a started database loader.
-%%
-%% Returns:
-%% - `{ok, Languages}', with `Languages' a list of binaries, in case of success.
-%% - `{error, not_applicable}' if the database doesn't support localization.
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
-%% @see lookup/3
--spec get_languages(DatabaseId) -> {ok, Languages} | {error, Error}
-            when DatabaseId :: atom(),
-                 Languages :: [binary()],
-                 Error :: not_applicable | database_unknown | database_not_loaded.
-get_languages(DatabaseId) ->
-    case locus_mmdb:get_metadata(DatabaseId) of
-        {ok, #{ <<"languages">> := Languages }} ->
-            {ok, lists:usort(Languages)};
-        {ok, #{}} ->
-            {error, not_applicable};
-        {error, Error} ->
-            {error, Error}
-    end.
-
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
@@ -242,32 +168,3 @@ is_url(String) ->
     catch
         error:badarg -> false
     end.
-
-localize_entry(Entry, Language, CatchFailure) ->
-    try localize_entry_recur(Entry, Language) of
-        LocalizedEntry ->
-            {ok, LocalizedEntry}
-    catch
-        error:unsupported_language when CatchFailure ->
-            {error, unsupported_language}
-    end.
-
-localize_entry_recur(Entry, Language) when is_map(Entry) ->
-    case maps:take(<<"names">>, Entry) of
-        {#{ Language := Name }, Entry2} ->
-            Entry2#{ <<"name">> => Name };
-        {#{} = _MissingLanguage, _Entry2} ->
-            error(unsupported_language);
-        {_NotLocalization, _Entry2} ->
-            Entry;
-        error ->
-            maps:map(
-              fun (_Key, ChildEntry) ->
-                      localize_entry_recur(ChildEntry, Language)
-              end,
-              Entry)
-    end;
-localize_entry_recur(Entry, Language) when is_list(Entry) ->
-    [localize_entry_recur(ChildEntry, Language) || ChildEntry <- Entry];
-localize_entry_recur(Entry, _Language) ->
-    Entry.

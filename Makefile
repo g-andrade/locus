@@ -38,6 +38,7 @@ test:
 cover: test
 	@$(REBAR3) as test cover
 
+console: export ERL_FLAGS =? +pc unicode
 console:
 	@$(REBAR3) as development shell --apps locus
 

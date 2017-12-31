@@ -13,9 +13,6 @@ city or ASN of IPv4 and IPv6 addresses.
 The [MaxMind databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) you choose
 are downloaded on-demand, cached on the filesystem and updated automatically.
 
-Looked-up entries are localized in English by default; other languages can be chosen from among
-the supported ones (when applicable.)
-
 You're encouraged to host your own private copies of the databases when using this library in production,
 both for reliability and netiquette towards MaxMind.
 
@@ -58,14 +55,39 @@ ok = locus:start_loader(country, URL).
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
 {ok,#{<<"continent">> =>
-          #{<<"code">> => <<"NA">>,<<"geoname_id">> => 6255149,
-            <<"name">> => <<"North America">>},
+          #{<<"code">> => <<"NA">>,
+            <<"geoname_id">> => 6255149,
+            <<"names">> =>
+                #{<<"de">> => <<"Nordamerika">>,
+                  <<"en">> => <<"North America">>,
+                  <<"es">> => <<"Norteamérica"/utf8>>,
+                  <<"fr">> => <<"Amérique du Nord"/utf8>>,
+                  <<"ja">> => <<"北アメリカ"/utf8>>,
+                  <<"pt-BR">> => <<"América do Norte"/utf8>>,
+                  <<"ru">> => <<"Северная Америка"/utf8>>,
+                  <<"zh-CN">> => <<"北美洲"/utf8>>}},
       <<"country">> =>
-          #{<<"geoname_id">> => 6252001,<<"iso_code">> => <<"US">>,
-            <<"name">> => <<"United States">>},
+          #{<<"geoname_id">> => 6252001,
+            <<"iso_code">> => <<"US">>,
+            <<"names">> =>
+                #{<<"de">> => <<"USA">>,<<"en">> => <<"United States">>,
+                  <<"es">> => <<"Estados Unidos">>,
+                  <<"fr">> => <<"États-Unis"/utf8>>,
+                  <<"ja">> => <<"アメリカ合衆国"/utf8>>,
+                  <<"pt-BR">> => <<"Estados Unidos">>,
+                  <<"ru">> => <<"США"/utf8>>,
+                  <<"zh-CN">> => <<"美国"/utf8>>}},
       <<"registered_country">> =>
-          #{<<"geoname_id">> => 6252001,<<"iso_code">> => <<"US">>,
-            <<"name">> => <<"United States">>}
+          #{<<"geoname_id">> => 6252001,
+            <<"iso_code">> => <<"US">>,
+            <<"names">> =>
+                #{<<"de">> => <<"USA">>,<<"en">> => <<"United States">>,
+                  <<"es">> => <<"Estados Unidos">>,
+                  <<"fr">> => <<"États-Unis"/utf8>>,
+                  <<"ja">> => <<"アメリカ合衆国"/utf8>>,
+                  <<"pt-BR">> => <<"Estados Unidos">>,
+                  <<"ru">> => <<"США"/utf8>>,
+                  <<"zh-CN">> => <<"美国"/utf8>>}}}}
 
 
 ```
