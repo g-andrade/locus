@@ -106,7 +106,7 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
 ==== On logging ====
 
 * Four logging levels are supported: `info', `warning', `error' and `none'
-* The backend is <a href="http://erlang.org/doc/man/error_logger.html">error_logger</a>; this usually plays nicely with `lager'
+* The backend is <a href="http://erlang.org/doc/man/error_logger">error_logger</a>; this usually plays nicely with `lager'
 * The default log level is `error'; it can be changed in the application's `env' config
 * To tweak the log level in runtime, use `locus_logger:set_loglevel/1'
 

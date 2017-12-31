@@ -117,7 +117,7 @@ and used to condition downloads on subsequent boots and save bandwidth
 <h5><a name="On_logging">On logging</a></h5>
 
 * Four logging levels are supported: `info`, `warning`, `error` and `none`
-* The backend is [error_logger](http://erlang.org/doc/man/error_logger.md); this usually plays nicely with `lager`
+* The backend is [error_logger](http://erlang.org/doc/man/error_logger); this usually plays nicely with `lager`
 * The default log level is `error`; it can be changed in the application's `env` config
 * To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
 
