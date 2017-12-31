@@ -85,9 +85,13 @@ stop_child(DatabaseId) when is_atom(DatabaseId) ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {#{ strategy := one_for_one }, []}}.
+-spec init([]) -> {ok, {#{ strategy := one_for_one,
+                           intensity := 10,
+                           period := 5 }, []}}.
 init([]) ->
-    SupFlags = #{ strategy => one_for_one },
+    SupFlags = #{ strategy => one_for_one,
+                  intensity => 10,
+                  period => 5 },
     {ok, {SupFlags, []}}.
 
 %% ------------------------------------------------------------------
