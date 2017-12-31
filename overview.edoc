@@ -110,6 +110,24 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
 * The default log level is `error'; it can be changed in the application's `env' config
 * To tweak the log level in runtime, use `locus_logger:set_loglevel/1'
 
+==== Alternatives (Erlang) ====
+
+* <a href="https://github.com/mochi/egeoip">egeoip</a>: IP Geolocation module, currently supporting the MaxMind GeoLite City Database
+* <a href="https://github.com/brigadier/geodata2">geodata2</a>: Application for working with MaxMind geoip2 (.mmdb) databases
+* <a href="https://github.com/manifest/geoip">geoip</a>: Returns the location of an IP address; based on the ipinfodb.com web service
+* <a href="https://hex.pm/packages/geolite2data">geolite2data</a>: Periodically fetches the free MaxMind GeoLite2 databases
+* <a href="https://github.com/ip2location/ip2location-erlang">ip2location-erlang</a>: Uses IP2Location geolocation database
+
+==== Alternatives (Elixir) ====
+
+* <a href="https://hex.pm/packages/asn">asn</a>: IP-to-AS-to-ASname lookup
+* <a href="https://hex.pm/packages/freegeoip">freegeoip</a>: Simple wrapper for freegeoip.net HTTP API
+* <a href="https://hex.pm/packages/freegeoipx">freegeoipx</a>: API Client for freegeoip.net
+* <a href="https://hex.pm/packages/geoip">geoip</a>: Lookup the geo location for a given IP address, hostname or Plug.Conn instance
+* <a href="https://hex.pm/packages/geolix">geolix</a>: MaxMind GeoIP2 database reader/decoder
+* <a href="https://hex.pm/packages/plug_geoip2">plug_geoip2</a>: Adds geo location to a Plug connection based upon the client IP address by using MaxMind's GeoIP2 database
+* <a href="https://hex.pm/packages/tz_world">tz_world</a>: Resolve timezones from a location efficiently using PostGIS and Ecto
+
 === Disclosure ===
 
 `locus' is an independent project and has not been authorized, sponsored, or otherwise approved by MaxMind.
