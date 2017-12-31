@@ -46,7 +46,7 @@ ok = locus:start_loader(country, URL).
 
 ```
 
-<h5><a name="3._Lookup_IP_Addresses">3. Lookup IP Addresses</a></h5>
+<h5><a name="3._Lookup_IP_addresses">3. Lookup IP addresses</a></h5>
 
 ```erlang
 

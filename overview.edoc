@@ -38,7 +38,7 @@ ok = locus:start_loader(country, URL).
 {ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 </pre>
 
-==== 3. Lookup IP Addresses ====
+==== 3. Lookup IP addresses ====
 
 <pre lang="erlang">
 <![CDATA[

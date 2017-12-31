@@ -26,7 +26,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--define(COUNTRY_URL, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz").
+-define(COUNTRY_URL, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz").
 %-define(CITY_URL, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz").
 %-define(ASN_URL, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz").
 
