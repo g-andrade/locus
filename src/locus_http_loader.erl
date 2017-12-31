@@ -480,8 +480,7 @@ has_mmdb_extension(Filename) ->
 
 -spec clear_inbox_of_late_http_messages(reference()) -> ok.
 clear_inbox_of_late_http_messages(RequestId) ->
-    % Only a best effort. It's theoretically
-    % possible that a delayed message could
+    % Only a best effort. It's possible that a delayed message could
     % arrive after the timeout.
     receive
         {http, {RequestId, stream_start, _Headers}} ->
