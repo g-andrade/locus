@@ -75,6 +75,9 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
   were all successfully tested; presumibly `locus' can deal with any MaxMind DB -formatted database that maps
   IP address prefixes to arbitrary data, but no <a href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
   commercial databases</a> have yet been tested
+* The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the
+  application callers using ETS tables, and the original binary search tree is used to lookup addresses.
+  The data for each entry is decoded on the fly upon successful lookups.
 
 ==== On formats ====
 
