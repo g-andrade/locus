@@ -61,8 +61,6 @@ tuple or a valid textual representation of an IP address.
 - `{error, ipv4_database}` if `Address` represents an IPv6 address and the database
 only supports IPv4 addresses.
 
-__See also:__ [lookup/3](#lookup-3).
-
 <a name="start_loader-2"></a>
 
 ### start_loader/2 ###

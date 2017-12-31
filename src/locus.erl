@@ -128,7 +128,6 @@ wait_for_loader(DatabaseId, Timeout) ->
 %% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
 %% - `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
 %% only supports IPv4 addresses.
-%% @see lookup/3
 -spec lookup(DatabaseId, Address) -> {ok, Entry} | {error, Error}
             when DatabaseId :: atom(),
                  Address :: inet:ip_address() | nonempty_string() | binary(),
