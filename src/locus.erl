@@ -40,7 +40,6 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
--define(DEFAULT_WAIT_TIMEOUT, infinity).
 -define(DEFAULT_LANGUAGE, <<"en">>).
 
 %% ------------------------------------------------------------------
@@ -99,7 +98,7 @@ stop(DatabaseId) ->
                  Error :: database_unknown | {loading, LoadingError},
                  LoadingError :: term().
 wait_until_ready(DatabaseId) ->
-    wait_until_ready(DatabaseId, ?DEFAULT_WAIT_TIMEOUT).
+    wait_until_ready(DatabaseId, infinity).
 
 %% @doc Like `wait_until_ready/1' but it can time-out
 %%

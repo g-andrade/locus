@@ -97,7 +97,7 @@ wait_until_database_is_loaded(Id, Timeout) ->
         {error, LoadingError} ->
             {error, {loading, LoadingError}}
     catch
-        exit:{timeout, {gen_statem,call,[ServerName|_]}} ->
+        exit:{timeout, {gen_statem,call,[ServerName|_]}} when Timeout =/= infinity ->
             {error, timeout};
         %exit:{{nodedown,_RemoteNode}, {gen_statem,call,[ServerName|_}} ->
         %    % Cannot happen (loader is always local)
