@@ -54,6 +54,12 @@
 
 -define(CB_MODULE, ?MODULE).
 
+-define(PRE_READINESS_UPDATE_PERIOD, (timer:minutes(1))).
+-define(POST_READINESS_UPDATE_PERIOD, (timer:hours(6))).
+
+-define(HTTP_CONNECT_TIMEOUT, (timer:seconds(8))).
+-define(HTTP_IDLE_STREAM_TIMEOUT, (timer:seconds(5))).
+
 %% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
@@ -152,7 +158,7 @@ ready(internal, update_database, StateData) ->
     URL = maps:get(url, StateData),
     Headers = request_headers(StateData),
     Request = {URL, Headers},
-    HTTPOptions = [{connect_timeout, 8000}],
+    HTTPOptions = [{connect_timeout, ?HTTP_CONNECT_TIMEOUT}],
     Options = [{sync, false}, {stream, self}],
     {ok, RequestId} = httpc:request(get, Request, HTTPOptions, Options),
     true = is_reference(RequestId),
@@ -162,7 +168,7 @@ ready(state_timeout, update_database, _StateData) ->
     {repeat_state_and_data, {next_event, internal, update_database}}.
 
 -spec waiting_stream_start(enter, atom(), state_data())
-                            -> {keep_state_and_data, {state_timeout, 5000, timeout}};
+                            -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
                           ({call,gen_statem:from()}, wait_until_database_is_loaded, state_data())
                             -> {keep_state, state_data(), [gen_statem:reply_action()]};
                           (info, {http, {reference(), stream_start, headers()}}, state_data())
@@ -176,7 +182,7 @@ ready(state_timeout, update_database, _StateData) ->
                           (state_timeout, timeout, state_data())
                             -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
 waiting_stream_start(enter, _PrevState, _StateData) ->
-    {keep_state_and_data, {state_timeout, 5000, timeout}};
+    {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_start({call,From}, wait_until_database_is_loaded, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
@@ -220,11 +226,11 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
     {next_state, ready, StateData3, Replies}.
 
 -spec waiting_stream_end(enter, atom(), state_data())
-                        -> {keep_state_and_data, {state_timeout, 5000, timeout}};
+                        -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
                         ({call,gen_statem:from()}, wait_until_database_is_loaded, state_data())
                         -> {keep_state, state_data(), [gen_statem:reply_action()]};
                         (info, {http, {reference(), stream, binary()}}, state_data())
-                        -> {keep_state, state_data(), {state_timeout, 5000, timeout}};
+                        -> {keep_state, state_data(), {state_timeout, pos_integer(), timeout}};
                         (info, {http, {reference(), stream_end, headers()}}, state_data())
                         -> {next_state, processing_update, state_data(),
                             {next_event, internal, execute}};
@@ -233,7 +239,7 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                         (state_timeout, timeout, state_data())
                         -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
 waiting_stream_end(enter, _PrevState, _StateData) ->
-    {keep_state_and_data, {state_timeout, 5000, timeout}};
+    {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_end({call,From}, wait_until_database_is_loaded, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
@@ -247,7 +253,7 @@ waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
     %?log_info("~p database download in progress - ~.3f MiB received so far",
     %          [maps:get(id, StateData),
     %           byte_size(maps:get(last_response_body, UpdatedStateData)) / (1 bsl 20)]),
-    {keep_state, UpdatedStateData, {state_timeout, 5000, timeout}};
+    {keep_state, UpdatedStateData, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked encoding
                    #{ request_id := RequestId } = StateData) ->
     ?log_info("~p database download finished", [maps:get(id, StateData)]),
@@ -416,9 +422,9 @@ read_file_and_its_modification_date(Filename) ->
 
 -spec update_period(state_data()) -> pos_integer().
 update_period(#{ last_modified := _ } = _StateData) ->
-    timer:hours(6);
+    ?POST_READINESS_UPDATE_PERIOD;
 update_period(#{} = _StateData) ->
-    timer:minutes(1).
+    ?PRE_READINESS_UPDATE_PERIOD.
 
 request_headers(#{ last_modified := LastModified } = _StateData) ->
     [{"if-modified-since", httpd_util:rfc1123_date(LastModified)}
