@@ -107,7 +107,7 @@ Check the [function reference](https://github.com/g-andrade/locus/blob/master/do
 <h5><a name="On_databases">On databases</a></h5>
 
 * The free GeoLite2 [Country, City and ASN databases](https://dev.maxmind.com/geoip/geoip2/geolite2/)
-  were all successfully tested; presumibly `locus` can deal with any MaxMind DB -formatted database that maps
+  were all successfully tested; presumably `locus` can deal with any MaxMind DB -formatted database that maps
   IP address prefixes to arbitrary data, but no [
   commercial databases](https://dev.maxmind.com/geoip/geoip2/downloadable/) have yet been tested
 * The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the

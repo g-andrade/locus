@@ -96,7 +96,7 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
 ==== On databases ====
 
 * The free GeoLite2 <a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">Country, City and ASN databases</a>
-  were all successfully tested; presumibly `locus' can deal with any MaxMind DB -formatted database that maps
+  were all successfully tested; presumably `locus' can deal with any MaxMind DB -formatted database that maps
   IP address prefixes to arbitrary data, but no <a href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
   commercial databases</a> have yet been tested
 * The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the
