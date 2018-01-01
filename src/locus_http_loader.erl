@@ -466,14 +466,21 @@ extract_database_from_tarball(Tarball) ->
 
 lists_anymap(Fun, [H|T]) ->
     case Fun(H) of
-        %{true, Mapped} -> {true, Mapped};
+        {true, Mapped} -> {true, Mapped};
         true -> {true, H};
         false -> lists_anymap(Fun, T)
     end;
 lists_anymap(_Fun, []) ->
     false.
 
--spec has_mmdb_extension(nonempty_string()) -> boolean().
+%-spec has_mmdb_extension(nonempty_string()) -> boolean().
+has_mmdb_extension({Filename, _Type, _Size, _MTime, _Mode, _Uid, _Gid}) ->
+    % FIXME: this a placeholder for OTP 20; due to the incomplete spec
+    % of erl_tar:table/2, Dialyzer comes to believe that no strings
+    % can be returned, only the above tuple, which in fact is only returned
+    % if the 'verbose' option is picked, something that we are definitely
+    % not doing.
+    filename:extension(Filename) =:= ".mmdb" andalso {true, Filename};
 has_mmdb_extension(Filename) ->
     filename:extension(Filename) =:= ".mmdb".
 
