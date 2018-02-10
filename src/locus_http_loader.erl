@@ -77,7 +77,7 @@
        url := url(),
        waiters := [?gen_statem:from()],
        event_subscribers := [module(), ...],
-       use_cache := boolean(),
+       no_cache => true,
        request_id => reference(),
        last_response_headers => headers(),
        last_response_body => binary(),
@@ -90,6 +90,7 @@
        url => url(),
        waiters => [?gen_statem:from()],
        event_subscribers => [module(), ...],
+       no_cache => true,
        request_id => reference(),
        last_response_headers => headers(),
        last_response_body => binary(),
@@ -217,9 +218,9 @@ init([Id, URL, Opts]) ->
 %% @private
 initializing(enter, _PrevState, _StateData) ->
     keep_state_and_data;
-initializing(internal, maybe_load_from_cache, #{ use_cache := false } = StateData) ->
+initializing(internal, maybe_load_from_cache, #{ no_cache := true } = StateData) ->
     {next_state, ready, StateData, {next_event, internal, update_database}};
-initializing(internal, maybe_load_from_cache, #{ use_cache := true } = StateData) ->
+initializing(internal, maybe_load_from_cache, StateData) ->
     CachedTarballName = cached_tarball_name(StateData),
     CachedTarballLookup = read_file_and_its_modification_date(CachedTarballName),
     StateData2 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
@@ -430,8 +431,7 @@ init(Id, URL, Opts) ->
         #{ id => Id,
            url => URL,
            waiters => [],
-           event_subscribers => [],
-           use_cache => true
+           event_subscribers => []
          },
     init_opts(Opts, BaseStateData).
 
@@ -451,7 +451,7 @@ init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
           StateData),
     init_opts(Opts, NewStateData);
 init_opts([no_cache | Opts], StateData) ->
-    NewStateData = StateData#{ use_cache := false },
+    NewStateData = StateData#{ no_cache => true },
     init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->
     {stop, {invalid_opt, InvalidOpt}};
@@ -502,9 +502,9 @@ load_database_from_tarball(Id, Tarball, Source) ->
     end.
 
 -spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
-maybe_try_saving_cached_tarball(_Tarball, _LastModified, #{ use_cache := false }) ->
+maybe_try_saving_cached_tarball(_Tarball, _LastModified, #{ no_cache := true }) ->
     ok;
-maybe_try_saving_cached_tarball(Tarball, LastModified, #{ use_cache := true } = StateData) ->
+maybe_try_saving_cached_tarball(Tarball, LastModified, StateData) ->
     case save_cached_tarball(Tarball, LastModified, StateData) of
         {ok, Filename} ->
             report_event({cache_attempt_finished, Filename, ok}, StateData);
