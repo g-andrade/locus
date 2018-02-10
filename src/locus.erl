@@ -46,9 +46,9 @@
 -export_type([database_error/0]).
 
 -type database_info() ::
-        #{ metadata := database_metadata(),
-           source := database_source(),
-           version := calendar:datetime()
+        #{ metadata => database_metadata(),
+           source => database_source(),
+           version => calendar:datetime()
          }.
 -export_type([database_info/0]).
 
