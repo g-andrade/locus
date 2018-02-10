@@ -1,7 +1,7 @@
 %% @private
 -module(locus_gen_statem_compat).
 -include("locus_pre_otp19_compat.hrl").
--ifndef(POST_OTP_18).
+-ifdef(NO_GEN_STATEM).
 %%
 %% %CopyrightBegin%
 %%

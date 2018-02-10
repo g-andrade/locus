@@ -1,13 +1,17 @@
 -ifdef(POST_OTP_18).
 -define(filename_basedir, (fun filename:basedir/2)).
--define(gen_statem, gen_statem).
 -define(maps_take, (fun maps:take/2)).
 -define(maps_update_with3, (fun maps:update_with/3)).
 -define(maps_update_with4, (fun maps:update_with/4)).
 -else.
 -define(filename_basedir, (fun locus_filename_compat:basedir/2)).
--define(gen_statem, locus_gen_statem_compat).
 -define(maps_take, (fun locus_maps_compat:take/2)).
 -define(maps_update_with3, (fun locus_maps_compat:update_with/3)).
 -define(maps_update_with4, (fun locus_maps_compat:update_with/4)).
+-endif.
+
+-ifdef(NO_GEN_STATEM).
+-define(gen_statem, locus_gen_statem_compat).
+-else.
+-define(gen_statem, gen_statem).
 -endif.
