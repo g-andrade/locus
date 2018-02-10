@@ -424,7 +424,7 @@ init(Id, URL, Opts) ->
 
 init_opts([{event_subscriber, Module} | Opts], StateData) when is_atom(Module), Module =/= undefined ->
     NewStateData =
-        maps:update_with(
+        ?maps_update_with3(
           event_subscribers,
           fun (PrevSubscribers) -> [Module | PrevSubscribers] end,
           StateData),
