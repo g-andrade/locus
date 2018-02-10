@@ -2,8 +2,6 @@
 
 # Module locus_http_loader #
 * [Data Types](#types)
-* [Function Index](#index)
-* [Function Details](#functions)
 
 __Behaviours:__ [`?gen_statem`](%3fgen_statem.md).
 
@@ -128,7 +126,7 @@ headers() = [{string(), string()}]
 
 
 <pre><code>
-opt() = {event_subscriber, module()}
+opt() = {event_subscriber, module() | pid()}
 </code></pre>
 
 
@@ -144,51 +142,10 @@ response_status() = {100..999, binary()}
 
 
 
-### <a name="type-state_data">state_data()</a> ###
-
-
-<pre><code>
-state_data() = #{id =&gt; atom(), url =&gt; <a href="#type-url">url()</a>, waiters =&gt; [<a href="%3fgen_statem.md#type-from">'?gen_statem':from()</a>], event_subscribers =&gt; [module(), ...], request_id =&gt; reference(), last_response_headers =&gt; <a href="#type-headers">headers()</a>, last_response_body =&gt; binary(), last_modified =&gt; <a href="calendar.md#type-datetime">calendar:datetime()</a>, last_version =&gt; <a href="calendar.md#type-datetime">calendar:datetime()</a>}
-</code></pre>
-
-
-
-
-### <a name="type-state_data">state_data()</a> ###
-
-
-<pre><code>
-state_data() = #{id =&gt; atom(), url =&gt; <a href="#type-url">url()</a>, waiters =&gt; [<a href="%3fgen_statem.md#type-from">'?gen_statem':from()</a>], event_subscribers =&gt; [module(), ...], request_id =&gt; reference(), last_response_headers =&gt; <a href="#type-headers">headers()</a>, last_response_body =&gt; binary(), last_modified =&gt; <a href="calendar.md#type-datetime">calendar:datetime()</a>, last_version =&gt; <a href="calendar.md#type-datetime">calendar:datetime()</a>}
-</code></pre>
-
-
-
-
 ### <a name="type-url">url()</a> ###
 
 
 <pre><code>
 url() = string()
 </code></pre>
-
-<a name="index"></a>
-
-## Function Index ##
-
-
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#code_change-4">code_change/4</a></td><td></td></tr></table>
-
-
-<a name="functions"></a>
-
-## Function Details ##
-
-<a name="code_change-4"></a>
-
-### code_change/4 ###
-
-<pre><code>
-code_change(OldVsn::term(), OldState::atom(), OldStateData::<a href="#type-state_data">state_data()</a>, Extra::term()) -&gt; {ok, atom(), <a href="#type-state_data">state_data()</a>}
-</code></pre>
-<br />
 

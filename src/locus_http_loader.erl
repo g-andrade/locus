@@ -67,7 +67,7 @@
 %% ------------------------------------------------------------------
 
 -type opt() ::
-    {event_subscriber, module()}.
+    {event_subscriber, module() | pid()}.
 -export_type([opt/0]).
 
 -ifdef(POST_OTP_18).
@@ -234,6 +234,8 @@ ready(enter, _PrevState, StateData) ->
 ready({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
+ready(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
+    handle_monitored_process_death(Pid, StateData);
 ready(internal, update_database, StateData) ->
     URL = maps:get(url, StateData),
     Headers = request_headers(StateData),
@@ -293,6 +295,8 @@ waiting_stream_start(info, {http, {RequestId, {error, Reason}}},
     StateData2 = maps:remove(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
     {next_state, ready, StateData3, Replies};
+waiting_stream_start(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
+    handle_monitored_process_death(Pid, StateData);
 waiting_stream_start(state_timeout, timeout, StateData) ->
     report_event({stream_failed_to_start, timeout}, StateData),
     {RequestId, StateData2} = ?maps_take(request_id, StateData),
@@ -352,6 +356,8 @@ waiting_stream_end(info, {http, {RequestId, {error, Reason}}},
                      StateData),
     {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
     {next_state, ready, {StateData3, Replies}};
+waiting_stream_end(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
+    handle_monitored_process_death(Pid, StateData);
 waiting_stream_end(state_timeout, timeout, StateData) ->
     BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
     report_event({stream_finished, BodySizeSoFar, {error, timeout}}, StateData),
@@ -427,6 +433,14 @@ init_opts([{event_subscriber, Module} | Opts], StateData) when is_atom(Module), 
         ?maps_update_with3(
           event_subscribers,
           fun (PrevSubscribers) -> [Module | PrevSubscribers] end,
+          StateData),
+    init_opts(Opts, NewStateData);
+init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
+    _ = monitor(process, Pid),
+    NewStateData =
+        ?maps_update_with3(
+          event_subscribers,
+          fun (PrevSubscribers) -> [Pid | PrevSubscribers] end,
           StateData),
     init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->
@@ -638,5 +652,15 @@ reply_to_waiters(Result, StateData) ->
 -spec report_event(event(), state_data()) -> ok.
 report_event(Event, #{ id := Id, event_subscribers := Modules }) ->
     lists:foreach(
-      fun (Module) -> Module:report(Id, Event) end,
+      fun (Module) when is_atom(Module) ->
+              Module:report(Id, Event);
+          (Pid) ->
+              erlang:send(Pid, {locus, Id, Event}, [noconnect])
+      end,
       Modules).
+
+handle_monitored_process_death(Pid, StateData) ->
+    ?maps_update_with3(
+      event_subscribers,
+      fun (Subscribers) -> lists:delete(Pid, Subscribers) end,
+      StateData).
