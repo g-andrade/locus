@@ -47,6 +47,21 @@
 -define(CB_MODULE, ?MODULE).
 
 %% ------------------------------------------------------------------
+%% Type Definitions
+%% ------------------------------------------------------------------
+
+% work around edoc annoyance
+-ifdef(POST_OTP_18).
+-type sup_flags() :: #{ strategy := one_for_one,
+                        intensity := 10,
+                        period := 5 }.
+-else.
+-type sup_flags() :: #{ strategy => one_for_one,
+                        intensity => 10,
+                        period => 5 }.
+-endif.
+
+%% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
@@ -85,15 +100,7 @@ stop_child(DatabaseId) ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--ifdef(POST_OTP_18).
--spec init([]) -> {ok, {#{ strategy := one_for_one,
-                           intensity := 10,
-                           period := 5 }, []}}.
--else.
--spec init([]) -> {ok, {#{ strategy => one_for_one,
-                           intensity => 10,
-                           period => 5 }, []}}.
--endif.
+-spec init([]) -> {ok, {sup_flags(), []}}.
 init([]) ->
     SupFlags = #{ strategy => one_for_one,
                   intensity => 10,
