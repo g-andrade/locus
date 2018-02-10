@@ -36,7 +36,7 @@
 -export([create_table/1]).
 -export([decode_and_update/2]).
 -export([lookup/2]).
--export([get_version/1]).
+-export([get_parts/1]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -148,10 +148,8 @@ lookup(Id, String) when is_list(String) ->
 lookup(_Id, _Other) ->
     {error, invalid_address}.
 
--spec get_version(atom())
-        -> {ok, calendar:datetime()} |
-           {error, database_unknown | database_not_loaded}.
-get_version(Id) ->
+-spec get_parts(atom()) -> {ok, parts()} | {error, database_unknown | database_not_loaded}.
+get_parts(Id) ->
     Table = table_name(Id),
     case ets:info(Table, name) =:= Table andalso
          ets:lookup(Table, database)
@@ -160,8 +158,8 @@ get_version(Id) ->
             {error, database_unknown};
         [] ->
             {error, database_not_loaded};
-        [{database, #{ version := LoadedVersion }}] ->
-            {ok, LoadedVersion}
+        [{database, Parts}] ->
+            {ok, Parts}
     end.
 
 %% ------------------------------------------------------------------

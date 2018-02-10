@@ -1,20 +1,97 @@
 
 
 # Module locus #
+* [Data Types](#types)
 * [Function Index](#index)
 * [Function Details](#functions)
+
+<a name="types"></a>
+
+## Data Types ##
+
+
+
+
+### <a name="type-database_error">database_error()</a> ###
+
+
+<pre><code>
+database_error() = database_unknown | database_not_loaded
+</code></pre>
+
+
+
+
+### <a name="type-database_info">database_info()</a> ###
+
+
+<pre><code>
+database_info() = #{metadata =&gt; <a href="#type-database_metadata">database_metadata()</a>, version =&gt; <a href="calendar.md#type-datetime">calendar:datetime()</a>}
+</code></pre>
+
+
+
+
+### <a name="type-database_metadata">database_metadata()</a> ###
+
+
+<pre><code>
+database_metadata() = #{binary() =&gt; term()}
+</code></pre>
 
 <a name="index"></a>
 
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#get_version-1">get_version/1</a></td><td>Returns the currently loaded database version.</td></tr><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start_loader-2">start_loader/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#stop_loader-1">stop_loader/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#wait_for_loader-1">wait_for_loader/1</a></td><td>Blocks caller execution until either readiness is achieved or a database load attempt fails.</td></tr><tr><td valign="top"><a href="#wait_for_loader-2">wait_for_loader/2</a></td><td>Like <code>wait_for_loader/1</code> but it can time-out.</td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#get_info-1">get_info/1</a></td><td>Returns the properties of the currently loaded database [DEPRECATED].</td></tr><tr><td valign="top"><a href="#get_info-2">get_info/2</a></td><td>Returns a specific property of the currently loaded database [DEPRECATED].</td></tr><tr><td valign="top"><a href="#get_version-1">get_version/1</a></td><td>(<em>Deprecated</em>.) Returns the currently loaded database version [DEPRECATED].</td></tr><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start_loader-2">start_loader/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#stop_loader-1">stop_loader/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#wait_for_loader-1">wait_for_loader/1</a></td><td>Blocks caller execution until either readiness is achieved or a database load attempt fails.</td></tr><tr><td valign="top"><a href="#wait_for_loader-2">wait_for_loader/2</a></td><td>Like <code>wait_for_loader/1</code> but it can time-out.</td></tr></table>
 
 
 <a name="functions"></a>
 
 ## Function Details ##
+
+<a name="get_info-1"></a>
+
+### get_info/1 ###
+
+<pre><code>
+get_info(DatabaseId) -&gt; {ok, Info} | {error, Error}
+</code></pre>
+
+<ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>Info = <a href="#type-database_info">database_info()</a></code></li><li><code>Error = database_unknown | database_not_loaded</code></li></ul>
+
+Returns the properties of the currently loaded database [DEPRECATED]
+
+- `DatabaseId` must be an atom and refer to a started database loader.
+
+Returns:
+- `{ok, database_info()}` in case of success
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
+
+__See also:__ [get_info/2](#get_info-2).
+
+<a name="get_info-2"></a>
+
+### get_info/2 ###
+
+<pre><code>
+get_info(DatabaseId::atom(), Property::metadata) -&gt; {ok, <a href="#type-database_metadata">database_metadata()</a>} | {error, <a href="#type-database_error">database_error()</a>}
+</code></pre>
+<br />
+
+Returns a specific property of the currently loaded database [DEPRECATED]
+
+- `DatabaseId` must be an atom and refer to a started database loader.
+- `Property` must be either `metadata` or `version`.
+
+Returns:
+- `{ok, Value}` in case of success
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
+
+__See also:__ [get_info/2](#get_info-2).
 
 <a name="get_version-1"></a>
 
@@ -26,7 +103,9 @@ get_version(DatabaseId) -&gt; {ok, LoadedVersion} | {error, Error}
 
 <ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>LoadedVersion = <a href="calendar.md#type-datetime">calendar:datetime()</a></code></li><li><code>Error = database_unknown | database_not_loaded</code></li></ul>
 
-Returns the currently loaded database version
+__This function is deprecated:__
+
+Please use [`get_info/2`](#get_info-2) instead.
 
 - `DatabaseId` must be an atom and refer to a started database loader.
 
@@ -34,6 +113,8 @@ Returns:
 - `{ok, LoadedVersion}` in case of success
 - `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
 - `{error, database_not_loaded}` if the database hasn't yet been loaded.
+
+Returns the currently loaded database version [DEPRECATED]
 
 <a name="lookup-2"></a>
 

@@ -33,6 +33,26 @@
 -export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
 -export([lookup/2]).                      -ignore_xref({lookup,2}).
 -export([get_version/1]).                 -ignore_xref({get_version,1}).
+-export([get_info/1]).                    -ignore_xref({get_info,1}).
+-export([get_info/2]).                    -ignore_xref({get_info,2}).
+
+%-deprecated([{get_version,1,eventually}]). % TODO Uncomment this on next major release
+
+%% ------------------------------------------------------------------
+%% Type Definitions
+%% ------------------------------------------------------------------
+
+-type database_error() :: database_unknown | database_not_loaded.
+-export_type([database_error/0]).
+
+-type database_info() ::
+        #{ metadata := database_metadata(),
+           version := calendar:datetime()
+         }.
+-export_type([database_info/0]).
+
+-type database_metadata() :: #{ binary() => term() }.
+-export_type([database_metadata/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -138,7 +158,8 @@ wait_for_loader(DatabaseId, Timeout) ->
 lookup(DatabaseId, Address) ->
     locus_mmdb:lookup(DatabaseId, Address).
 
-%% @doc Returns the currently loaded database version
+%% @doc Returns the currently loaded database version [DEPRECATED]
+%% @deprecated Please use {@link get_info/2} instead.
 %%
 %% - `DatabaseId' must be an atom and refer to a started database loader.
 %%
@@ -151,7 +172,48 @@ lookup(DatabaseId, Address) ->
                  LoadedVersion :: calendar:datetime(),
                  Error :: database_unknown | database_not_loaded.
 get_version(DatabaseId) ->
-    locus_mmdb:get_version(DatabaseId).
+    get_info(DatabaseId, version).
+
+%% @doc Returns the properties of the currently loaded database [DEPRECATED]
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%%
+%% Returns:
+%% - `{ok, database_info()}' in case of success
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% @see get_info/2
+-spec get_info(DatabaseId) -> {ok, Info} | {error, Error}
+            when DatabaseId :: atom(),
+                 Info :: database_info(),
+                 Error :: database_unknown | database_not_loaded.
+get_info(DatabaseId) ->
+    case locus_mmdb:get_parts(DatabaseId) of
+        {ok, Parts} ->
+            {ok, info_from_db_parts(Parts)};
+        {error, Error} ->
+            {error, Error}
+    end.
+
+%% @doc Returns a specific property of the currently loaded database [DEPRECATED]
+%%
+%% - `DatabaseId' must be an atom and refer to a started database loader.
+%% - `Property' must be either `metadata' or `version'.
+%%
+%% Returns:
+%% - `{ok, Value}' in case of success
+%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
+%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% @see get_info/2
+-spec get_info(DatabaseId :: atom(), metadata) -> {ok, database_metadata()} | {error, database_error()};
+              (DatabaseId :: atom(), version)  -> {ok, calendar:datetime()} | {error, database_error()}.
+get_info(DatabaseId, Property) ->
+    case get_info(DatabaseId) of
+        {ok, #{ Property := Value }} ->
+            {ok, Value};
+        {error, Error} ->
+            {error, Error}
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -167,3 +229,6 @@ is_url(String) ->
     catch
         error:badarg -> false
     end.
+
+info_from_db_parts(Parts) ->
+    maps:with([metadata, version], Parts).
