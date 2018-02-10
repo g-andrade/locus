@@ -34,7 +34,7 @@
 %% ------------------------------------------------------------------
 
 -export([create_table/1]).
--export([decode_and_update/2]).
+-export([decode_and_update/3]).
 -export([lookup/2]).
 -export([get_parts/1]).
 
@@ -86,12 +86,16 @@
 -type bin_database() :: <<_:64,_:_*8>>.
 -export_type([bin_database/0]).
 
+-type source() :: {cache, Path :: string()} | {remote, URL :: string()}.
+-export_type([source/0]).
+
 -ifdef(POST_OTP_18).
 -type parts() ::
         #{ tree := binary(),
            data_section := binary(),
            metadata := metadata(),
            ipv4_root_index := non_neg_integer(),
+           source := string(),
            version := calendar:datetime()
          }.
 -else.
@@ -100,6 +104,7 @@
            data_section => binary(),
            metadata => metadata(),
            ipv4_root_index => non_neg_integer(),
+           source => string(),
            version => calendar:datetime()
          }.
 -endif.
@@ -119,10 +124,10 @@ create_table(Id) ->
     _ = ets:new(Table, [named_table, protected, {read_concurrency,true}]),
     ok.
 
--spec decode_and_update(atom(), bin_database()) -> calendar:datetime().
-decode_and_update(Id, BinDatabase) ->
+-spec decode_and_update(atom(), bin_database(), source()) -> calendar:datetime().
+decode_and_update(Id, BinDatabase, Source) ->
     Table = table_name(Id),
-    {DatabaseParts, Version} = decode_database_parts(BinDatabase),
+    {DatabaseParts, Version} = decode_database_parts(BinDatabase, Source),
     ets:insert(Table, {database, DatabaseParts}),
     Version.
 
@@ -170,8 +175,8 @@ get_parts(Id) ->
 table_name(Id) ->
     list_to_atom("locus_mmdb_" ++ atom_to_list(Id)).
 
--spec decode_database_parts(bin_database()) -> {parts(), calendar:datetime()}.
-decode_database_parts(BinDatabase) ->
+-spec decode_database_parts(bin_database(), source()) -> {parts(), calendar:datetime()}.
+decode_database_parts(BinDatabase, Source) ->
     BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
     {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
     <<TreeAndDataSection:BinMetadataStart/binary, ?METADATA_MARKER, BinMetadata/binary>>
@@ -190,7 +195,7 @@ decode_database_parts(BinDatabase) ->
     Version = epoch_to_datetime(BuildEpoch),
     DatabaseParts = #{ tree => Tree, data_section => DataSection,
                        metadata => Metadata, ipv4_root_index => IPv4RootIndex,
-                       version => Version },
+                       source => Source, version => Version },
     {DatabaseParts, Version}.
 
 -spec decode_metadata(binary()) -> metadata().

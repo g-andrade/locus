@@ -7,4 +7,4 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## Unreleased
 ### Added
 - OTP 18 support
-- `:get_info/1` and `:get_info/2`
+- ability of consulting database metadata, source and version through `:get_info`

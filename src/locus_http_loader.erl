@@ -309,7 +309,8 @@ processing_update(internal, execute, StateData) ->
     ?log_info("now processing ~p database", [Id]),
     {Headers, StateData2} = ?maps_take(last_response_headers, StateData),
     {Body, StateData3} = ?maps_take(last_response_body, StateData2),
-    case load_database_from_tarball(Id, Body) of
+    URL = maps:get(url, StateData),
+    case load_database_from_tarball(Id, Body, {remote, URL}) of
         {ok, Version} ->
             ?log_info("~p database version is now ~p", [Id, Version]),
             LastModified = extract_last_modified_datetime_from_response_headers(Headers),
@@ -347,7 +348,7 @@ cached_tarball_name(StateData) ->
                                               {error, term()}).
 handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, StateData) ->
     Id = maps:get(id, StateData),
-    case load_database_from_tarball(Id, Content) of
+    case load_database_from_tarball(Id, Content, {cache, CachedTarballName}) of
         {ok, Version} ->
             ?log_info("~p database version is now ~p (loaded from cache)", [Id, Version]),
             StateData#{ last_modified => max(ModificationDate, Version),
@@ -362,13 +363,13 @@ handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
                  [maps:get(id, StateData), CachedTarballName, Error]),
     StateData.
 
--spec load_database_from_tarball(atom(), binary())
+-spec load_database_from_tarball(atom(), binary(), locus_mmdb:source())
         -> {ok, calendar:datetime()} |
            {error, {exception, atom(), term()}}.
-load_database_from_tarball(Id, Tarball) ->
+load_database_from_tarball(Id, Tarball, Source) ->
     try
         BinDatabase = extract_database_from_tarball(Tarball),
-        Version = locus_mmdb:decode_and_update(Id, BinDatabase),
+        Version = locus_mmdb:decode_and_update(Id, BinDatabase, Source),
         {ok, Version}
     catch
         Class:Reason ->

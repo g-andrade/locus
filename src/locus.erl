@@ -47,12 +47,16 @@
 
 -type database_info() ::
         #{ metadata := database_metadata(),
+           source := database_source(),
            version := calendar:datetime()
          }.
 -export_type([database_info/0]).
 
 -type database_metadata() :: #{ binary() => term() }.
 -export_type([database_metadata/0]).
+
+-type database_source() :: {cache, string()} | {remote, string()}.
+-export_type([database_source/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -206,6 +210,7 @@ get_info(DatabaseId) ->
 %% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
 %% @see get_info/2
 -spec get_info(DatabaseId :: atom(), metadata) -> {ok, database_metadata()} | {error, database_error()};
+              (DatabaseId :: atom(), source)   -> {ok, database_source()} | {error, database_error()};
               (DatabaseId :: atom(), version)  -> {ok, calendar:datetime()} | {error, database_error()}.
 get_info(DatabaseId, Property) ->
     case get_info(DatabaseId) of
@@ -231,4 +236,4 @@ is_url(String) ->
     end.
 
 info_from_db_parts(Parts) ->
-    maps:with([metadata, version], Parts).
+    maps:with([metadata, source, version], Parts).

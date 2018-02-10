@@ -26,7 +26,7 @@ database_error() = database_unknown | database_not_loaded
 
 
 <pre><code>
-database_info() = #{metadata =&gt; <a href="#type-database_metadata">database_metadata()</a>, version =&gt; <a href="calendar.md#type-datetime">calendar:datetime()</a>}
+database_info() = #{metadata =&gt; <a href="#type-database_metadata">database_metadata()</a>, source =&gt; <a href="#type-database_source">database_source()</a>, version =&gt; <a href="calendar.md#type-datetime">calendar:datetime()</a>}
 </code></pre>
 
 
@@ -37,6 +37,16 @@ database_info() = #{metadata =&gt; <a href="#type-database_metadata">database_me
 
 <pre><code>
 database_metadata() = #{binary() =&gt; term()}
+</code></pre>
+
+
+
+
+### <a name="type-database_source">database_source()</a> ###
+
+
+<pre><code>
+database_source() = {cache, string()} | {remote, string()}
 </code></pre>
 
 <a name="index"></a>
