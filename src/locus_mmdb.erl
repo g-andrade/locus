@@ -86,6 +86,7 @@
 -type bin_database() :: <<_:64,_:_*8>>.
 -export_type([bin_database/0]).
 
+-ifdef(POST_OTP_18).
 -type parts() ::
         #{ tree := binary(),
            data_section := binary(),
@@ -93,6 +94,15 @@
            ipv4_root_index := non_neg_integer(),
            version := calendar:datetime()
          }.
+-else.
+-type parts() ::
+        #{ tree => binary(),
+           data_section => binary(),
+           metadata => metadata(),
+           ipv4_root_index => non_neg_integer(),
+           version => calendar:datetime()
+         }.
+-endif.
 -export_type([parts/0]).
 
 -type metadata() ::

@@ -21,9 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+-include("locus_pre_otp19_compat.hrl").
+
 %% @private
 -module(locus_http_loader).
--behaviour(gen_statem).
+-behaviour(?gen_statem).
 
 -include_lib("kernel/include/file.hrl").
 -include("locus_logger.hrl").
@@ -64,6 +66,7 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
+-ifdef(POST_OTP_18).
 -type state_data() ::
     #{ id := atom(),
        url := string(),
@@ -72,8 +75,20 @@
        last_response_body => binary(),
        last_modified => calendar:datetime(),
        last_version => calendar:datetime(),
-       waiters => [gen_statem:from()]
+       waiters := [?gen_statem:from()]
      }.
+-else.
+-type state_data() ::
+    #{ id => atom(),
+       url => string(),
+       request_id => reference(),
+       last_response_headers => [{string(), string()}],
+       last_response_body => binary(),
+       last_modified => calendar:datetime(),
+       last_version => calendar:datetime(),
+       waiters => [?gen_statem:from()]
+     }.
+-endif.
 
 -type headers() :: [{string(), string()}].
 
@@ -84,43 +99,43 @@
 -spec start_link(atom(), string()) -> {ok, pid()}.
 start_link(Id, URL) ->
     ServerName = server_name(Id),
-    gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL], []).
+    ?gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL], []).
 
 -spec wait(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
            {error, database_unknown | timeout | {loading, term()}}.
 wait(Id, Timeout) ->
     ServerName = server_name(Id),
-    try gen_statem:call(ServerName, wait, Timeout) of
+    try ?gen_statem:call(ServerName, wait, Timeout) of
         {ok, LoadedVersion} ->
             {ok, LoadedVersion};
         {error, LoadingError} ->
             {error, {loading, LoadingError}}
     catch
-        exit:{timeout, {gen_statem,call,[ServerName|_]}} when Timeout =/= infinity ->
+        exit:{timeout, {?gen_statem,call,[ServerName|_]}} when Timeout =/= infinity ->
             {error, timeout};
-        %exit:{{nodedown,_RemoteNode}, {gen_statem,call,[ServerName|_}} ->
+        %exit:{{nodedown,_RemoteNode}, {?gen_statem,call,[ServerName|_}} ->
         %    % Cannot happen (loader is always local)
         %    {error, database_unknown};
-        exit:{noproc, {gen_statem,call,[ServerName|_]}} ->
+        exit:{noproc, {?gen_statem,call,[ServerName|_]}} ->
             {error, database_unknown};
-        exit:{normal, {gen_statem,call, [ServerName|_]}} ->
+        exit:{normal, {?gen_statem,call, [ServerName|_]}} ->
             {error, database_unknown};
-        exit:{shutdown, {gen_statem,call, [ServerName|_]}} ->
+        exit:{shutdown, {?gen_statem,call, [ServerName|_]}} ->
             {error, database_unknown};
-        exit:{{shutdown,_Reason}, {gen_statem,call, [ServerName|_]}} ->
+        exit:{{shutdown,_Reason}, {?gen_statem,call, [ServerName|_]}} ->
             {error, database_unknown}
     end.
 
 %% ------------------------------------------------------------------
-%% gen_server Function Definitions
+%% gen_statem Function Definitions
 %% ------------------------------------------------------------------
 
 -spec callback_mode() -> [state_functions | state_enter, ...].
 callback_mode() -> [state_functions, state_enter].
 
 -spec init([atom() | string(), ...])
-        -> gen_statem:init_result(initializing).
+        -> ?gen_statem:init_result(initializing).
 init([Id, URL]) ->
     locus_mmdb:create_table(Id),
     StateData = #{ id => Id, url => URL, waiters => [] },
@@ -140,8 +155,8 @@ initializing(internal, load_from_cache, StateData) ->
 
 -spec ready(enter, atom(), state_data())
             -> {keep_state_and_data, {state_timeout, pos_integer(), update_database}};
-           ({call,gen_statem:from()}, wait, state_data())
-           -> {keep_state, state_data(), [gen_statem:reply_action()]};
+           ({call,?gen_statem:from()}, wait, state_data())
+           -> {keep_state, state_data(), [?gen_statem:reply_action()]};
            (internal, update_database, state_data())
             -> {next_state, waiting_stream_start, state_data()};
            (state_timeout, update_database, state_data())
@@ -168,18 +183,18 @@ ready(state_timeout, update_database, _StateData) ->
 
 -spec waiting_stream_start(enter, atom(), state_data())
                             -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
-                          ({call,gen_statem:from()}, wait, state_data())
-                            -> {keep_state, state_data(), [gen_statem:reply_action()]};
+                          ({call,?gen_statem:from()}, wait, state_data())
+                            -> {keep_state, state_data(), [?gen_statem:reply_action()]};
                           (info, {http, {reference(), stream_start, headers()}}, state_data())
                             -> {next_state, waiting_stream_end, state_data()};
                           (info, {http, {reference(), {{string(), integer(), string()},
                                                        headers(), binary()}}}, state_data())
                             -> {next_state, ready, state_data()} |
-                               {next_state, ready, state_data(), [gen_statem:reply_action()]};
+                               {next_state, ready, state_data(), [?gen_statem:reply_action()]};
                           (info, {http, {reference(), {error, term()}}}, state_data())
-                            -> {next_state, ready, state_data(), [gen_statem:reply_action()]};
+                            -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
                           (state_timeout, timeout, state_data())
-                            -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
+                            -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 waiting_stream_start(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_start({call,From}, wait, StateData) ->
@@ -218,7 +233,7 @@ waiting_stream_start(info, {http, {RequestId, {error, Reason}}},
 waiting_stream_start(state_timeout, timeout, StateData) ->
     ?log_error("timeout downloading ~p database while ~p",
                [maps:get(id, StateData), waiting_stream_start]),
-    {RequestId, StateData2} = maps:take(request_id, StateData),
+    {RequestId, StateData2} = ?maps_take(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {timeout, waiting_stream_start}}, StateData2),
     ok = httpc:cancel_request(RequestId),
     clear_inbox_of_late_http_messages(RequestId),
@@ -226,17 +241,17 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
 
 -spec waiting_stream_end(enter, atom(), state_data())
                         -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
-                        ({call,gen_statem:from()}, wait, state_data())
-                        -> {keep_state, state_data(), [gen_statem:reply_action()]};
+                        ({call,?gen_statem:from()}, wait, state_data())
+                        -> {keep_state, state_data(), [?gen_statem:reply_action()]};
                         (info, {http, {reference(), stream, binary()}}, state_data())
                         -> {keep_state, state_data(), {state_timeout, pos_integer(), timeout}};
                         (info, {http, {reference(), stream_end, headers()}}, state_data())
                         -> {next_state, processing_update, state_data(),
                             {next_event, internal, execute}};
                         (info, {http, {reference(), {error, term()}}}, state_data())
-                        -> {next_state, ready, state_data(), [gen_statem:reply_action()]};
+                        -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
                         (state_timeout, timeout, state_data())
-                        -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
+                        -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 waiting_stream_end(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_end({call,From}, wait, StateData) ->
@@ -245,7 +260,7 @@ waiting_stream_end({call,From}, wait, StateData) ->
 waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
                    #{ request_id := RequestId } = StateData) ->
     UpdatedStateData =
-        maps:update_with(
+        ?maps_update_with4(
           last_response_body,
           fun (Body) -> <<Body/binary, BinBodyPart/binary>> end,
           BinBodyPart, StateData),
@@ -257,7 +272,7 @@ waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked 
                    #{ request_id := RequestId } = StateData) ->
     ?log_info("~p database download finished", [maps:get(id, StateData)]),
     StateData2 =
-        maps:update_with(
+        ?maps_update_with4(
           last_response_headers,
           fun (PrevHeaders) -> PrevHeaders ++ Headers end,
           Headers, StateData),
@@ -276,7 +291,7 @@ waiting_stream_end(info, {http, {RequestId, {error, Reason}}},
 waiting_stream_end(state_timeout, timeout, StateData) ->
     ?log_error("timeout downloading ~p database while ~p",
                [maps:get(id, StateData), waiting_stream_end]),
-    {RequestId, StateData2} = maps:take(request_id, StateData),
+    {RequestId, StateData2} = ?maps_take(request_id, StateData),
     StateData3 = maps:without([last_response_headers, last_response_body], StateData2),
     {StateData4, Replies} = reply_to_waiters({error, {timeout, waiting_stream_end}}, StateData3),
     ok = httpc:cancel_request(RequestId),
@@ -286,14 +301,14 @@ waiting_stream_end(state_timeout, timeout, StateData) ->
 -spec processing_update(enter, atom(), state_data())
                         -> keep_state_and_data;
                        (internal, execute, state_data())
-                       -> {next_state, ready, state_data(), [gen_statem:reply_action()]}.
+                       -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 processing_update(enter, _PrevState, _StateData) ->
     keep_state_and_data;
 processing_update(internal, execute, StateData) ->
     Id = maps:get(id, StateData),
     ?log_info("now processing ~p database", [Id]),
-    {Headers, StateData2} = maps:take(last_response_headers, StateData),
-    {Body, StateData3} = maps:take(last_response_body, StateData2),
+    {Headers, StateData2} = ?maps_take(last_response_headers, StateData),
+    {Body, StateData3} = ?maps_take(last_response_body, StateData2),
     case load_database_from_tarball(Id, Body) of
         {ok, Version} ->
             ?log_info("~p database version is now ~p", [Id, Version]),
@@ -324,7 +339,7 @@ cached_tarball_name(StateData) ->
     Hash = crypto:hash(sha256, URL),
     HexHash = bin_to_hex_str(Hash),
     Filename = HexHash ++ ".tgz",
-    UserCachePath = filename:basedir(user_cache, "locus_erlang"),
+    UserCachePath = ?filename_basedir(user_cache, "locus_erlang"),
     filename:join(UserCachePath, Filename).
 
 -spec handle_cached_tarball_lookup(LookupResult, nonempty_string(), state_data())
@@ -391,11 +406,11 @@ save_cached_tarball(Tarball, LastModified, StateData) ->
             {{error, {exception, Class, Reason}}, Filename}
     end.
 
--spec bin_to_hex_str(binary()) -> [$0..$9 | $a..$f].
+-spec bin_to_hex_str(binary()) -> [48..57 | 97..102].
 bin_to_hex_str(Bin) ->
     bin_to_hex_str_recur(Bin, []).
 
--spec bin_to_hex_str_recur(bitstring(), [$0..$9 | $a..$f]) -> [$0..$9 | $a..$f].
+-spec bin_to_hex_str_recur(bitstring(), [48..57 | 97..102]) -> [48..57 | 97..102].
 bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) when Nibble < 10 ->
     bin_to_hex_str_recur(Rest, [$0 + Nibble | Acc]);
 bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
@@ -501,20 +516,20 @@ clear_inbox_of_late_http_messages(RequestId) ->
         1000 -> ok
     end.
 
--spec maybe_enqueue_waiter(gen_statem:from(), state_data())
-        -> {state_data(), [gen_statem:reply_action()]}.
+-spec maybe_enqueue_waiter(?gen_statem:from(), state_data())
+        -> {state_data(), [?gen_statem:reply_action()]}.
 maybe_enqueue_waiter(From, #{ last_version := LastVersion } = StateData) ->
     {StateData, [{reply, From, {ok, LastVersion}}]};
 maybe_enqueue_waiter(From, StateData) ->
     StateData2 =
-        maps:update_with(
+        ?maps_update_with3(
           waiters,
           fun (PrevWaiters) -> [From | PrevWaiters] end,
           StateData),
     {StateData2, []}.
 
 -spec reply_to_waiters({ok, calendar:datetime()} | {error, term()}, state_data())
-        -> {state_data(), [gen_statem:reply_action()]}.
+        -> {state_data(), [?gen_statem:reply_action()]}.
 reply_to_waiters(Result, StateData) ->
     Waiters = maps:get(waiters, StateData),
     Replies = [{reply, From, Result} || From <- Waiters],

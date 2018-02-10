@@ -101,7 +101,7 @@ Check the [function reference](https://github.com/g-andrade/locus/blob/master/do
 
 <h5><a name="Requirements">Requirements</a></h5>
 
-* Erlang/OTP 19.3 or higher
+* Erlang/OTP 18.0 or higher
 * rebar3
 
 <h5><a name="On_databases">On databases</a></h5>

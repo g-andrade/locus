@@ -85,9 +85,15 @@ stop_child(DatabaseId) ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
+-ifdef(POST_OTP_18).
 -spec init([]) -> {ok, {#{ strategy := one_for_one,
                            intensity := 10,
                            period := 5 }, []}}.
+-else.
+-spec init([]) -> {ok, {#{ strategy => one_for_one,
+                           intensity => 10,
+                           period => 5 }, []}}.
+-endif.
 init([]) ->
     SupFlags = #{ strategy => one_for_one,
                   intensity => 10,
