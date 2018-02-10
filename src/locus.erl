@@ -28,6 +28,7 @@
 %% ------------------------------------------------------------------
 
 -export([start_loader/2]).                -ignore_xref({start_loader,2}).
+-export([start_loader/3]).                -ignore_xref({start_loader,3}).
 -export([stop_loader/1]).                 -ignore_xref({stop_loader,1}).
 -export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
 -export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
@@ -73,16 +74,39 @@
 %% - `{error, already_started}' if the loader under `DatabaseId' has already been started.
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
+%% @see start_loader/3
 -spec start_loader(DatabaseId, DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseURL :: string() | binary(),
                  Error :: invalid_url | already_started.
-start_loader(DatabaseId, BinDatabaseURL) when is_binary(BinDatabaseURL) ->
-    DatabaseURL = binary_to_list(BinDatabaseURL),
-    start_loader(DatabaseId, DatabaseURL);
 start_loader(DatabaseId, DatabaseURL) ->
+    start_loader(DatabaseId, DatabaseURL, []).
+
+%% @doc Starts a database loader under id `DatabaseId' with options `Opts'
+%%
+%% `DatabaseId' must be an atom.
+%% `DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.
+%% `Opts' must be a list of `locus_http_loader:opt()' values
+%%
+%% Returns:
+%% - `ok' in case of success.
+%% - `{error, invalid_url}' if the URL is invalid.
+%% - `{error, already_started}' if the loader under `DatabaseId' has already been started.
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/2
+-spec start_loader(DatabaseId, DatabaseURL, Opts) -> ok | {error, Error}
+            when DatabaseId :: atom(),
+                 DatabaseURL :: string() | binary(),
+                 Opts :: [locus_http_loader:opt()],
+                 Error :: invalid_url | already_started.
+start_loader(DatabaseId, BinDatabaseURL, Opts) when is_binary(BinDatabaseURL) ->
+    DatabaseURL = binary_to_list(BinDatabaseURL),
+    start_loader(DatabaseId, DatabaseURL, Opts);
+start_loader(DatabaseId, DatabaseURL, Opts) ->
+    OptsWithDefaults = opts_with_defaults(Opts),
     case is_url(DatabaseURL) of
-        true -> locus_sup:start_child(DatabaseId, DatabaseURL);
+        true -> locus_sup:start_child(DatabaseId, DatabaseURL, OptsWithDefaults);
         false -> {error, invalid_url}
     end.
 
@@ -208,7 +232,7 @@ get_info(DatabaseId) ->
 %% - `{ok, Value}' in case of success
 %% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
 %% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
-%% @see get_info/2
+%% @see get_info/1
 -spec get_info(DatabaseId :: atom(), metadata) -> {ok, database_metadata()} | {error, database_error()};
               (DatabaseId :: atom(), source)   -> {ok, database_source()} | {error, database_error()};
               (DatabaseId :: atom(), version)  -> {ok, calendar:datetime()} | {error, database_error()}.
@@ -237,3 +261,6 @@ is_url(String) ->
 
 info_from_db_parts(Parts) ->
     maps:with([metadata, source, version], Parts).
+
+opts_with_defaults(Opts) ->
+    [{event_subscriber, locus_logger} | Opts].

@@ -202,5 +202,7 @@ released under the Apache License 2.0.
 
 <table width="100%" border="0" summary="list of modules">
 <tr><td><a href="https://github.com/g-andrade/locus/blob/master/doc/locus.md" class="module">locus</a></td></tr>
+<tr><td><a href="https://github.com/g-andrade/locus/blob/master/doc/locus_event_subscriber.md" class="module">locus_event_subscriber</a></td></tr>
+<tr><td><a href="https://github.com/g-andrade/locus/blob/master/doc/locus_http_loader.md" class="module">locus_http_loader</a></td></tr>
 <tr><td><a href="https://github.com/g-andrade/locus/blob/master/doc/locus_logger.md" class="module">locus_logger</a></td></tr></table>
 

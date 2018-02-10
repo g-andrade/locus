@@ -4,6 +4,8 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
+__Behaviours:__ [`locus_event_subscriber`](locus_event_subscriber.md).
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -21,7 +23,7 @@
 ### set_loglevel/1 ###
 
 <pre><code>
-set_loglevel(Level::info | warning | error | none) -&gt; ok
+set_loglevel(Level::debug | info | warning | error | none) -&gt; ok
 </code></pre>
 <br />
 

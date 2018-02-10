@@ -54,7 +54,7 @@ database_source() = {cache, string()} | {remote, string()}
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#get_info-1">get_info/1</a></td><td>Returns the properties of the currently loaded database [DEPRECATED].</td></tr><tr><td valign="top"><a href="#get_info-2">get_info/2</a></td><td>Returns a specific property of the currently loaded database [DEPRECATED].</td></tr><tr><td valign="top"><a href="#get_version-1">get_version/1</a></td><td>(<em>Deprecated</em>.) Returns the currently loaded database version [DEPRECATED].</td></tr><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start_loader-2">start_loader/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#stop_loader-1">stop_loader/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#wait_for_loader-1">wait_for_loader/1</a></td><td>Blocks caller execution until either readiness is achieved or a database load attempt fails.</td></tr><tr><td valign="top"><a href="#wait_for_loader-2">wait_for_loader/2</a></td><td>Like <code>wait_for_loader/1</code> but it can time-out.</td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#get_info-1">get_info/1</a></td><td>Returns the properties of the currently loaded database [DEPRECATED].</td></tr><tr><td valign="top"><a href="#get_info-2">get_info/2</a></td><td>Returns a specific property of the currently loaded database [DEPRECATED].</td></tr><tr><td valign="top"><a href="#get_version-1">get_version/1</a></td><td>(<em>Deprecated</em>.) Returns the currently loaded database version [DEPRECATED].</td></tr><tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>Looks-up info on IPv4 and IPv6 addresses.</td></tr><tr><td valign="top"><a href="#start_loader-2">start_loader/2</a></td><td>Starts a database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#start_loader-3">start_loader/3</a></td><td>Starts a database loader under id <code>DatabaseId</code> with options <code>Opts</code></td></tr><tr><td valign="top"><a href="#stop_loader-1">stop_loader/1</a></td><td>Stops the database loader under id <code>DatabaseId</code></td></tr><tr><td valign="top"><a href="#wait_for_loader-1">wait_for_loader/1</a></td><td>Blocks caller execution until either readiness is achieved or a database load attempt fails.</td></tr><tr><td valign="top"><a href="#wait_for_loader-2">wait_for_loader/2</a></td><td>Like <code>wait_for_loader/1</code> but it can time-out.</td></tr></table>
 
 
 <a name="functions"></a>
@@ -101,7 +101,7 @@ Returns:
 - `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
 - `{error, database_not_loaded}` if the database hasn't yet been loaded.
 
-__See also:__ [get_info/2](#get_info-2).
+__See also:__ [get_info/1](#get_info-1).
 
 <a name="get_version-1"></a>
 
@@ -172,7 +172,30 @@ Returns:
 - `{error, invalid_url}` if the URL is invalid.
 - `{error, already_started}` if the loader under `DatabaseId` has already been started.
 
-__See also:__ [wait_for_loader/1](#wait_for_loader-1), [wait_for_loader/2](#wait_for_loader-2).
+__See also:__ [start_loader/3](#start_loader-3), [wait_for_loader/1](#wait_for_loader-1), [wait_for_loader/2](#wait_for_loader-2).
+
+<a name="start_loader-3"></a>
+
+### start_loader/3 ###
+
+<pre><code>
+start_loader(DatabaseId, DatabaseURL, Opts) -&gt; ok | {error, Error}
+</code></pre>
+
+<ul class="definitions"><li><code>DatabaseId = atom()</code></li><li><code>DatabaseURL = string() | binary()</code></li><li><code>Opts = [<a href="locus_http_loader.md#type-opt">locus_http_loader:opt()</a>]</code></li><li><code>Error = invalid_url | already_started</code></li></ul>
+
+Starts a database loader under id `DatabaseId` with options `Opts`
+
+`DatabaseId` must be an atom.
+`DatabaseURL` must be either a string or a binary containing a HTTP(S) URL.
+`Opts` must be a list of `locus_http_loader:opt()` values
+
+Returns:
+- `ok` in case of success.
+- `{error, invalid_url}` if the URL is invalid.
+- `{error, already_started}` if the loader under `DatabaseId` has already been started.
+
+__See also:__ [start_loader/2](#start_loader-2), [wait_for_loader/1](#wait_for_loader-1), [wait_for_loader/2](#wait_for_loader-2).
 
 <a name="stop_loader-1"></a>
 

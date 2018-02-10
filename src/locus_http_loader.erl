@@ -23,18 +23,16 @@
 
 -include("locus_pre_otp19_compat.hrl").
 
-%% @private
 -module(locus_http_loader).
 -behaviour(?gen_statem).
 
 -include_lib("kernel/include/file.hrl").
--include("locus_logger.hrl").
 
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/2]).                    -ignore_xref({start_link, 2}).
+-export([start_link/3]).                    -ignore_xref({start_link, 3}).
 -export([wait/2]).
 
 %% ------------------------------------------------------------------
@@ -49,6 +47,8 @@
 -export([waiting_stream_start/3]).          -ignore_xref({waiting_stream_start,3}).
 -export([waiting_stream_end/3]).            -ignore_xref({waiting_stream_end,3}).
 -export([processing_update/3]).             -ignore_xref({processing_update,3}).
+%%
+-export([code_change/4]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -66,44 +66,109 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
+-type opt() ::
+    {event_subscriber, module()}.
+-export_type([opt/0]).
+
 -ifdef(POST_OTP_18).
 -type state_data() ::
     #{ id := atom(),
-       url := string(),
+       url := url(),
+       waiters := [?gen_statem:from()],
+       event_subscribers := [module(), ...],
        request_id => reference(),
-       last_response_headers => [{string(), string()}],
+       last_response_headers => headers(),
        last_response_body => binary(),
        last_modified => calendar:datetime(),
-       last_version => calendar:datetime(),
-       waiters := [?gen_statem:from()]
+       last_version => calendar:datetime()
      }.
 -else.
 -type state_data() ::
     #{ id => atom(),
-       url => string(),
+       url => url(),
+       waiters => [?gen_statem:from()],
+       event_subscribers => [module(), ...],
        request_id => reference(),
-       last_response_headers => [{string(), string()}],
+       last_response_headers => headers(),
        last_response_body => binary(),
        last_modified => calendar:datetime(),
-       last_version => calendar:datetime(),
-       waiters => [?gen_statem:from()]
+       last_version => calendar:datetime()
      }.
 -endif.
 
+-type filename() :: string().
+-export_type([filename/0]).
+
+-type url() :: string().
+-export_type([url/0]).
+
+-type response_status() :: {100..999, binary()}.
+-export_type([response_status/0]).
+
 -type headers() :: [{string(), string()}].
+-export_type([headers/0]).
+
+-type body() :: binary().
+-export_type([body/0]).
+
+-type event() ::
+        event_request_sent() |
+        event_stream_dismissed() |
+        event_stream_failed_to_start() |
+        event_stream_started() |
+        event_stream_finished() |
+        event_load_attempt_finished() |
+        event_cache_attempt_finished().
+-export_type([event/0]).
+
+-type event_request_sent() ::
+        {request_sent, url(), headers()}.
+-export_type([event_request_sent/0]).
+
+-type event_stream_dismissed() ::
+        {stream_dismissed, {http, response_status(), headers(), body()}}.
+-export_type([event_stream_dismissed/0]).
+
+-type event_stream_failed_to_start() ::
+        {stream_failed_to_start, {http, response_status(), headers(), body()}} |
+        {stream_failed_to_start, {error, term()}} |
+        {stream_failed_to_start, timeout}.
+-export_type([event_stream_failed_to_start/0]).
+
+-type event_stream_started() ::
+        {stream_started, headers()}.
+-export_type([event_stream_started/0]).
+
+-type event_stream_finished() ::
+        {stream_finished, BodySize :: non_neg_integer(), {ok, TrailingHeaders :: headers()}} |
+        {stream_finished, BodySize :: non_neg_integer(), {error, term()}} |
+        {stream_finished, BodySize :: non_neg_integer(), {error, timeout}}.
+-export_type([event_stream_finished/0]).
+
+-type event_load_attempt_finished() ::
+        {load_attempt_finished, locus_mmdb:source(), {ok, Version :: calendar:datetime()}} |
+        {load_attempt_finished, locus_mmdb:source(), {error, term()}}.
+-export_type([event_load_attempt_finished/0]).
+
+-type event_cache_attempt_finished() ::
+        {cache_attempt_finished, filename(), ok} |
+        {cache_attempt_finished, filename(), {error, term()}}.
+-export_type([event_cache_attempt_finished/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start_link(atom(), string()) -> {ok, pid()}.
-start_link(Id, URL) ->
+-spec start_link(atom(), string(), [opt()]) -> {ok, pid()}.
+%% @private
+start_link(Id, URL, Opts) ->
     ServerName = server_name(Id),
-    ?gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL], []).
+    ?gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL, Opts], []).
 
 -spec wait(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
            {error, database_unknown | timeout | {loading, term()}}.
+%% @private
 wait(Id, Timeout) ->
     ServerName = server_name(Id),
     try ?gen_statem:call(ServerName, wait, Timeout) of
@@ -132,19 +197,21 @@ wait(Id, Timeout) ->
 %% ------------------------------------------------------------------
 
 -spec callback_mode() -> [state_functions | state_enter, ...].
+%% @private
 callback_mode() -> [state_functions, state_enter].
 
--spec init([atom() | string(), ...])
+-spec init([atom() | string() | opt(), ...])
         -> ?gen_statem:init_result(initializing).
-init([Id, URL]) ->
+%% @private
+init([Id, URL, Opts]) ->
     locus_mmdb:create_table(Id),
-    StateData = #{ id => Id, url => URL, waiters => [] },
-    {ok, initializing, StateData, {next_event, internal, load_from_cache}}.
+    init(Id, URL, Opts).
 
 -spec initializing(enter, atom(), state_data())
                    -> keep_state_and_data;
                   (internal, load_from_cache, state_data())
                    -> {next_state, ready, state_data(), {next_event, internal, update_database}}.
+%% @private
 initializing(enter, _PrevState, _StateData) ->
     keep_state_and_data;
 initializing(internal, load_from_cache, StateData) ->
@@ -161,14 +228,13 @@ initializing(internal, load_from_cache, StateData) ->
             -> {next_state, waiting_stream_start, state_data()};
            (state_timeout, update_database, state_data())
             -> {repeat_state_and_data, {next_event, internal, update_database}}.
+%% @private
 ready(enter, _PrevState, StateData) ->
     {keep_state_and_data, {state_timeout, update_period(StateData), update_database}};
 ready({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
 ready(internal, update_database, StateData) ->
-    ?log_info("sending request to download database ~p",
-              [maps:get(id, StateData)]),
     URL = maps:get(url, StateData),
     Headers = request_headers(StateData),
     Request = {URL, Headers},
@@ -177,6 +243,7 @@ ready(internal, update_database, StateData) ->
     {ok, RequestId} = httpc:request(get, Request, HTTPOptions, Options),
     true = is_reference(RequestId),
     UpdatedStateData = StateData#{ request_id => RequestId },
+    report_event({request_sent, URL, Headers}, StateData),
     {next_state, waiting_stream_start, UpdatedStateData};
 ready(state_timeout, update_database, _StateData) ->
     {repeat_state_and_data, {next_event, internal, update_database}}.
@@ -195,6 +262,7 @@ ready(state_timeout, update_database, _StateData) ->
                             -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
                           (state_timeout, timeout, state_data())
                             -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
+%% @private
 waiting_stream_start(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_start({call,From}, wait, StateData) ->
@@ -202,37 +270,31 @@ waiting_stream_start({call,From}, wait, StateData) ->
     {keep_state, StateData2, Actions};
 waiting_stream_start(info, {http, {RequestId, stream_start, Headers}},
                      #{ request_id := RequestId } = StateData) ->
-    ?log_info("~p database download has started", [maps:get(id, StateData)]),
+    report_event({stream_started, Headers}, StateData),
     UpdatedStateData = StateData#{ last_response_headers => Headers },
     {next_state, waiting_stream_end, UpdatedStateData};
 waiting_stream_start(info,
-                     {http, {RequestId, {{_HttpVersion, StatusCode, _StatusDesc}, _Headers, _Body}}},
+                     {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
                      #{ request_id := RequestId } = StateData)
   when StatusCode =:= 304 ->
-    ?log_info("~p database download canceled - remote file not modified",
-              [maps:get(id, StateData)]),
+    report_event({stream_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
     UpdatedStateData = maps:remove(request_id, StateData),
     {next_state, ready, UpdatedStateData};
 waiting_stream_start(info,
-                     {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, _Headers, _Body}}},
+                     {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
                      #{ request_id := RequestId } = StateData) ->
-    ?log_error("error downloading ~p database while ~p: ~p",
-               [maps:get(id, StateData), waiting_stream_start,
-                {http, StatusCode, StatusDesc}]),
+    report_event({stream_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
     StateData2 = maps:remove(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {http, StatusCode, StatusDesc}}, StateData2),
     {next_state, ready, StateData3, Replies};
 waiting_stream_start(info, {http, {RequestId, {error, Reason}}},
                      #{ request_id := RequestId } = StateData) ->
-    ?log_error("error downloading ~p database while ~p: ~p",
-               [maps:get(id, StateData), waiting_stream_start,
-                Reason]),
+    report_event({stream_failed_to_start, {error, Reason}}, StateData),
     StateData2 = maps:remove(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
     {next_state, ready, StateData3, Replies};
 waiting_stream_start(state_timeout, timeout, StateData) ->
-    ?log_error("timeout downloading ~p database while ~p",
-               [maps:get(id, StateData), waiting_stream_start]),
+    report_event({stream_failed_to_start, timeout}, StateData),
     {RequestId, StateData2} = ?maps_take(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {timeout, waiting_stream_start}}, StateData2),
     ok = httpc:cancel_request(RequestId),
@@ -252,6 +314,7 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                         -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
                         (state_timeout, timeout, state_data())
                         -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
+%% @private
 waiting_stream_end(enter, _PrevState, _StateData) ->
     {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_end({call,From}, wait, StateData) ->
@@ -270,27 +333,28 @@ waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
     {keep_state, UpdatedStateData, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
 waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked encoding
                    #{ request_id := RequestId } = StateData) ->
-    ?log_info("~p database download finished", [maps:get(id, StateData)]),
+    BodySize = byte_size(maps:get(last_response_body, StateData)),
+    report_event({stream_finished, BodySize, {ok, Headers}}, StateData),
     StateData2 =
         ?maps_update_with4(
           last_response_headers,
-          fun (PrevHeaders) -> PrevHeaders ++ Headers end,
+          fun (PrevHeaders) -> lists:usort(PrevHeaders ++ Headers) end,
           Headers, StateData),
     StateData3 = maps:remove(request_id, StateData2),
     {next_state, processing_update, StateData3,
      {next_event, internal, execute}};
 waiting_stream_end(info, {http, {RequestId, {error, Reason}}},
                    #{ request_id := RequestId } = StateData) ->
-    ?log_error("error downloading ~p database while ~p: ~p",
-               [maps:get(id, StateData), waiting_stream_end, Reason]),
+    BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
+    report_event({stream_finished, BodySizeSoFar, {error, Reason}}, StateData),
     StateData2 =
         maps:without([request_id, last_response_headers, last_response_body],
                      StateData),
     {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
     {next_state, ready, {StateData3, Replies}};
 waiting_stream_end(state_timeout, timeout, StateData) ->
-    ?log_error("timeout downloading ~p database while ~p",
-               [maps:get(id, StateData), waiting_stream_end]),
+    BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
+    report_event({stream_finished, BodySizeSoFar, {error, timeout}}, StateData),
     {RequestId, StateData2} = ?maps_take(request_id, StateData),
     StateData3 = maps:without([last_response_headers, last_response_body], StateData2),
     {StateData4, Replies} = reply_to_waiters({error, {timeout, waiting_stream_end}}, StateData3),
@@ -302,17 +366,18 @@ waiting_stream_end(state_timeout, timeout, StateData) ->
                         -> keep_state_and_data;
                        (internal, execute, state_data())
                        -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
+%% @private
 processing_update(enter, _PrevState, _StateData) ->
     keep_state_and_data;
 processing_update(internal, execute, StateData) ->
     Id = maps:get(id, StateData),
-    ?log_info("now processing ~p database", [Id]),
     {Headers, StateData2} = ?maps_take(last_response_headers, StateData),
     {Body, StateData3} = ?maps_take(last_response_body, StateData2),
     URL = maps:get(url, StateData),
-    case load_database_from_tarball(Id, Body, {remote, URL}) of
+    Source = {remote, URL},
+    case load_database_from_tarball(Id, Body, Source) of
         {ok, Version} ->
-            ?log_info("~p database version is now ~p", [Id, Version]),
+            report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
             LastModified = extract_last_modified_datetime_from_response_headers(Headers),
             StateData4 = StateData3#{ last_modified => max(LastModified, Version),
                                       last_version => Version },
@@ -320,10 +385,22 @@ processing_update(internal, execute, StateData) ->
             {StateData5, Replies} = reply_to_waiters({ok, Version}, StateData4),
             {next_state, ready, StateData5, Replies};
         {error, Error} ->
-            ?log_warning("failed to load ~p database from downloaded tarball: ~p",
-                         [Id, Error]),
+            report_event({load_attempt_finished, Source, {error, Error}}, StateData),
             {StateData4, Replies} = reply_to_waiters({error, Error}, StateData3),
             {next_state, ready, StateData4, Replies}
+    end.
+
+-spec code_change(term(), atom(), state_data(), term()) -> {ok, atom(), state_data()}.
+%% @private
+code_change(_OldVsn, OldState, OldStateData, _Extra) ->
+    case OldStateData of
+        #{ id := _, url := _, waiters := _, event_subscribers := _ } ->
+            {ok, OldState, OldStateData};
+        #{ id := _, url := _, waiters := _ } ->
+            % lib was at version 1.0.0; ensure logging keeps working as before
+            EventSubscribers = [locus_logger],
+            StateData = OldStateData#{ event_subscribers => EventSubscribers },
+            {ok, OldState, StateData}
     end.
 
 %% ------------------------------------------------------------------
@@ -333,6 +410,30 @@ processing_update(internal, execute, StateData) ->
 -spec server_name(atom()) -> atom().
 server_name(Id) ->
     list_to_atom(atom_to_list(?MODULE) ++ "_" ++ atom_to_list(Id)).
+
+-spec init(atom(), string(), [opt()])
+        -> ?gen_statem:init_result(initializing) |
+           {stop, {invalid_opt, term()}}.
+init(Id, URL, Opts) ->
+    BaseStateData =
+        #{ id => Id,
+           url => URL,
+           waiters => [],
+           event_subscribers => [] },
+    init_opts(Opts, BaseStateData).
+
+init_opts([{event_subscriber, Module} | Opts], StateData) when is_atom(Module), Module =/= undefined ->
+    NewStateData =
+        maps:update_with(
+          event_subscribers,
+          fun (PrevSubscribers) -> [Module | PrevSubscribers] end,
+          StateData),
+    init_opts(Opts, NewStateData);
+init_opts([InvalidOpt | _], _StateData) ->
+    {stop, {invalid_opt, InvalidOpt}};
+init_opts([], StateData) ->
+    Actions = [{next_event, internal, load_from_cache}],
+    {ok, initializing, StateData, Actions}.
 
 -spec cached_tarball_name(state_data()) -> nonempty_string().
 cached_tarball_name(StateData) ->
@@ -348,19 +449,19 @@ cached_tarball_name(StateData) ->
                                               {error, term()}).
 handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, StateData) ->
     Id = maps:get(id, StateData),
-    case load_database_from_tarball(Id, Content, {cache, CachedTarballName}) of
+    Source = {cache, CachedTarballName},
+    case load_database_from_tarball(Id, Content, Source) of
         {ok, Version} ->
-            ?log_info("~p database version is now ~p (loaded from cache)", [Id, Version]),
+            report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
             StateData#{ last_modified => max(ModificationDate, Version),
                         last_version => Version };
         {error, Error} ->
-            ?log_warning("failure loading ~p database from cache file ~p: ~p",
-                         [Id, CachedTarballName, Error]),
+            report_event({load_attempt_finished, Source, {error, Error}}, StateData),
             StateData
     end;
 handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
-    ?log_warning("failure loading ~p database from cache file ~p: ~p",
-                 [maps:get(id, StateData), CachedTarballName, Error]),
+    Source = {cache, CachedTarballName},
+    report_event({load_attempt_finished, Source, {error, Error}}, StateData),
     StateData.
 
 -spec load_database_from_tarball(atom(), binary(), locus_mmdb:source())
@@ -380,11 +481,9 @@ load_database_from_tarball(Id, Tarball, Source) ->
 try_saving_cached_tarball(Tarball, LastModified, StateData) ->
     case save_cached_tarball(Tarball, LastModified, StateData) of
         {ok, Filename} ->
-            ?log_info("~p database cached in ~p",
-                      [maps:get(id, StateData), Filename]);
+            report_event({cache_attempt_finished, Filename, ok}, StateData);
         {{error, Error}, Filename} ->
-            ?log_error("error caching ~p database in ~p: ~p",
-                       [maps:get(id, StateData), Filename, Error])
+            report_event({cache_attempt_finished, Filename, {error, Error}}, StateData)
     end.
 
 -spec save_cached_tarball(binary(), calendar:datetime(), state_data())
@@ -535,3 +634,9 @@ reply_to_waiters(Result, StateData) ->
     Waiters = maps:get(waiters, StateData),
     Replies = [{reply, From, Result} || From <- Waiters],
     {StateData#{ waiters := [] }, Replies}.
+
+-spec report_event(event(), state_data()) -> ok.
+report_event(Event, #{ id := Id, event_subscribers := Modules }) ->
+    lists:foreach(
+      fun (Module) -> Module:report(Id, Event) end,
+      Modules).

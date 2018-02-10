@@ -30,7 +30,7 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/0]).                      -ignore_xref({start_link,0}).
--export([start_child/2]).
+-export([start_child/3]).
 -export([stop_child/1]).
 
 %% ------------------------------------------------------------------
@@ -69,10 +69,10 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
--spec start_child(atom(), string())
+-spec start_child(atom(), string(), [locus_http_loader:opt()])
         -> ok | {error, already_started}.
-start_child(DatabaseId, DatabaseURL) ->
-    ChildSpec = child_spec(DatabaseId, DatabaseURL),
+start_child(DatabaseId, DatabaseURL, Opts) ->
+    ChildSpec = child_spec(DatabaseId, DatabaseURL, Opts),
     case supervisor:start_child(?SERVER, ChildSpec) of
         {ok, _Pid} ->
             ok;
@@ -102,6 +102,7 @@ stop_child(DatabaseId) ->
 
 -spec init([]) -> {ok, {sup_flags(), []}}.
 init([]) ->
+    % TODO consider simple_one_for_one strategy with transient children
     SupFlags = #{ strategy => one_for_one,
                   intensity => 10,
                   period => 5 },
@@ -111,8 +112,8 @@ init([]) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-child_spec(DatabaseId, DatabaseURL) ->
-    Args = [DatabaseId, DatabaseURL],
+child_spec(DatabaseId, DatabaseURL, Opts) ->
+    Args = [DatabaseId, DatabaseURL, Opts],
     #{ id => child_id(DatabaseId),
        start => {locus_http_loader, start_link, Args}
      }.

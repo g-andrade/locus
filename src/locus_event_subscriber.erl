@@ -1,4 +1,4 @@
-%% Copyright (c) 2017 Guilherme Andrade <locus.lib@gandrade.net>
+%% Copyright (c) 2017-2018 Guilherme Andrade <locus.lib@gandrade.net>
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -21,21 +21,22 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%-define(log_debug(Fmt, Args),     ?___log(debug, Fmt, Args)).
-%-define(log_info(Fmt, Args),      ?___log(info, Fmt, Args)).
-%-define(log_notice(Fmt, Args),    ?___log(notice, Fmt, Args)).
-%-define(log_warning(Fmt, Args),   ?___log(warning, Fmt, Args)).
-%-define(log_error(Fmt, Args),     ?___log(error, Fmt, Args)).
-%-define(log_critical(Fmt, Args),  ?___log(critical, Fmt, Args)).
-%-define(log_alert(Fmt, Args),     ?___log(alert, Fmt, Args)).
-%-define(log_emergency(Fmt, Args), ?___log(emergency, Fmt, Args)).
+-module(locus_event_subscriber).
 
-%-define(___log(Level, Fmt, Args),
-%        (locus_logger:should_log((Level)) andalso lager:(Level)((Fmt), (Args)))).
+%% ------------------------------------------------------------------
+%% Callback Definitions
+%% ------------------------------------------------------------------
 
--define(log_info(Fmt, Args),      ?___log(info, info_msg, Fmt, Args)).
--define(log_warning(Fmt, Args),   ?___log(warning, warning_msg, Fmt, Args)).
--define(log_error(Fmt, Args),     ?___log(error, error_msg, Fmt, Args)).
+-callback report(DatabaseId, Event) -> ok
+        when DatabaseId :: atom(),
+             Event :: event().
 
--define(___log(Level, Fun, Fmt, Args),
-        (locus_logger:should_log((Level)) andalso error_logger:(Fun)(("[locus] " ++ (Fmt) ++ "~n"), (Args)))).
+-ignore_xref({behaviour_info,1}).
+
+%% ------------------------------------------------------------------
+%% Type Definitions
+%% ------------------------------------------------------------------
+
+-type event() ::
+        locus_http_loader:event().
+-export_type([event/0]).
