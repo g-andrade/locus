@@ -126,7 +126,7 @@ headers() = [{string(), string()}]
 
 
 <pre><code>
-opt() = {event_subscriber, module() | pid()}
+opt() = {event_subscriber, module() | pid()} | no_cache
 </code></pre>
 
 

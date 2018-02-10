@@ -67,7 +67,8 @@
 %% ------------------------------------------------------------------
 
 -type opt() ::
-    {event_subscriber, module() | pid()}.
+    {event_subscriber, module() | pid()} |
+    no_cache.
 -export_type([opt/0]).
 
 -ifdef(POST_OTP_18).
@@ -76,6 +77,7 @@
        url := url(),
        waiters := [?gen_statem:from()],
        event_subscribers := [module(), ...],
+       use_cache := boolean(),
        request_id => reference(),
        last_response_headers => headers(),
        last_response_body => binary(),
@@ -209,12 +211,15 @@ init([Id, URL, Opts]) ->
 
 -spec initializing(enter, atom(), state_data())
                    -> keep_state_and_data;
-                  (internal, load_from_cache, state_data())
-                   -> {next_state, ready, state_data(), {next_event, internal, update_database}}.
+                  (internal, maybe_load_from_cache, state_data())
+                   -> {next_state, ready, state_data(),
+                       {next_event, internal, update_database}}.
 %% @private
 initializing(enter, _PrevState, _StateData) ->
     keep_state_and_data;
-initializing(internal, load_from_cache, StateData) ->
+initializing(internal, maybe_load_from_cache, #{ use_cache := false } = StateData) ->
+    {next_state, ready, StateData, {next_event, internal, update_database}};
+initializing(internal, maybe_load_from_cache, #{ use_cache := true } = StateData) ->
     CachedTarballName = cached_tarball_name(StateData),
     CachedTarballLookup = read_file_and_its_modification_date(CachedTarballName),
     StateData2 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
@@ -387,7 +392,7 @@ processing_update(internal, execute, StateData) ->
             LastModified = extract_last_modified_datetime_from_response_headers(Headers),
             StateData4 = StateData3#{ last_modified => max(LastModified, Version),
                                       last_version => Version },
-            try_saving_cached_tarball(Body, LastModified, StateData4),
+            maybe_try_saving_cached_tarball(Body, LastModified, StateData4),
             {StateData5, Replies} = reply_to_waiters({ok, Version}, StateData4),
             {next_state, ready, StateData5, Replies};
         {error, Error} ->
@@ -425,7 +430,9 @@ init(Id, URL, Opts) ->
         #{ id => Id,
            url => URL,
            waiters => [],
-           event_subscribers => [] },
+           event_subscribers => [],
+           use_cache => true
+         },
     init_opts(Opts, BaseStateData).
 
 init_opts([{event_subscriber, Module} | Opts], StateData) when is_atom(Module), Module =/= undefined ->
@@ -443,10 +450,13 @@ init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
           fun (PrevSubscribers) -> [Pid | PrevSubscribers] end,
           StateData),
     init_opts(Opts, NewStateData);
+init_opts([no_cache | Opts], StateData) ->
+    NewStateData = StateData#{ use_cache := false },
+    init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->
     {stop, {invalid_opt, InvalidOpt}};
 init_opts([], StateData) ->
-    Actions = [{next_event, internal, load_from_cache}],
+    Actions = [{next_event, internal, maybe_load_from_cache}],
     {ok, initializing, StateData, Actions}.
 
 -spec cached_tarball_name(state_data()) -> nonempty_string().
@@ -491,8 +501,10 @@ load_database_from_tarball(Id, Tarball, Source) ->
             {error, {exception, Class, Reason}}
     end.
 
--spec try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
-try_saving_cached_tarball(Tarball, LastModified, StateData) ->
+-spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
+maybe_try_saving_cached_tarball(_Tarball, _LastModified, #{ use_cache := false }) ->
+    ok;
+maybe_try_saving_cached_tarball(Tarball, LastModified, #{ use_cache := true } = StateData) ->
     case save_cached_tarball(Tarball, LastModified, StateData) of
         {ok, Filename} ->
             report_event({cache_attempt_finished, Filename, ok}, StateData);
