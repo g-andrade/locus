@@ -683,6 +683,9 @@ enter(Module, Opts, State, Data, Server, Actions, Parent) ->
 %%%==========================================================================
 %%%  gen callbacks
 
+-ifdef(POST_OTP_18).
+-dialyzer({nowarn_function, init_it/6}).
+-endif.
 -spec init_it(pid(),_,pid() | {'global',atom()} | {'local',atom()} | {'via',atom() | tuple(),_},_,_,_) -> any().
 init_it(Starter, self, ServerRef, Module, Args, Opts) ->
     init_it(Starter, self(), ServerRef, Module, Args, Opts);
@@ -743,14 +746,23 @@ init_result(Starter, Parent, ServerRef, Module, Result, Opts) ->
 %%%==========================================================================
 %%% sys callbacks
 
+-ifdef(POST_OTP_18).
+-dialyzer({nowarn_function, system_continue/3}).
+-endif.
 -spec system_continue(_,_,#{}) -> any().
 system_continue(Parent, Debug, S) ->
     loop(Parent, Debug, S).
 
+-ifdef(POST_OTP_18).
+-dialyzer({nowarn_function, system_terminate/4}).
+-endif.
 -spec system_terminate(_,_,[sys:dbg_opt()],#{}) -> any().
 system_terminate(Reason, _Parent, Debug, S) ->
     terminate(exit, Reason, ?STACKTRACE(), Debug, S, []).
 
+-ifdef(POST_OTP_18).
+-dialyzer({nowarn_function, system_code_change/4}).
+-endif.
 -spec system_code_change(#{},_,_,_) -> any().
 system_code_change(
   #{module := Module,
@@ -774,10 +786,16 @@ system_code_change(
         Error
     end.
 
+-ifdef(POST_OTP_18).
+-dialyzer({nowarn_function, system_get_state/1}).
+-endif.
 -spec system_get_state(#{}) -> {'ok',{_,_}}.
 system_get_state(#{state := State, data := Data}) ->
     {ok,{State,Data}}.
 
+-ifdef(POST_OTP_18).
+-dialyzer({nowarn_function, system_replace_state/2}).
+-endif.
 -spec system_replace_state(fun((_) -> any()),#{}) -> {'ok',{_,_},#{}}.
 system_replace_state(
   StateFun,
@@ -786,6 +804,9 @@ system_replace_state(
     {NewState,NewData} = Result = StateFun({State,Data}),
     {ok,Result,S#{state := NewState, data := NewData}}.
 
+-ifdef(POST_OTP_18).
+-dialyzer({nowarn_function, format_status/2}).
+-endif.
 -spec format_status(_,[any(),...]) -> nonempty_maybe_improper_list().
 format_status(
   Opt,
