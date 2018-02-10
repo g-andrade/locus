@@ -289,18 +289,18 @@
 %        State :: state(),
 %        Data :: data()) ->
 %    any().
-%
-%% Note that the new code can expect to get an OldState from
-%% the old code version not only in code_change/4 but in the first
-%% state callback function called thereafter
-%-callback code_change(
-%        OldVsn :: term() | {'down', term()},
-%        OldState :: state(),
-%        OldData :: data(),
-%        Extra :: term()) ->
-%    {ok, NewState :: state(), NewData :: data()} |
-%    (Reason :: term()).
-%
+
+% Note that the new code can expect to get an OldState from
+% the old code version not only in code_change/4 but in the first
+% state callback function called thereafter
+-callback code_change(
+        OldVsn :: term() | {'down', term()},
+        OldState :: state(),
+        OldData :: data(),
+        Extra :: term()) ->
+    {ok, NewState :: state(), NewData :: data()} |
+    (Reason :: term()).
+
 %% Format the callback module state in some sensible that is
 %% often condensed way.  For StatusOption =:= 'normal' the perferred
 %% return term is [{data,[{"State",FormattedState}]}], and for
