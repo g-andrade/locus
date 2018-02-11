@@ -299,7 +299,8 @@ waiting_stream_start({call,From}, wait, StateData) ->
 waiting_stream_start(info, {http, {RequestId, stream_start, Headers}},
                      #{ request_id := RequestId } = StateData) ->
     report_event({download_started, Headers}, StateData),
-    UpdatedStateData = StateData#{ last_response_headers => Headers },
+    UpdatedStateData = StateData#{ last_response_headers => Headers,
+                                   last_response_body => <<>> },
     {next_state, waiting_stream_end, UpdatedStateData};
 waiting_stream_start(info,
                      {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
@@ -356,10 +357,10 @@ waiting_stream_end({call,From}, wait, StateData) ->
 waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
                    #{ request_id := RequestId } = StateData) ->
     UpdatedStateData =
-        ?maps_update_with4(
+        ?maps_update_with3(
           last_response_body,
           fun (Body) -> <<Body/binary, BinBodyPart/binary>> end,
-          BinBodyPart, StateData),
+          StateData),
     %?log_info("~p database download in progress - ~.3f MiB received so far",
     %          [maps:get(id, StateData),
     %           byte_size(maps:get(last_response_body, UpdatedStateData)) / (1 bsl 20)]),
