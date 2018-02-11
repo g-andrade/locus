@@ -672,7 +672,9 @@ report_event(Event, #{ id := Id, event_subscribers := Modules }) ->
       Modules).
 
 handle_monitored_process_death(Pid, StateData) ->
-    ?maps_update_with3(
-      event_subscribers,
-      fun (Subscribers) -> lists:delete(Pid, Subscribers) end,
-      StateData).
+    StateData2 =
+        ?maps_update_with3(
+          event_subscribers,
+          fun (Subscribers) -> lists:delete(Pid, Subscribers) end,
+          StateData),
+    {keep_state, StateData2}.
