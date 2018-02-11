@@ -58,4 +58,5 @@ README.md: doc
 	@rm "README.md_"
 
 publish:
-	@$(REBAR3) as publication hex publish
+	@$(REBAR3) hex publish
+	@$(REBAR3) hex publish docs
