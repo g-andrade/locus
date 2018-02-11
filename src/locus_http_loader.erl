@@ -619,7 +619,6 @@ base_request_headers() ->
                    "application/x-gtar",
                    "application/x-tgz"])},
      {"content-encoding", "identity"},
-     {"transfer-encoding", "identity"},
      {"connection", "close"}
     ].
 
