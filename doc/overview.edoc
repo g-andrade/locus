@@ -2,11 +2,9 @@
 @doc
 
 <a href="https://hex.pm/packages/locus" alt="Hex.pm Package">
-    <img src="https://img.shields.io/hexpm/v/locus.svg?style=flat"></img>
-</a>
+    <img src="https://img.shields.io/hexpm/v/locus.svg?style=flat"/></a>
 <a href="https://travis-ci.org/g-andrade/locus" alt="Build Status">
-    <img src="https://travis-ci.org/g-andrade/locus.png?branch=master"></img>
-</a>
+    <img src="https://travis-ci.org/g-andrade/locus.png?branch=master"/></a>
 
 == locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2 ==
 
