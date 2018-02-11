@@ -46,41 +46,56 @@ all_individual_tests() ->
 
 init_per_group(individual_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
-    ok = locus:start_loader(tests, ?COUNTRY_URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(tests, timer:seconds(60)),
+    warm_up_caches(),
     Config.
 
 end_per_group(individual_tests, Config) ->
-    ok = locus:stop_loader(tests),
     ok = application:stop(locus),
     Config.
 
 %%%
 
 ipv4_country_lookup_test(_Config) ->
-    country_lookup_test_(?IPV4_STR_ADDR).
+    Loader = ipv4_country_lookup_test,
+    ok = locus:start_loader(Loader, ?COUNTRY_URL),
+    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(5)),
+    {StrAddr, BinAddr, Addr} = address_forms(?IPV4_STR_ADDR),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, Addr)),
+    ok = locus:stop_loader(Loader).
 
 ipv4_invalid_addr_test(_Config) ->
-    invalid_addr_test_("256.0.1.2").
-
-%%%
+    Loader = ipv4_invalid_addr_test,
+    ok = locus:start_loader(Loader, ?COUNTRY_URL),
+    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(5)),
+    ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
+    ok = locus:stop_loader(Loader).
 
 ipv6_country_lookup_test(_Config) ->
-    country_lookup_test_(?IPV6_STR_ADDR).
+    Loader = ipv6_country_lookup_test,
+    ok = locus:start_loader(Loader, ?COUNTRY_URL),
+    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(5)),
+    {StrAddr, BinAddr, Addr} = address_forms(?IPV6_STR_ADDR),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, Addr)),
+    ok = locus:stop_loader(Loader).
 
 ipv6_invalid_addr_test(_Config) ->
-    invalid_addr_test_("22606:2800:220:1:248:1893:25c8:1946").
+    Loader = ipv6_invalid_addr_test,
+    ok = locus:start_loader(Loader, ?COUNTRY_URL),
+    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(5)),
+    ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
+    ok = locus:stop_loader(Loader).
 
 %%%
 
-country_lookup_test_(StrAddr) ->
-    {StrAddr, BinAddr, Addr} = address_forms(StrAddr),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, StrAddr)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, BinAddr)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(tests, Addr)).
-
-invalid_addr_test_(StrAddr) ->
-    ?assertMatch({error, invalid_address}, locus:lookup(tests, StrAddr)).
+warm_up_caches() ->
+    Loader = cache_warmer,
+    ok = locus:start_loader(Loader, ?COUNTRY_URL),
+    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(60)),
+    ok.
 
 address_forms(StrAddr) ->
     BinAddr = list_to_binary(StrAddr),
