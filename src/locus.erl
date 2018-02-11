@@ -49,7 +49,7 @@
 -type database_info() ::
         #{ metadata => database_metadata(),
            source => database_source(),
-           version => calendar:datetime()
+           version => database_version()
          }.
 -export_type([database_info/0]).
 
@@ -59,19 +59,26 @@
 -type database_source() :: {cache, string()} | {remote, string()}.
 -export_type([database_source/0]).
 
+-type database_version() :: calendar:datetime().
+-export_type([database_version/0]).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Starts a database loader under id `DatabaseId'
+%% @doc Like `:start_loader/3' but with default options
 %%
-%% `DatabaseId' must be an atom.
-%% `DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.</li>
+%% </ul>
 %%
 %% Returns:
-%% - `ok' in case of success.
-%% - `{error, invalid_url}' if the URL is invalid.
-%% - `{error, already_started}' if the loader under `DatabaseId' has already been started.
+%% <ul>
+%% <li>`ok' in case of success.</li>
+%% <li>`{error, invalid_url}' if the URL is invalid.</li>
+%% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
+%% </ul>
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
 %% @see start_loader/3
@@ -82,16 +89,20 @@
 start_loader(DatabaseId, DatabaseURL) ->
     start_loader(DatabaseId, DatabaseURL, []).
 
-%% @doc Starts a database loader under id `DatabaseId' with options `Opts'
+%% @doc Starts a database loader under id `DatabaseId' with options `Opts'.
 %%
-%% `DatabaseId' must be an atom.
-%% `DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.
-%% `Opts' must be a list of `locus_http_loader:opt()' values
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.</li>
+%% <li>`Opts' must be a list of `locus_http_loader:opt()' values</li>
+%% </ul>
 %%
 %% Returns:
-%% - `ok' in case of success.
-%% - `{error, invalid_url}' if the URL is invalid.
-%% - `{error, already_started}' if the loader under `DatabaseId' has already been started.
+%% <ul>
+%% <li>`ok' in case of success.</li>
+%% <li>`{error, invalid_url}' if the URL is invalid.</li>
+%% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
+%% </ul>
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
 %% @see start_loader/2
@@ -110,9 +121,11 @@ start_loader(DatabaseId, DatabaseURL, Opts) ->
         false -> {error, invalid_url}
     end.
 
-%% @doc Stops the database loader under id `DatabaseId'
+%% @doc Stops the database loader under id `DatabaseId'.
 %%
-%% `DatabaseId' must be an atom and refer to a started database loader.
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% </ul>
 %%
 %% Returns `ok' in case of success, `{error, not_found}' otherwise.
 -spec stop_loader(DatabaseId) -> ok | {error, Error}
@@ -121,61 +134,73 @@ start_loader(DatabaseId, DatabaseURL, Opts) ->
 stop_loader(DatabaseId) ->
     locus_sup:stop_child(DatabaseId).
 
-%% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails
+%% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails.
 %%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% </ul>
 %%
 %% Returns:
-%% - `{ok, LoadedVersion}' when the database is ready to use.
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, {loading, term()}}' if loading the database failed for some reason.
+%% <ul>
+%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
+%% </ul>
 %%
 %% @see wait_for_loader/2
 %% @see start_loader/2
 -spec wait_for_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
             when DatabaseId :: atom(),
-                 LoadedVersion :: calendar:datetime(),
+                 LoadedVersion :: database_version(),
                  Error :: database_unknown | {loading, LoadingError},
                  LoadingError :: term().
 wait_for_loader(DatabaseId) ->
     wait_for_loader(DatabaseId, infinity).
 
-%% @doc Like `wait_for_loader/1' but it can time-out
+%% @doc Like `wait_for_loader/1' but it can time-out.
 %%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
-%% - `Timeout' must be either a non-negative integer (milliseconds) or `infinity'.
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
+%% </ul>
 %%
 %% Returns:
-%% - `{ok, LoadedVersion}' when the database is ready to use.
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, timeout}' if we've given up on waiting.
-%% - `{error, {loading, term()}}' if loading the database failed for some reason.
+%% <ul>
+%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
+%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
+%% </ul>
 %% @see wait_for_loader/1
 %% @see start_loader/2
 -spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Error}
             when DatabaseId :: atom(),
                  Timeout :: timeout(),
-                 LoadedVersion :: calendar:datetime(),
+                 LoadedVersion :: database_version(),
                  Error :: database_unknown | timeout | {loading, LoadingError},
                  LoadingError :: term().
 wait_for_loader(DatabaseId, Timeout) ->
     locus_http_loader:wait(DatabaseId, Timeout).
 
-%% @doc Looks-up info on IPv4 and IPv6 addresses
+%% @doc Looks-up info on IPv4 and IPv6 addresses.
 %%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
-%% - `Address' must be either an `inet:ip_address()' tuple, or a string/binary
-%%    containing a valid representation of the address.
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% <li>`Address' must be either an `inet:ip_address()' tuple, or a string/binary
+%%    containing a valid representation of the address.</li>
+%% </ul>
 %%
 %% Returns:
-%% - `{ok, Entry}' in case of success
-%% - `{error, not_found}' if no data was found for this `Address'.
-%% - `{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
-%%    tuple or a valid textual representation of an IP address.
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
-%% - `{error, ipv4_database}' if `Address' represents an IPv6 address and the database
-%% only supports IPv4 addresses.
+%% <ul>
+%% <li>`{ok, Entry}' in case of success</li>
+%% <li>`{error, not_found}' if no data was found for this `Address'.</li>
+%% <li>`{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
+%%    tuple or a valid textual representation of an IP address.</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% <li>`{error, ipv4_database}' if `Address' represents an IPv6 address and the database
+%%      only supports IPv4 addresses.</li>
+%% </ul>
 -spec lookup(DatabaseId, Address) -> {ok, Entry} | {error, Error}
             when DatabaseId :: atom(),
                  Address :: inet:ip_address() | nonempty_string() | binary(),
@@ -186,30 +211,38 @@ wait_for_loader(DatabaseId, Timeout) ->
 lookup(DatabaseId, Address) ->
     locus_mmdb:lookup(DatabaseId, Address).
 
-%% @doc Returns the currently loaded database version [DEPRECATED]
+%% @doc Returns the currently loaded database version.
 %% @deprecated Please use {@link get_info/2} instead.
 %%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% </ul>
 %%
 %% Returns:
-%% - `{ok, LoadedVersion}' in case of success
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% <ul>
+%% <li>`{ok, LoadedVersion}' in case of success</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% </ul>
 -spec get_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
             when DatabaseId :: atom(),
-                 LoadedVersion :: calendar:datetime(),
+                 LoadedVersion :: database_version(),
                  Error :: database_unknown | database_not_loaded.
 get_version(DatabaseId) ->
     get_info(DatabaseId, version).
 
-%% @doc Returns the properties of the currently loaded database [DEPRECATED]
+%% @doc Returns the properties of a currently loaded database.
 %%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% </ul>
 %%
 %% Returns:
-%% - `{ok, database_info()}' in case of success
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% <ul>
+%% <li>`{ok, database_info()}' in case of success</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% </ul>
 %% @see get_info/2
 -spec get_info(DatabaseId) -> {ok, Info} | {error, Error}
             when DatabaseId :: atom(),
@@ -223,19 +256,25 @@ get_info(DatabaseId) ->
             {error, Error}
     end.
 
-%% @doc Returns a specific property of the currently loaded database [DEPRECATED]
+%% @doc Returns a specific property of a currently loaded database.
 %%
-%% - `DatabaseId' must be an atom and refer to a started database loader.
-%% - `Property' must be either `metadata' or `version'.
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% <li>`Property' must be either `metadata', `source' or `version'.</li>
+%% </ul>
 %%
 %% Returns:
-%% - `{ok, Value}' in case of success
-%% - `{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.
-%% - `{error, database_not_loaded}' if the database hasn't yet been loaded.
+%% <ul>
+%% <li>`{ok, Value}' in case of success</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% </ul>
 %% @see get_info/1
--spec get_info(DatabaseId :: atom(), metadata) -> {ok, database_metadata()} | {error, database_error()};
-              (DatabaseId :: atom(), source)   -> {ok, database_source()} | {error, database_error()};
-              (DatabaseId :: atom(), version)  -> {ok, calendar:datetime()} | {error, database_error()}.
+-spec get_info(DatabaseId, Property) -> {ok, Value} | {error, Error}
+            when DatabaseId :: atom(),
+                 Property :: metadata | source | version,
+                 Value :: database_metadata() | database_source() | database_version(),
+                 Error :: database_unknown | database_not_loaded.
 get_info(DatabaseId, Property) ->
     case get_info(DatabaseId) of
         {ok, #{ Property := Value }} ->
