@@ -82,6 +82,7 @@ report(DatabaseId, Event) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec report(non_neg_integer() | infinity, atom(), locus_event_subscriber:event()) -> ok.
 report(MinWeight, DatabaseId, {request_sent, URL, Headers}) ->
     if MinWeight =< ?debug ->
            log_info("~p database download request sent (url ~p, headers ~p)", [DatabaseId, URL, Headers]);
@@ -90,7 +91,7 @@ report(MinWeight, DatabaseId, {request_sent, URL, Headers}) ->
        true ->
            ok
     end;
-report(MinWeight, DatabaseId, {stream_dismissed, HttpResponse}) ->
+report(MinWeight, DatabaseId, {download_dismissed, HttpResponse}) ->
     if MinWeight =< ?debug ->
            log_info("~p database download canceled: ~p", [DatabaseId, HttpResponse]);
        MinWeight =< ?info ->
@@ -98,13 +99,13 @@ report(MinWeight, DatabaseId, {stream_dismissed, HttpResponse}) ->
        true ->
            ok
     end;
-report(MinWeight, DatabaseId, {stream_failed_to_start, Reason}) ->
+report(MinWeight, DatabaseId, {download_failed_to_start, Reason}) ->
     if MinWeight =< ?error ->
            log_error("~p database download failed to start: ~p", [DatabaseId, Reason]);
        true ->
            ok
     end;
-report(MinWeight, DatabaseId, {stream_started, Headers}) ->
+report(MinWeight, DatabaseId, {download_started, Headers}) ->
     if MinWeight =< ?debug ->
            log_info("~p database download started (headers ~p)", [DatabaseId, Headers]);
        MinWeight =< ?info ->
@@ -112,7 +113,7 @@ report(MinWeight, DatabaseId, {stream_started, Headers}) ->
        true ->
            ok
     end;
-report(MinWeight, DatabaseId, {stream_finished, BodySize, {ok, TrailingHeaders}}) ->
+report(MinWeight, DatabaseId, {download_finished, BodySize, {ok, TrailingHeaders}}) ->
     if MinWeight =< ?debug ->
            log_info("~p database download succeeded after ~p bytes (trailing headers ~p)",
                      [DatabaseId, BodySize, TrailingHeaders]);
@@ -122,7 +123,7 @@ report(MinWeight, DatabaseId, {stream_finished, BodySize, {ok, TrailingHeaders}}
        true ->
            ok
     end;
-report(MinWeight, DatabaseId, {stream_finished, BodySize, {error, Error}}) ->
+report(MinWeight, DatabaseId, {download_finished, BodySize, {error, Error}}) ->
     if MinWeight =< ?error ->
            log_error("~p database download failed after ~p bytes: ~p",
                      [DatabaseId, BodySize, Error]);

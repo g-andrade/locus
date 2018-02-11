@@ -60,8 +60,8 @@
 -define(POST_READINESS_UPDATE_PERIOD, (timer:hours(6))).
 
 -define(DEFAULT_HTTP_CONNECT_TIMEOUT, (timer:seconds(8))).
--define(DEFAULT_HTTP_STREAM_START_TIMEOUT, (timer:seconds(5))).
--define(DEFAULT_HTTP_IDLE_STREAM_TIMEOUT, (timer:seconds(5))).
+-define(DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT, (timer:seconds(5))).
+-define(DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT, (timer:seconds(5))).
 
 -define(is_timeout(V), ((is_integer((V)) andalso ((V) >= 0)) orelse ((V) =:= infinity))).
 
@@ -72,8 +72,8 @@
 -type opt() ::
     {event_subscriber, module() | pid()} |
     {connect_timeout, timeout()} |
-    {stream_start_timeout, timeout()} |
-    {idle_stream_timeout, timeout()} |
+    {download_start_timeout, timeout()} |
+    {idle_download_timeout, timeout()} |
     no_cache.
 -export_type([opt/0]).
 
@@ -84,8 +84,8 @@
        waiters := [?gen_statem:from()],
        event_subscribers := [module(), ...],
        connect_timeout := timeout(),
-       stream_start_timeout := timeout(),
-       idle_stream_timeout := timeout(),
+       download_start_timeout := timeout(),
+       idle_download_timeout := timeout(),
        no_cache => true,
 
        request_id => reference(),
@@ -101,8 +101,8 @@
        waiters => [?gen_statem:from()],
        event_subscribers => [module(), ...],
        connect_timeout => timeout(),
-       stream_start_timeout => timeout(),
-       idle_stream_timeout => timeout(),
+       download_start_timeout => timeout(),
+       idle_download_timeout => timeout(),
        no_cache => true,
 
        request_id => reference(),
@@ -130,10 +130,10 @@
 
 -type event() ::
         event_request_sent() |
-        event_stream_dismissed() |
-        event_stream_failed_to_start() |
-        event_stream_started() |
-        event_stream_finished() |
+        event_download_dismissed() |
+        event_download_failed_to_start() |
+        event_download_started() |
+        event_download_finished() |
         event_load_attempt_finished() |
         event_cache_attempt_finished().
 -export_type([event/0]).
@@ -142,25 +142,25 @@
         {request_sent, url(), headers()}.
 -export_type([event_request_sent/0]).
 
--type event_stream_dismissed() ::
-        {stream_dismissed, {http, response_status(), headers(), body()}}.
--export_type([event_stream_dismissed/0]).
+-type event_download_dismissed() ::
+        {download_dismissed, {http, response_status(), headers(), body()}}.
+-export_type([event_download_dismissed/0]).
 
--type event_stream_failed_to_start() ::
-        {stream_failed_to_start, {http, response_status(), headers(), body()}} |
-        {stream_failed_to_start, {error, term()}} |
-        {stream_failed_to_start, timeout}.
--export_type([event_stream_failed_to_start/0]).
+-type event_download_failed_to_start() ::
+        {download_failed_to_start, {http, response_status(), headers(), body()}} |
+        {download_failed_to_start, {error, term()}} |
+        {download_failed_to_start, timeout}.
+-export_type([event_download_failed_to_start/0]).
 
--type event_stream_started() ::
-        {stream_started, headers()}.
--export_type([event_stream_started/0]).
+-type event_download_started() ::
+        {download_started, headers()}.
+-export_type([event_download_started/0]).
 
--type event_stream_finished() ::
-        {stream_finished, BodySize :: non_neg_integer(), {ok, TrailingHeaders :: headers()}} |
-        {stream_finished, BodySize :: non_neg_integer(), {error, term()}} |
-        {stream_finished, BodySize :: non_neg_integer(), {error, timeout}}.
--export_type([event_stream_finished/0]).
+-type event_download_finished() ::
+        {download_finished, BodySize :: non_neg_integer(), {ok, TrailingHeaders :: headers()}} |
+        {download_finished, BodySize :: non_neg_integer(), {error, term()}} |
+        {download_finished, BodySize :: non_neg_integer(), {error, timeout}}.
+-export_type([event_download_finished/0]).
 
 -type event_load_attempt_finished() ::
         {load_attempt_finished, locus_mmdb:source(), {ok, Version :: calendar:datetime()}} |
@@ -291,40 +291,40 @@ ready(state_timeout, update_database, _StateData) ->
                             -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
 waiting_stream_start(enter, _PrevState, StateData) ->
-    StreamStartTimeout = maps:get(stream_start_timeout, StateData),
+    StreamStartTimeout = maps:get(download_start_timeout, StateData),
     {keep_state_and_data, {state_timeout, StreamStartTimeout, timeout}};
 waiting_stream_start({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
 waiting_stream_start(info, {http, {RequestId, stream_start, Headers}},
                      #{ request_id := RequestId } = StateData) ->
-    report_event({stream_started, Headers}, StateData),
+    report_event({download_started, Headers}, StateData),
     UpdatedStateData = StateData#{ last_response_headers => Headers },
     {next_state, waiting_stream_end, UpdatedStateData};
 waiting_stream_start(info,
                      {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
                      #{ request_id := RequestId } = StateData)
   when StatusCode =:= 304 ->
-    report_event({stream_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
+    report_event({download_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
     UpdatedStateData = maps:remove(request_id, StateData),
     {next_state, ready, UpdatedStateData};
 waiting_stream_start(info,
                      {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
                      #{ request_id := RequestId } = StateData) ->
-    report_event({stream_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
+    report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
     StateData2 = maps:remove(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {http, StatusCode, StatusDesc}}, StateData2),
     {next_state, ready, StateData3, Replies};
 waiting_stream_start(info, {http, {RequestId, {error, Reason}}},
                      #{ request_id := RequestId } = StateData) ->
-    report_event({stream_failed_to_start, {error, Reason}}, StateData),
+    report_event({download_failed_to_start, {error, Reason}}, StateData),
     StateData2 = maps:remove(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
     {next_state, ready, StateData3, Replies};
 waiting_stream_start(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
     handle_monitored_process_death(Pid, StateData);
 waiting_stream_start(state_timeout, timeout, StateData) ->
-    report_event({stream_failed_to_start, timeout}, StateData),
+    report_event({download_failed_to_start, timeout}, StateData),
     {RequestId, StateData2} = ?maps_take(request_id, StateData),
     {StateData3, Replies} = reply_to_waiters({error, {timeout, waiting_stream_start}}, StateData2),
     ok = httpc:cancel_request(RequestId),
@@ -348,7 +348,7 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                         -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
 waiting_stream_end(enter, _PrevState, StateData) ->
-    IdleStreamTimeout = maps:get(idle_stream_timeout, StateData),
+    IdleStreamTimeout = maps:get(idle_download_timeout, StateData),
     {keep_state_and_data, {state_timeout, IdleStreamTimeout, timeout}};
 waiting_stream_end({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
@@ -363,12 +363,12 @@ waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
     %?log_info("~p database download in progress - ~.3f MiB received so far",
     %          [maps:get(id, StateData),
     %           byte_size(maps:get(last_response_body, UpdatedStateData)) / (1 bsl 20)]),
-    IdleStreamTimeout = maps:get(idle_stream_timeout, StateData),
+    IdleStreamTimeout = maps:get(idle_download_timeout, StateData),
     {keep_state, UpdatedStateData, {state_timeout, IdleStreamTimeout, timeout}};
 waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked encoding
                    #{ request_id := RequestId } = StateData) ->
     BodySize = byte_size(maps:get(last_response_body, StateData)),
-    report_event({stream_finished, BodySize, {ok, Headers}}, StateData),
+    report_event({download_finished, BodySize, {ok, Headers}}, StateData),
     StateData2 =
         ?maps_update_with4(
           last_response_headers,
@@ -380,7 +380,7 @@ waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked 
 waiting_stream_end(info, {http, {RequestId, {error, Reason}}},
                    #{ request_id := RequestId } = StateData) ->
     BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
-    report_event({stream_finished, BodySizeSoFar, {error, Reason}}, StateData),
+    report_event({download_finished, BodySizeSoFar, {error, Reason}}, StateData),
     StateData2 =
         maps:without([request_id, last_response_headers, last_response_body],
                      StateData),
@@ -390,7 +390,7 @@ waiting_stream_end(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
     handle_monitored_process_death(Pid, StateData);
 waiting_stream_end(state_timeout, timeout, StateData) ->
     BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
-    report_event({stream_finished, BodySizeSoFar, {error, timeout}}, StateData),
+    report_event({download_finished, BodySizeSoFar, {error, timeout}}, StateData),
     {RequestId, StateData2} = ?maps_take(request_id, StateData),
     StateData3 = maps:without([last_response_headers, last_response_body], StateData2),
     {StateData4, Replies} = reply_to_waiters({error, {timeout, waiting_stream_end}}, StateData3),
@@ -437,8 +437,8 @@ code_change(_OldVsn, OldState, OldStateData, _Extra) ->
             EventSubscribers = [locus_logger],
             StateData = OldStateData#{ event_subscribers => EventSubscribers,
                                        connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
-                                       stream_start_timeout => ?DEFAULT_HTTP_STREAM_START_TIMEOUT,
-                                       idle_stream_timeout => ?DEFAULT_HTTP_IDLE_STREAM_TIMEOUT },
+                                       download_start_timeout => ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
+                                       idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT },
             {ok, OldState, StateData}
     end.
 
@@ -460,8 +460,8 @@ init(Id, URL, Opts) ->
            waiters => [],
            event_subscribers => [],
            connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
-           stream_start_timeout => ?DEFAULT_HTTP_STREAM_START_TIMEOUT,
-           idle_stream_timeout => ?DEFAULT_HTTP_IDLE_STREAM_TIMEOUT
+           download_start_timeout => ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
+           idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT
          },
     init_opts(Opts, BaseStateData).
 
@@ -483,11 +483,11 @@ init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
 init_opts([{connect_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
     NewStateData = StateData#{ connect_timeout := Timeout },
     init_opts(Opts, NewStateData);
-init_opts([{stream_start_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
-    NewStateData = StateData#{ stream_start_timeout := Timeout },
+init_opts([{download_start_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ download_start_timeout := Timeout },
     init_opts(Opts, NewStateData);
-init_opts([{idle_stream_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
-    NewStateData = StateData#{ idle_stream_timeout := Timeout },
+init_opts([{idle_download_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ idle_download_timeout := Timeout },
     init_opts(Opts, NewStateData);
 init_opts([no_cache | Opts], StateData) ->
     NewStateData = StateData#{ no_cache => true },
