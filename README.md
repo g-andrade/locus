@@ -1,8 +1,9 @@
 locus
 =====
 
-[![Hex
-pm](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
+[![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
+
+[![](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus.png?branch=master)
 
 ### locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2
 
