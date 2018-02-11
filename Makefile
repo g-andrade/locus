@@ -59,4 +59,4 @@ README.md: doc
 
 publish:
 	@$(REBAR3) hex publish
-	@$(REBAR3) hex publish docs
+	@$(REBAR3) hex docs
