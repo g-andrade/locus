@@ -230,6 +230,8 @@ initializing(internal, maybe_load_from_cache, StateData) ->
             -> {keep_state_and_data, {state_timeout, pos_integer(), update_database}};
            ({call,?gen_statem:from()}, wait, state_data())
            -> {keep_state, state_data(), [?gen_statem:reply_action()]};
+           (info, {'DOWN', reference(), process, pid(), term()}, state_data())
+           -> {keep_state, state_data()};
            (internal, update_database, state_data())
             -> {next_state, waiting_stream_start, state_data()};
            (state_timeout, update_database, state_data())
@@ -268,6 +270,8 @@ ready(state_timeout, update_database, _StateData) ->
                                {next_state, ready, state_data(), [?gen_statem:reply_action()]};
                           (info, {http, {reference(), {error, term()}}}, state_data())
                             -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
+                          (info, {'DOWN', reference(), process, pid(), term()}, state_data())
+                          -> {keep_state, state_data()};
                           (state_timeout, timeout, state_data())
                             -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
@@ -322,6 +326,8 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                             {next_event, internal, execute}};
                         (info, {http, {reference(), {error, term()}}}, state_data())
                         -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
+                        (info, {'DOWN', reference(), process, pid(), term()}, state_data())
+                        -> {keep_state, state_data()};
                         (state_timeout, timeout, state_data())
                         -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
