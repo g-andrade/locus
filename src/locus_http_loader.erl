@@ -35,6 +35,10 @@
 -export([start_link/3]).                    -ignore_xref({start_link, 3}).
 -export([wait/2]).
 
+-ifdef(TEST).
+-export([cached_tarball_name_for_url/1]).
+-endif.
+
 %% ------------------------------------------------------------------
 %% gen_statem Function Exports
 %% ------------------------------------------------------------------
@@ -502,6 +506,10 @@ init_opts([], StateData) ->
 -spec cached_tarball_name(state_data()) -> nonempty_string().
 cached_tarball_name(StateData) ->
     #{ url := URL } = StateData,
+    cached_tarball_name_for_url(URL).
+
+-spec cached_tarball_name_for_url(string()) -> nonempty_string().
+cached_tarball_name_for_url(URL) ->
     Hash = crypto:hash(sha256, URL),
     HexHash = bin_to_hex_str(Hash),
     Filename = HexHash ++ ".tgz",
