@@ -13,7 +13,7 @@
   {modules, []},
 
   {env,
-   [{log_level, error} % info | warning | error
+   [{log_level, error} % debug | info | warning | error
    ]},
 
   {maintainers, ["Guilherme Andrade"]},
