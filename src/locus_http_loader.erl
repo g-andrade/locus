@@ -59,8 +59,11 @@
 -define(PRE_READINESS_UPDATE_PERIOD, (timer:minutes(1))).
 -define(POST_READINESS_UPDATE_PERIOD, (timer:hours(6))).
 
--define(HTTP_CONNECT_TIMEOUT, (timer:seconds(8))).
--define(HTTP_IDLE_STREAM_TIMEOUT, (timer:seconds(5))).
+-define(DEFAULT_HTTP_CONNECT_TIMEOUT, (timer:seconds(8))).
+-define(DEFAULT_HTTP_STREAM_START_TIMEOUT, (timer:seconds(5))).
+-define(DEFAULT_HTTP_IDLE_STREAM_TIMEOUT, (timer:seconds(5))).
+
+-define(is_timeout(V), ((is_integer((V)) andalso ((V) >= 0)) orelse ((V) =:= infinity))).
 
 %% ------------------------------------------------------------------
 %% Type Definitions
@@ -68,6 +71,9 @@
 
 -type opt() ::
     {event_subscriber, module() | pid()} |
+    {connect_timeout, timeout()} |
+    {stream_start_timeout, timeout()} |
+    {idle_stream_timeout, timeout()} |
     no_cache.
 -export_type([opt/0]).
 
@@ -77,7 +83,11 @@
        url := url(),
        waiters := [?gen_statem:from()],
        event_subscribers := [module(), ...],
+       connect_timeout := timeout(),
+       stream_start_timeout := timeout(),
+       idle_stream_timeout := timeout(),
        no_cache => true,
+
        request_id => reference(),
        last_response_headers => headers(),
        last_response_body => binary(),
@@ -90,7 +100,11 @@
        url => url(),
        waiters => [?gen_statem:from()],
        event_subscribers => [module(), ...],
+       connect_timeout => timeout(),
+       stream_start_timeout => timeout(),
+       idle_stream_timeout => timeout(),
        no_cache => true,
+
        request_id => reference(),
        last_response_headers => headers(),
        last_response_body => binary(),
@@ -248,7 +262,8 @@ ready(internal, update_database, StateData) ->
     URL = maps:get(url, StateData),
     Headers = request_headers(StateData),
     Request = {URL, Headers},
-    HTTPOptions = [{connect_timeout, ?HTTP_CONNECT_TIMEOUT}],
+    ConnectTimeout = maps:get(connect_timeout, StateData),
+    HTTPOptions = [{connect_timeout, ConnectTimeout}],
     Options = [{sync, false}, {stream, self}],
     {ok, RequestId} = httpc:request(get, Request, HTTPOptions, Options),
     true = is_reference(RequestId),
@@ -275,8 +290,9 @@ ready(state_timeout, update_database, _StateData) ->
                           (state_timeout, timeout, state_data())
                             -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
-waiting_stream_start(enter, _PrevState, _StateData) ->
-    {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
+waiting_stream_start(enter, _PrevState, StateData) ->
+    StreamStartTimeout = maps:get(stream_start_timeout, StateData),
+    {keep_state_and_data, {state_timeout, StreamStartTimeout, timeout}};
 waiting_stream_start({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
@@ -331,8 +347,9 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                         (state_timeout, timeout, state_data())
                         -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
-waiting_stream_end(enter, _PrevState, _StateData) ->
-    {keep_state_and_data, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
+waiting_stream_end(enter, _PrevState, StateData) ->
+    IdleStreamTimeout = maps:get(idle_stream_timeout, StateData),
+    {keep_state_and_data, {state_timeout, IdleStreamTimeout, timeout}};
 waiting_stream_end({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
@@ -346,7 +363,8 @@ waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
     %?log_info("~p database download in progress - ~.3f MiB received so far",
     %          [maps:get(id, StateData),
     %           byte_size(maps:get(last_response_body, UpdatedStateData)) / (1 bsl 20)]),
-    {keep_state, UpdatedStateData, {state_timeout, ?HTTP_IDLE_STREAM_TIMEOUT, timeout}};
+    IdleStreamTimeout = maps:get(idle_stream_timeout, StateData),
+    {keep_state, UpdatedStateData, {state_timeout, IdleStreamTimeout, timeout}};
 waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked encoding
                    #{ request_id := RequestId } = StateData) ->
     BodySize = byte_size(maps:get(last_response_body, StateData)),
@@ -415,9 +433,12 @@ code_change(_OldVsn, OldState, OldStateData, _Extra) ->
         #{ id := _, url := _, waiters := _, event_subscribers := _ } ->
             {ok, OldState, OldStateData};
         #{ id := _, url := _, waiters := _ } ->
-            % lib was at version 1.0.0; ensure logging keeps working as before
+            % lib was at version 1.0.0; ensure everything works as before
             EventSubscribers = [locus_logger],
-            StateData = OldStateData#{ event_subscribers => EventSubscribers },
+            StateData = OldStateData#{ event_subscribers => EventSubscribers,
+                                       connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
+                                       stream_start_timeout => ?DEFAULT_HTTP_STREAM_START_TIMEOUT,
+                                       idle_stream_timeout => ?DEFAULT_HTTP_IDLE_STREAM_TIMEOUT },
             {ok, OldState, StateData}
     end.
 
@@ -437,7 +458,10 @@ init(Id, URL, Opts) ->
         #{ id => Id,
            url => URL,
            waiters => [],
-           event_subscribers => []
+           event_subscribers => [],
+           connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
+           stream_start_timeout => ?DEFAULT_HTTP_STREAM_START_TIMEOUT,
+           idle_stream_timeout => ?DEFAULT_HTTP_IDLE_STREAM_TIMEOUT
          },
     init_opts(Opts, BaseStateData).
 
@@ -455,6 +479,15 @@ init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
           event_subscribers,
           fun (PrevSubscribers) -> [Pid | PrevSubscribers] end,
           StateData),
+    init_opts(Opts, NewStateData);
+init_opts([{connect_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ connect_timeout := Timeout },
+    init_opts(Opts, NewStateData);
+init_opts([{stream_start_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ stream_start_timeout := Timeout },
+    init_opts(Opts, NewStateData);
+init_opts([{idle_stream_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ idle_stream_timeout := Timeout },
     init_opts(Opts, NewStateData);
 init_opts([no_cache | Opts], StateData) ->
     NewStateData = StateData#{ no_cache => true },

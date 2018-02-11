@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - OTP 19.0, 19.1 and 19.2 support
 - ability of consulting database metadata, source and version through `:get_info`
 - ability of subscribing database loader events
+- ability of specifying connect, download start and idle download timeouts
 - ability of turning off cache
 
 ## [1.0.0] - 2017-12-31
