@@ -19,7 +19,7 @@ both for reliability and netiquette towards MaxMind.
 
 === Usage ===
 
-Run `make console' to bring up a shell.
+Clone the repository and run `make console' to bring up a shell.
 
 ==== 1. Start the database loader ====
 
@@ -145,7 +145,7 @@ Documentation is hosted on <a href="https://hexdocs.pm/locus/">HexDocs</a>.
 <li>Modification time of the tarballs is extracted from 'last-modified' response header (when present)
   and used to condition downloads on subsequent boots and save bandwidth
   </li>
-<li>It can be disabled by specifying the `no_cache' option when running `:start_loader'</li>
+<li>Caching can be disabled by specifying the `no_cache' option when running `:start_loader'</li>
 </ul>
 
 ==== Logging ====
