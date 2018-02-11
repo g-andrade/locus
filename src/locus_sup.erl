@@ -70,7 +70,7 @@ start_link() ->
     supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
 -spec start_child(atom(), string(), [locus_http_loader:opt()])
-        -> ok | {error, already_started}.
+        -> ok | {error, term()}.
 start_child(DatabaseId, DatabaseURL, Opts) ->
     ChildSpec = child_spec(DatabaseId, DatabaseURL, Opts),
     case supervisor:start_child(?SERVER, ChildSpec) of
@@ -79,7 +79,9 @@ start_child(DatabaseId, DatabaseURL, Opts) ->
         {error, already_present} ->
             {error, already_started};
         {error, {already_started, _Pid}} ->
-            {error, already_started}
+            {error, already_started};
+        {error, {Error, _Child}} ->
+            {error, Error}
     end.
 
 -spec stop_child(atom()) -> ok | {error, not_found}.
