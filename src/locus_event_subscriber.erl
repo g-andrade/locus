@@ -21,6 +21,12 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc
+%% Callbacks:
+%% <ul>
+%% <li>`report(DatabaseId :: atom(), Event :: event()) -> ok'</li>
+%% </ul>
+
 -module(locus_event_subscriber).
 
 %% ------------------------------------------------------------------
