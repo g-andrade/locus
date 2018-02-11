@@ -5,6 +5,7 @@ ifeq ($(wildcard rebar3),rebar3)
 endif
 
 REBAR3 ?= $(shell test -e `which rebar3` 2>/dev/null && which rebar3 || echo "./rebar3")
+PANDOC = pandoc
 
 ifeq ($(REBAR3),)
 	REBAR3 = $(CURDIR)/rebar3
@@ -42,8 +43,9 @@ console: export ERL_FLAGS =? +pc unicode
 console:
 	@$(REBAR3) as development shell --apps locus
 
-doc: build
-	./scripts/hackish_make_docs.sh
+doc:
+	@$(REBAR3) edoc
+	@$(PANDOC) --from html --to markdown doc/overview-summary.html -o README.md
 
 publish:
 	@$(REBAR3) as publication hex publish
