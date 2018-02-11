@@ -120,7 +120,7 @@ The data for each entry is decoded on the fly upon successful lookups.
 * The first file to be found, within the tarball, with an .mmdb extension, is the one that's chosen for loading
 * The implementation of [MaxMind DB format](https://maxmind.github.io/MaxMind-DB/) is mostly complete
 
-<h5><a name="On_downloading_and_updating">On downloading and updating</a></h5>
+<h5><a name="Downloads_and_updates">Downloads and updates</a></h5>
 
 * The downloaded tarballs are uncompressed in memory
 * The 'last-modified' response header, if present, is used to condition subsequent download
@@ -130,20 +130,30 @@ on future launches of the database loader
 * Until the database loader achieves readiness, download attempts are made every minute;
 once readiness is achieved (either from cache or network), this interval increases to every 6 hours
 
-<h5><a name="On_caching">On caching</a></h5>
+<h5><a name="Caching">Caching</a></h5>
 
 * Caching is a best-effort; the system falls back to relying exclusively on the network if needed
 * A caching directory named 'locus_erlang' is created under the ['user_cache' basedir](http://erlang.org/doc/man/filename#basedir-3)
 * Cached tarballs are named after the SHA256 hash of their source URL
 * Modification time of the tarballs is extracted from 'last-modified' response header (when present)
-and used to condition downloads on subsequent boots and save bandwidth
+  and used to condition downloads on subsequent boots and save bandwidth
+* It can be disabled by specifying the `no_cache` option when running `:start_loader`
 
-<h5><a name="On_logging">On logging</a></h5>
+<h5><a name="Logging">Logging</a></h5>
 
-* Four logging levels are supported: `info`, `warning`, `error` and `none`
+* Five logging levels are supported: `debug`, `info`, `warning`, `error` and `none`
 * The backend is [error_logger](http://erlang.org/doc/man/error_logger); this usually plays nicely with `lager`
 * The default log level is `error`; it can be changed in the application's `env` config
 * To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
+
+<h5><a name="Event_subscription">Event subscription</a></h5>
+
+* Any number of event subscribers can be attached to a database loader by specifying the `{event_subscriber, Subscriber}`
+  option when starting the database
+* A `Subscriber` can be either a module implementing the `locus_event_subscriber` behaviour or an arbitrary `pid()`
+* The format and content of reported events can be consulted on the function reference at the end of this page;
+most key steps in the loader pipeline are reported (download started, download succeeded, download failed,
+caching succeeded, loading failed, etc.)
 
 
 #### <a name="Alternatives_(Erlang)">Alternatives (Erlang)</a> ####
