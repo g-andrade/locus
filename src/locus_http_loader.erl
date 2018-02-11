@@ -36,6 +36,8 @@
 -export([wait/2]).
 
 -ifdef(TEST).
+-export([whereis/1]).
+-export([list_subscribers/1]).
 -export([cached_tarball_name_for_url/1]).
 -endif.
 
@@ -212,6 +214,17 @@ wait(Id, Timeout) ->
         exit:{{shutdown,_Reason}, {?gen_statem,call, [ServerName|_]}} ->
             {error, database_unknown}
     end.
+
+-ifdef(TEST).
+whereis(Id) ->
+    ServerName = server_name(Id),
+    erlang:whereis(ServerName).
+
+list_subscribers(Id) ->
+    ServerName = server_name(Id),
+    {_State, StateName} = sys:get_state(ServerName),
+    maps:get(event_subscribers, StateName).
+-endif.
 
 %% ------------------------------------------------------------------
 %% gen_statem Function Definitions
