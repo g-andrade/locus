@@ -100,13 +100,15 @@ Check the <a href="#modules">function reference</a> for an overview on everythin
 ==== On databases ====
 
 <ul>
-<li>The free GeoLite2 <a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">Country, City and ASN databases</a></li>
+<li>The free GeoLite2 <a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">Country, City and ASN databases</a>
   were all successfully tested; presumably `locus' can deal with any MaxMind DB -formatted database that maps
   IP address prefixes to arbitrary data, but no <a href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
   commercial databases</a> have yet been tested
-<li>The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the</li>
+  </li>
+<li>The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the
   application callers using ETS tables, and the original binary search tree is used to lookup addresses.
   The data for each entry is decoded on the fly upon successful lookups.
+  </li>
 </ul>
 
 ==== On formats ====

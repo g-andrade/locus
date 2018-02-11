@@ -99,9 +99,17 @@ you can do.
 ##### On databases
 
 -   The free GeoLite2 [Country, City and ASN
-    databases](https://dev.maxmind.com/geoip/geoip2/geolite2/)
+    databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
+    successfully tested; presumably `locus` can deal with any MaxMind DB
+    -formatted database that maps IP address prefixes to arbitrary data,
+    but no [commercial
+    databases](https://dev.maxmind.com/geoip/geoip2/downloadable/) have
+    yet been tested
 -   The databases are loaded into memory (mostly) as-is; reference
-    counted binaries are shared with the
+    counted binaries are shared with the application callers using ETS
+    tables, and the original binary search tree is used to lookup
+    addresses. The data for each entry is decoded on the fly upon
+    successful lookups.
 
 ##### On formats
 
