@@ -115,11 +115,14 @@ you can do.
 
 -   The downloaded tarballs are uncompressed in memory
 -   The 'last-modified' response header, if present, is used to
-    condition subsequent download
+    condition subsequent download attempts (using 'if-modified-since'
+    request headers) in order to save bandwidth
 -   The downloaded tarballs are cached on the filesystem in order to
-    more quickly achieve readiness
+    more quickly achieve readiness on future launches of the database
+    loader
 -   Until the database loader achieves readiness, download attempts are
-    made every minute;
+    made every minute; once readiness is achieved (either from cache or
+    network), this interval increases to every 6 hours
 
 ##### Caching
 
@@ -130,7 +133,8 @@ you can do.
     basedir](http://erlang.org/doc/man/filename#basedir-3)
 -   Cached tarballs are named after the SHA256 hash of their source URL
 -   Modification time of the tarballs is extracted from 'last-modified'
-    response header (when present)
+    response header (when present) and used to condition downloads on
+    subsequent boots and save bandwidth
 -   It can be disabled by specifying the `no_cache` option when running
     `:start_loader`
 
@@ -148,11 +152,14 @@ you can do.
 ##### Event subscription
 
 -   Any number of event subscribers can be attached to a database loader
-    by specifying the `{event_subscriber, Subscriber}`
+    by specifying the `{event_subscriber, Subscriber}` option when
+    starting the database
 -   A `Subscriber` can be either a module implementing the
     `locus_event_subscriber` behaviour or an arbitrary `pid()`
 -   The format and content of reported events can be consulted on the
-    function reference at the end of this page;
+    function reference at the end of this page; most key steps in the
+    loader pipeline are reported (download started, download succeeded,
+    download failed, caching succeeded, loading failed, etc.)
 
 #### Alternatives (Erlang)
 
