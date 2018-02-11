@@ -86,9 +86,6 @@ ok = locus:start_loader(country, URL).
                   <<"zh-CN">> => <<"美国"/utf8>>}}}}
 ~~~~
 
-Check the [function reference](#modules) for an overview on everything
-you can do.
-
 #### Details
 
 ##### Requirements
@@ -96,7 +93,11 @@ you can do.
 -   Erlang/OTP 18.0 or higher
 -   rebar3
 
-##### On databases
+##### Documentation
+
+Documentation is hosted on [HexDocs](https://hexdocs.pm/locus/).
+
+##### Databases
 
 -   The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
@@ -111,7 +112,7 @@ you can do.
     addresses. The data for each entry is decoded on the fly upon
     successful lookups.
 
-##### On formats
+##### Formats
 
 -   Only gzip-compressed tarballs are supported at this moment
 -   The first file to be found, within the tarball, with an .mmdb
@@ -138,7 +139,7 @@ you can do.
     exclusively on the network if needed
 -   A caching directory named 'locus\_erlang' is created under the
     ['user\_cache'
-    basedir](http://erlang.org/doc/man/filename#basedir-3)
+    basedir](http://erlang.org/doc/man/filename.html#basedir-3)
 -   Cached tarballs are named after the SHA256 hash of their source URL
 -   Modification time of the tarballs is extracted from 'last-modified'
     response header (when present) and used to condition downloads on
@@ -151,7 +152,7 @@ you can do.
 -   Five logging levels are supported: `debug`, `info`, `warning`,
     `error` and `none`
 -   The backend is
-    [error\_logger](http://erlang.org/doc/man/error_logger); this
+    [error\_logger](http://erlang.org/doc/man/error_logger.html); this
     usually plays nicely with `lager`
 -   The default log level is `error`; it can be changed in the
     application's `env` config
@@ -164,10 +165,10 @@ you can do.
     starting the database
 -   A `Subscriber` can be either a module implementing the
     `locus_event_subscriber` behaviour or an arbitrary `pid()`
--   The format and content of reported events can be consulted on the
-    function reference at the end of this page; most key steps in the
-    loader pipeline are reported (download started, download succeeded,
-    download failed, caching succeeded, loading failed, etc.)
+-   The format and content of reported events can be consulted in detail
+    on the `locus_event_subscriber` module documentation; most key steps
+    in the loader pipeline are reported (download started, download
+    succeeded, download failed, caching succeeded, loading failed, etc.)
 
 #### Alternatives (Erlang)
 
