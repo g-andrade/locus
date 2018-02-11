@@ -1,10 +1,9 @@
-locus
-=====
+# locus
 
 [![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 [![](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)
 
-### locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2
+### <span id="locus_-_Geolocation_and_ASN_lookup_of_IP_addresses_using_MaxMind_GeoIP2">locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2</span>
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
 the country, city or ASN of IPv4 and IPv6 addresses.
@@ -18,32 +17,33 @@ You're encouraged to host your own private copies of the databases when
 using this library in production, both for reliability and netiquette
 towards MaxMind.
 
-#### Usage
+#### <span id="Usage">Usage</span>
 
-Run `make console` to bring up a shell.
+Run `make console` to bring up a
+shell.
 
-##### 1. Start the database loader
+##### <span id="1._Start_the_database_loader">1. Start the database loader</span>
 
-~~~~ {lang="erlang"}
+``` erlang
 URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
 ok = locus:start_loader(country, URL).
-~~~~
+```
 
-##### 2. Wait for the database to load (optional)
+##### <span id="2._Wait_for_the_database_to_load_(optional)">2. Wait for the database to load (optional)</span>
 
-~~~~ {lang="erlang"}
+``` erlang
 % Either block indefinitely
 {ok, _DatabaseVersion} = locus:wait_for_loader(country).
-~~~~
+```
 
-~~~~ {lang="erlang"}
+``` erlang
 % ... or give-up after 30 seconds
 {ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
-~~~~
+```
 
-##### 3. Lookup IP addresses
+##### <span id="3._Lookup_IP_addresses">3. Lookup IP addresses</span>
 
-~~~~ {lang="erlang"}
+``` erlang
 
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
@@ -84,123 +84,124 @@ ok = locus:start_loader(country, URL).
                   <<"pt-BR">> => <<"Estados Unidos">>,
                   <<"ru">> => <<"США"/utf8>>,
                   <<"zh-CN">> => <<"美国"/utf8>>}}}}
-~~~~
+```
 
-#### Details
+#### <span id="Details">Details</span>
 
-##### Requirements
+##### <span id="Requirements">Requirements</span>
 
--   Erlang/OTP 18.0 or higher
--   rebar3
+  - Erlang/OTP 18.0 or higher
+  - rebar3
 
-##### Documentation
+##### <span id="Documentation">Documentation</span>
 
 Documentation is hosted on [HexDocs](https://hexdocs.pm/locus/).
 
-##### Databases
+##### <span id="Databases">Databases</span>
 
--   The free GeoLite2 [Country, City and ASN
+  - The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
     successfully tested; presumably `locus` can deal with any MaxMind DB
     -formatted database that maps IP address prefixes to arbitrary data,
     but no [commercial
     databases](https://dev.maxmind.com/geoip/geoip2/downloadable/) have
     yet been tested
--   The databases are loaded into memory (mostly) as-is; reference
+  - The databases are loaded into memory (mostly) as-is; reference
     counted binaries are shared with the application callers using ETS
     tables, and the original binary search tree is used to lookup
     addresses. The data for each entry is decoded on the fly upon
     successful lookups.
 
-##### Formats
+##### <span id="Formats">Formats</span>
 
--   Only gzip-compressed tarballs are supported at this moment
--   The first file to be found, within the tarball, with an .mmdb
+  - Only gzip-compressed tarballs are supported at this moment
+  - The first file to be found, within the tarball, with an .mmdb
     extension, is the one that's chosen for loading
--   The implementation of [MaxMind DB
+  - The implementation of [MaxMind DB
     format](https://maxmind.github.io/MaxMind-DB/) is mostly complete
 
-##### Downloads and updates
+##### <span id="Downloads_and_updates">Downloads and updates</span>
 
--   The downloaded tarballs are uncompressed in memory
--   The 'last-modified' response header, if present, is used to
+  - The downloaded tarballs are uncompressed in memory
+  - The 'last-modified' response header, if present, is used to
     condition subsequent download attempts (using 'if-modified-since'
     request headers) in order to save bandwidth
--   The downloaded tarballs are cached on the filesystem in order to
+  - The downloaded tarballs are cached on the filesystem in order to
     more quickly achieve readiness on future launches of the database
     loader
--   Until the database loader achieves readiness, download attempts are
+  - Until the database loader achieves readiness, download attempts are
     made every minute; once readiness is achieved (either from cache or
     network), this interval increases to every 6 hours
 
-##### Caching
+##### <span id="Caching">Caching</span>
 
--   Caching is a best-effort; the system falls back to relying
+  - Caching is a best-effort; the system falls back to relying
     exclusively on the network if needed
--   A caching directory named 'locus\_erlang' is created under the
+  - A caching directory named 'locus\_erlang' is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
--   Cached tarballs are named after the SHA256 hash of their source URL
--   Modification time of the tarballs is extracted from 'last-modified'
+  - Cached tarballs are named after the SHA256 hash of their source URL
+  - Modification time of the tarballs is extracted from 'last-modified'
     response header (when present) and used to condition downloads on
     subsequent boots and save bandwidth
--   It can be disabled by specifying the `no_cache` option when running
+  - It can be disabled by specifying the `no_cache` option when running
     `:start_loader`
 
-##### Logging
+##### <span id="Logging">Logging</span>
 
--   Five logging levels are supported: `debug`, `info`, `warning`,
+  - Five logging levels are supported: `debug`, `info`, `warning`,
     `error` and `none`
--   The backend is
+  - The backend is
     [error\_logger](http://erlang.org/doc/man/error_logger.html); this
     usually plays nicely with `lager`
--   The default log level is `error`; it can be changed in the
+  - The default log level is `error`; it can be changed in the
     application's `env` config
--   To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
+  - To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
 
-##### Event subscription
+##### <span id="Event_subscription">Event subscription</span>
 
--   Any number of event subscribers can be attached to a database loader
+  - Any number of event subscribers can be attached to a database loader
     by specifying the `{event_subscriber, Subscriber}` option when
     starting the database
--   A `Subscriber` can be either a module implementing the
+  - A `Subscriber` can be either a module implementing the
     `locus_event_subscriber` behaviour or an arbitrary `pid()`
--   The format and content of reported events can be consulted in detail
+  - The format and content of reported events can be consulted in detail
     on the `locus_event_subscriber` module documentation; most key steps
     in the loader pipeline are reported (download started, download
     succeeded, download failed, caching succeeded, loading failed, etc.)
 
-#### Alternatives (Erlang)
+#### <span id="Alternatives_(Erlang)">Alternatives (Erlang)</span>
 
--   [egeoip](https://github.com/mochi/egeoip): IP Geolocation module,
+  - [egeoip](https://github.com/mochi/egeoip): IP Geolocation module,
     currently supporting the MaxMind GeoLite City Database
--   [geodata2](https://github.com/brigadier/geodata2): Application for
+  - [geodata2](https://github.com/brigadier/geodata2): Application for
     working with MaxMind geoip2 (.mmdb) databases
--   [geoip](https://github.com/manifest/geoip): Returns the location of
+  - [geoip](https://github.com/manifest/geoip): Returns the location of
     an IP address; based on the ipinfodb.com web service
--   [geolite2data](https://hex.pm/packages/geolite2data): Periodically
-    fetches the free MaxMind GeoLite2 databases
--   [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
+  - [geolite2data](https://hex.pm/packages/geolite2data): Periodically
+    fetches the free MaxMind GeoLite2
+    databases
+  - [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
     Uses IP2Location geolocation database
 
-#### Alternatives (Elixir)
+#### <span id="Alternatives_(Elixir)">Alternatives (Elixir)</span>
 
--   [asn](https://hex.pm/packages/asn): IP-to-AS-to-ASname lookup
--   [freegeoip](https://hex.pm/packages/freegeoip): Simple wrapper for
+  - [asn](https://hex.pm/packages/asn): IP-to-AS-to-ASname lookup
+  - [freegeoip](https://hex.pm/packages/freegeoip): Simple wrapper for
     freegeoip.net HTTP API
--   [freegeoipx](https://hex.pm/packages/freegeoipx): API Client for
+  - [freegeoipx](https://hex.pm/packages/freegeoipx): API Client for
     freegeoip.net
--   [geoip](https://hex.pm/packages/geoip): Lookup the geo location for
+  - [geoip](https://hex.pm/packages/geoip): Lookup the geo location for
     a given IP address, hostname or Plug.Conn instance
--   [geolix](https://hex.pm/packages/geolix): MaxMind GeoIP2 database
+  - [geolix](https://hex.pm/packages/geolix): MaxMind GeoIP2 database
     reader/decoder
--   [plug\_geoip2](https://hex.pm/packages/plug_geoip2): Adds geo
+  - [plug\_geoip2](https://hex.pm/packages/plug_geoip2): Adds geo
     location to a Plug connection based upon the client IP address by
     using MaxMind's GeoIP2 database
--   [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
+  - [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
     from a location efficiently using PostGIS and Ecto
 
-#### License
+#### <span id="License">License</span>
 
 MIT License
 
@@ -229,6 +230,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 sponsored, or otherwise approved by MaxMind.
 
 `locus` includes code extracted from OTP source code, by Ericsson AB,
-released under the Apache License 2.0.
+released under the Apache License
+2.0.
 
-*Generated by EDoc, Feb 11 2018, 15:52:34.*
+-----
+
+*Generated by EDoc, Feb 11 2018, 16:13:47.*

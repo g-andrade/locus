@@ -44,11 +44,11 @@ console:
 
 doc:
 	@$(REBAR3) edoc
-	# non-portable dirty hack follows
-	pandoc --from html --to markdown doc/overview-summary.html -o README.md
-	@tail -n +5 <"README.md" >"README.md_"
-	@head -n -8 <"README.md_" >"README.md"
-	@tail -n  2 <"README.md_" >>"README.md"
+	# non-portable dirty hack follows (pandoc 2.1.1 used)
+	pandoc --from html --to gfm doc/overview-summary.html -o README.md # gfm: github-flavoured markdown
+	@tail -n +11 <"README.md"   >"README.md_"
+	@head -n -12 <"README.md_"  >"README.md"
+	@tail -n  2  <"README.md_" >>"README.md"
 	@rm "README.md_"
 
 publish:
