@@ -216,10 +216,12 @@ wait(Id, Timeout) ->
     end.
 
 -ifdef(TEST).
+%% @private
 whereis(Id) ->
     ServerName = server_name(Id),
     erlang:whereis(ServerName).
 
+%% @private
 list_subscribers(Id) ->
     ServerName = server_name(Id),
     {_State, StateName} = sys:get_state(ServerName),
@@ -522,6 +524,7 @@ cached_tarball_name(StateData) ->
     cached_tarball_name_for_url(URL).
 
 -spec cached_tarball_name_for_url(string()) -> nonempty_string().
+%% @private
 cached_tarball_name_for_url(URL) ->
     Hash = crypto:hash(sha256, URL),
     HexHash = bin_to_hex_str(Hash),
