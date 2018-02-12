@@ -58,7 +58,7 @@
 
 %% @doc Changes the logging verbosity in runtime
 %%
-%% `Level' must be either `info', `warning', `error' or `none'.
+%% `Level' must be either `debug', `info', `warning', `error' or `none'.
 -spec set_loglevel(debug | info | warning | error | none) -> ok.
 set_loglevel(Level) when Level =:= debug;
                          Level =:= info;
