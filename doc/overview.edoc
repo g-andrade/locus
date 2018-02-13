@@ -47,7 +47,8 @@ ok = locus:start_loader(country, URL).
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
-{ok,#{<<"continent">> =>
+{ok,#{prefix => {{93,184,216,0},24},
+      <<"continent">> =>
           #{<<"code">> => <<"NA">>,
             <<"geoname_id">> => 6255149,
             <<"names">> =>

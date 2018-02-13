@@ -184,9 +184,9 @@ ipv4_country_lookup_test(Config) ->
     ok = locus:start_loader(Loader, URL),
     {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV4_STR_ADDR),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, Addr)),
+    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
+    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
+    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
 
 ipv4_invalid_addr_test(Config) ->
@@ -203,9 +203,9 @@ ipv6_country_lookup_test(Config) ->
     ok = locus:start_loader(Loader, URL),
     {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV6_STR_ADDR),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
-    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, Addr)),
+    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
+    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
+    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
 
 ipv6_invalid_addr_test(Config) ->

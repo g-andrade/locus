@@ -4,14 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- return matched IP address prefix on successful lookups
+
 ## [1.1.2] - 2018-02-13
 ### Fixed
-- Open documentation external links in parent frame
+- open documentation external links in parent frame
 
 ## [1.1.1] - 2018-02-12
 ### Fixed
-- Internal functions showing up as public in documentation
-- Documented description of `locus_logger:set_loglevel/2`
+- internal functions showing up as public in documentation
+- documented description of `locus_logger:set_loglevel/2`
 
 ## [1.1.0] - 2018-02-11
 ### Added

@@ -132,7 +132,8 @@ decode_and_update(Id, BinDatabase, Source) ->
     Version.
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
-        -> {ok, #{ binary() => term() }} |
+        -> {ok, #{ prefix => {inet:ip_address(), 0..128},
+                   binary() => term() }} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
 lookup(Id, Address) when ?is_ip_address(Address) ->
@@ -368,8 +369,10 @@ lookup_([{database, DatabaseParts}] = _DatabaseLookup, Address) ->
             NodeCount = metadata_get(<<"node_count">>, DatabaseParts),
             RecordSize = metadata_get(<<"record_size">>, DatabaseParts),
             NodeSize = (RecordSize * 2) div 8,
-            lookup_recur(BitAddress, Tree, DataSection,
-                         NodeSize, RecordSize, RootNodeIndex, NodeCount);
+            Result =
+                lookup_recur(BitAddress, Tree, DataSection,
+                             NodeSize, RecordSize, RootNodeIndex, NodeCount),
+            handle_recursive_lookup_result(Result, BitAddress);
         {error, Error} ->
             {error, Error}
     end.
@@ -387,12 +390,13 @@ lookup_recur(_BitAddress, _Tree, _DataSection, _NodeSize, _RecordSize,
   when NodeIndex =:= NodeCount ->
     % end of the line
     {error, not_found};
-lookup_recur(_BitAddress, _Tree, DataSection, _NodeSize, _RecordSize,
+lookup_recur(BitAddress, _Tree, DataSection, _NodeSize, _RecordSize,
              NodeIndex, NodeCount) ->
     % pointer to the data section
     DataIndex = (NodeIndex - NodeCount) - 16,
     {#{} = DecodedData, _NewDataIndex} = decode_data(DataSection, DataIndex),
-    {ok, DecodedData}.
+    SuffixSize = bit_size(BitAddress),
+    {ok, DecodedData, SuffixSize}.
 
 extract_node_record(0 = _Bit, Node, RecordSize) when byte_size(Node) band 1 =:= 0 ->
     <<Left:RecordSize, _/bits>> = Node,
@@ -415,3 +419,23 @@ is_utf8_text(<<Binary/binary>>) ->
     end;
 is_utf8_text(_Value) ->
     false.
+
+handle_recursive_lookup_result({ok, Entry, SuffixSize}, BitAddress) ->
+    Prefix = ip_address_prefix(BitAddress, SuffixSize),
+    ExtendedEntry = Entry#{ prefix => Prefix },
+    {ok, ExtendedEntry};
+handle_recursive_lookup_result({error, Error}, _BitAddress) ->
+    {error, Error}.
+
+ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 32 ->
+    PrefixSize = 32 - SuffixSize,
+    <<Prefix:PrefixSize/bits, _Suffix/bits>> = BitAddress,
+    BitBaseAddress = <<Prefix/bits, 0:SuffixSize>>,
+    <<A,B,C,D>> = BitBaseAddress,
+    {{A,B,C,D}, PrefixSize};
+ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 128 ->
+    PrefixSize = 128 - SuffixSize,
+    <<Prefix:PrefixSize/bits, _Suffix/bits>> = BitAddress,
+    BitBaseAddress = <<Prefix/bits, 0:SuffixSize>>,
+    <<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>> = BitBaseAddress,
+    {{A,B,C,D,E,F,G,H}, PrefixSize}.
