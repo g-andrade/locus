@@ -1,9 +1,9 @@
 @title locus
 @doc
 
-<a href="https://hex.pm/packages/locus" alt="Hex.pm Package">
+<a target="_parent" href="https://hex.pm/packages/locus" alt="Hex.pm Package">
     <img src="https://img.shields.io/hexpm/v/locus.svg?style=flat"/></a>
-<a href="https://travis-ci.org/g-andrade/locus" alt="Build Status">
+<a target="_parent" href="https://travis-ci.org/g-andrade/locus" alt="Build Status">
     <img src="https://travis-ci.org/g-andrade/locus.png?branch=master"/></a>
 
 == locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2 ==
@@ -11,7 +11,7 @@
 `locus' is library for Erlang/OTP and Elixir that allows you to pinpoint the country,
 city or ASN of IPv4 and IPv6 addresses.
 
-The free <a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">MaxMind databases</a> you choose
+The free <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/geolite2/">MaxMind databases</a> you choose
 are downloaded on-demand, cached on the filesystem and updated automatically.
 
 You're encouraged to host your own private copies of the databases when using this library in production,
@@ -97,14 +97,14 @@ ok = locus:start_loader(country, URL).
 
 ==== Documentation ====
 
-Documentation is hosted on <a href="https://hexdocs.pm/locus/">HexDocs</a>.
+Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">HexDocs</a>.
 
 ==== Databases ====
 
 <ul>
-<li>The free GeoLite2 <a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">Country, City and ASN databases</a>
+<li>The free GeoLite2 <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/geolite2/">Country, City and ASN databases</a>
   were all successfully tested; presumably `locus' can deal with any MaxMind DB -formatted database that maps
-  IP address prefixes to arbitrary data, but no <a href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
+  IP address prefixes to arbitrary data, but no <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
   commercial databases</a> have yet been tested
   </li>
 <li>The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the
@@ -118,7 +118,7 @@ Documentation is hosted on <a href="https://hexdocs.pm/locus/">HexDocs</a>.
 <ul>
 <li>Only gzip-compressed tarballs are supported at this moment</li>
 <li>The first file to be found, within the tarball, with an .mmdb extension, is the one that's chosen for loading</li>
-<li>The implementation of <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a> is mostly complete</li>
+<li>The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a> is mostly complete</li>
 </ul>
 
 ==== Downloads and updates ====
@@ -140,7 +140,7 @@ Documentation is hosted on <a href="https://hexdocs.pm/locus/">HexDocs</a>.
 
 <ul>
 <li>Caching is a best-effort; the system falls back to relying exclusively on the network if needed</li>
-<li>A caching directory named 'locus_erlang' is created under the <a href="http://erlang.org/doc/man/filename.html#basedir-3">'user_cache' basedir</a></li>
+<li>A caching directory named 'locus_erlang' is created under the <a target="_parent" href="http://erlang.org/doc/man/filename.html#basedir-3">'user_cache' basedir</a></li>
 <li>Cached tarballs are named after the SHA256 hash of their source URL</li>
 <li>Modification time of the tarballs is extracted from 'last-modified' response header (when present)
   and used to condition downloads on subsequent boots and save bandwidth
@@ -152,7 +152,7 @@ Documentation is hosted on <a href="https://hexdocs.pm/locus/">HexDocs</a>.
 
 <ul>
 <li>Five logging levels are supported: `debug', `info', `warning', `error' and `none'</li>
-<li>The backend is <a href="http://erlang.org/doc/man/error_logger.html">error_logger</a>; this usually plays nicely with `lager'</li>
+<li>The backend is <a target="_parent" href="http://erlang.org/doc/man/error_logger.html">error_logger</a>; this usually plays nicely with `lager'</li>
 <li>The default log level is `error'; it can be changed in the application's `env' config</li>
 <li>To tweak the log level in runtime, use `locus_logger:set_loglevel/1'</li>
 </ul>
@@ -173,23 +173,23 @@ Documentation is hosted on <a href="https://hexdocs.pm/locus/">HexDocs</a>.
 === Alternatives (Erlang) ===
 
 <ul>
-<li><a href="https://github.com/mochi/egeoip">egeoip</a>: IP Geolocation module, currently supporting the MaxMind GeoLite City Database</li>
-<li><a href="https://github.com/brigadier/geodata2">geodata2</a>: Application for working with MaxMind geoip2 (.mmdb) databases</li>
-<li><a href="https://github.com/manifest/geoip">geoip</a>: Returns the location of an IP address; based on the ipinfodb.com web service</li>
-<li><a href="https://hex.pm/packages/geolite2data">geolite2data</a>: Periodically fetches the free MaxMind GeoLite2 databases</li>
-<li><a href="https://github.com/ip2location/ip2location-erlang">ip2location-erlang</a>: Uses IP2Location geolocation database</li>
+<li><a target="_parent" href="https://github.com/mochi/egeoip">egeoip</a>: IP Geolocation module, currently supporting the MaxMind GeoLite City Database</li>
+<li><a target="_parent" href="https://github.com/brigadier/geodata2">geodata2</a>: Application for working with MaxMind geoip2 (.mmdb) databases</li>
+<li><a target="_parent" href="https://github.com/manifest/geoip">geoip</a>: Returns the location of an IP address; based on the ipinfodb.com web service</li>
+<li><a target="_parent" href="https://hex.pm/packages/geolite2data">geolite2data</a>: Periodically fetches the free MaxMind GeoLite2 databases</li>
+<li><a target="_parent" href="https://github.com/ip2location/ip2location-erlang">ip2location-erlang</a>: Uses IP2Location geolocation database</li>
 </ul>
 
 === Alternatives (Elixir) ===
 
 <ul>
-<li><a href="https://hex.pm/packages/asn">asn</a>: IP-to-AS-to-ASname lookup</li>
-<li><a href="https://hex.pm/packages/freegeoip">freegeoip</a>: Simple wrapper for freegeoip.net HTTP API</li>
-<li><a href="https://hex.pm/packages/freegeoipx">freegeoipx</a>: API Client for freegeoip.net</li>
-<li><a href="https://hex.pm/packages/geoip">geoip</a>: Lookup the geo location for a given IP address, hostname or Plug.Conn instance</li>
-<li><a href="https://hex.pm/packages/geolix">geolix</a>: MaxMind GeoIP2 database reader/decoder</li>
-<li><a href="https://hex.pm/packages/plug_geoip2">plug_geoip2</a>: Adds geo location to a Plug connection based upon the client IP address by using MaxMind's GeoIP2 database</li>
-<li><a href="https://hex.pm/packages/tz_world">tz_world</a>: Resolve timezones from a location efficiently using PostGIS and Ecto</li>
+<li><a target="_parent" href="https://hex.pm/packages/asn">asn</a>: IP-to-AS-to-ASname lookup</li>
+<li><a target="_parent" href="https://hex.pm/packages/freegeoip">freegeoip</a>: Simple wrapper for freegeoip.net HTTP API</li>
+<li><a target="_parent" href="https://hex.pm/packages/freegeoipx">freegeoipx</a>: API Client for freegeoip.net</li>
+<li><a target="_parent" href="https://hex.pm/packages/geoip">geoip</a>: Lookup the geo location for a given IP address, hostname or Plug.Conn instance</li>
+<li><a target="_parent" href="https://hex.pm/packages/geolix">geolix</a>: MaxMind GeoIP2 database reader/decoder</li>
+<li><a target="_parent" href="https://hex.pm/packages/plug_geoip2">plug_geoip2</a>: Adds geo location to a Plug connection based upon the client IP address by using MaxMind's GeoIP2 database</li>
+<li><a target="_parent" href="https://hex.pm/packages/tz_world">tz_world</a>: Resolve timezones from a location efficiently using PostGIS and Ecto</li>
 </ul>
 
 === License ===
