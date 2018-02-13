@@ -4,13 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-### Added
-- return matched IP address prefix on successful lookups
+## [1.1.3] - 2018-02-13
+### Fixed
+- matched IP address prefix not being returned on successful lookups
 
 ## [1.1.2] - 2018-02-13
 ### Fixed
-- open documentation external links in parent frame
+- documentation external links not opening in parent frame
 
 ## [1.1.1] - 2018-02-12
 ### Fixed
