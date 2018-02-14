@@ -30,10 +30,10 @@
 -spec seed() -> ok.
 -ifdef(POST_OTP_17).
 seed() ->
-    random:seed(erlang:now()),
     ok.
 -else.
 seed() ->
+    random:seed(erlang:now()),
     ok.
 -endif.
 
