@@ -92,7 +92,7 @@ ok = locus:start_loader(country, URL).
 ==== Requirements ====
 
 <ul>
-<li>Erlang/OTP 17.0 or higher</li>
+<li>Erlang/OTP 17.5 or higher</li>
 <li>rebar3</li>
 </ul>
 
