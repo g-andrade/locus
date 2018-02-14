@@ -36,8 +36,6 @@
     start/3,
     start/4,
     start_link/3,
-    stop/1,
-    stop/3,
     system_code_change/4,
     system_continue/3,
     system_get_state/1,
@@ -45,14 +43,25 @@
     system_terminate/4,
     wakeup_from_hibernate/3]).
 
+-ifdef(POST_OTP_17).
+-ignore_xref(
+   [stop/1,
+    stop/3
+   ]).
+-endif.
 
 %% API
 -export(
    [start/3,start/4,start_link/3,start_link/4,
-    stop/1,stop/3,
     cast/2,call/2,call/3,
     enter_loop/4,enter_loop/5,enter_loop/6,
     reply/1,reply/2]).
+
+-ifdef(POST_OTP_17).
+-export(
+   [stop/1,stop/3
+   ]).
+-endif.
 
 %% gen callbacks
 -export(
@@ -423,6 +432,7 @@ start_link(Module, Args, Opts) ->
 start_link(ServerName, Module, Args, Opts) ->
     gen:start(?MODULE, link, ServerName, Module, Args, Opts).
 
+-ifdef(POST_OTP_17).
 %% Stop a state machine
 -spec stop(ServerRef :: server_ref()) -> ok.
 stop(ServerRef) ->
@@ -434,6 +444,7 @@ stop(ServerRef) ->
     Timeout :: timeout()) -> ok.
 stop(ServerRef, Reason, Timeout) ->
     gen:stop(ServerRef, Reason, Timeout).
+-endif.
 
 %% Send an event to a state machine that arrives with type 'event'
 -spec cast(ServerRef :: server_ref(), Msg :: term()) -> ok.
@@ -923,13 +934,13 @@ loop_receive(Parent, Debug, S) ->
             #{timer_refs := TimerRefs,
               timer_types := TimerTypes,
               hibernate := Hibernate} = S,
-            case TimerRefs of
-            #{TimerRef := TimerType} ->
+            case maps:find(TimerRef, TimerRefs) of
+            {ok, TimerType} ->
                 %% We know of this timer; is it a running
                 %% timer or a timer being cancelled that
                 %% managed to send a late timeout message?
-                case TimerTypes of
-                #{TimerType := TimerRef} ->
+                case maps:find(TimerType, TimerTypes) of
+                {ok, TimerRef} ->
                     %% The timer type maps back to this
                     %% timer ref, so it was a running timer
                     Event = {TimerType,TimerMsg},
@@ -962,8 +973,8 @@ loop_receive(Parent, Debug, S) ->
             #{timer_refs := TimerRefs,
               cancel_timers := CancelTimers,
               hibernate := Hibernate} = S,
-            case TimerRefs of
-            #{TimerRef := _} ->
+            case maps:is_key(TimerRef, TimerRefs) of
+            true ->
                 %% We must have requested a cancel
                 %% of this timer so it is already
                 %% removed from TimerTypes
@@ -1504,15 +1515,15 @@ parse_timers(
   TimerRefs, TimerTypes, CancelTimers, TimeoutsR,
   Seen, TimeoutEvents,
   TimerType, Time, TimerMsg) ->
-    case Seen of
-    #{TimerType := _} ->
+    case maps:is_key(TimerType, Seen) of
+    true ->
         %% Type seen before - ignore
         parse_timers(
           TimerRefs, TimerTypes, CancelTimers, TimeoutsR,
           Seen, TimeoutEvents);
-    #{} ->
+    false ->
         %% Unseen type - handle
-        NewSeen = Seen#{TimerType => true},
+        NewSeen = maps:put(TimerType, true, Seen),
         case Time of
         infinity ->
             %% Cancel any running timer
@@ -1536,22 +1547,22 @@ parse_timers(
             %% (Re)start the timer
             TimerRef =
             erlang:start_timer(Time, self(), TimerMsg),
-            case TimerTypes of
-            #{TimerType := OldTimerRef} ->
+            case maps:find(TimerType, TimerTypes) of
+            {ok, OldTimerRef} ->
                 %% Cancel the running timer
                 cancel_timer(OldTimerRef),
                 NewCancelTimers = CancelTimers + 1,
                 %% Insert the new timer into
                 %% both TimerRefs and TimerTypes
                 parse_timers(
-                  TimerRefs#{TimerRef => TimerType},
-                  TimerTypes#{TimerType => TimerRef},
+                  maps:put(TimerRef, TimerType, TimerRefs),
+                  maps:put(TimerType, TimerRef, TimerTypes),
                   NewCancelTimers, TimeoutsR,
                   NewSeen, TimeoutEvents);
-            #{} ->
+            _ ->
                 parse_timers(
-                  TimerRefs#{TimerRef => TimerType},
-                  TimerTypes#{TimerType => TimerRef},
+                  maps:put(TimerRef, TimerType, TimerRefs),
+                  maps:put(TimerType, TimerRef, TimerTypes),
                   CancelTimers, TimeoutsR,
                   NewSeen, TimeoutEvents)
             end
@@ -1780,14 +1791,22 @@ listify(Item) ->
 %% Remove the timer from TimerTypes.
 %% When we get the cancel_timer msg we remove it from TimerRefs.
 cancel_timer_by_type(TimerType, TimerTypes, CancelTimers) ->
-    case TimerTypes of
-    #{TimerType := TimerRef} ->
+    case maps:find(TimerType, TimerTypes) of
+    {ok, TimerRef} ->
         cancel_timer(TimerRef),
         {maps:remove(TimerType, TimerTypes),CancelTimers + 1};
-    #{} ->
+    _ ->
         {TimerTypes,CancelTimers}
     end.
 
+-ifdef(POST_OTP_17).
 cancel_timer(TimerRef) ->
     ok = erlang:cancel_timer(TimerRef, [{async,true}]).
+-else.
+cancel_timer(TimerRef) ->
+    % one more dirty hack for retro compatibility - simulate VM behaviour
+    Result = erlang:cancel_timer(TimerRef) ,
+    self() ! {cancel_timer, TimerRef, Result}.
+-endif.
+
 -endif.

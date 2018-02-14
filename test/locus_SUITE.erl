@@ -80,7 +80,8 @@ init_per_group(local_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     ok = locus_logger:set_loglevel(debug),
     {ok, HttpdPid, BaseURL} = locus_httpd:start(),
-    RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
+    locus_rand_compat:seed(),
+    RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
     DatabaseURL = BaseURL ++ "/GeoLite2-Country.tar.gz" ++ "#" ++ RandomAnchor,
     CorruptURL = BaseURL ++ "/corruption.tar.gz" ++ "#" ++ RandomAnchor,
     [{httpd_pid, HttpdPid},
@@ -91,7 +92,8 @@ init_per_group(local_tests, Config) ->
 init_per_group(remote_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     ok = locus_logger:set_loglevel(debug),
-    RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
+    locus_rand_compat:seed(),
+    RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
     URL = ?REMOTE_COUNTRY_URL ++ "#" ++ RandomAnchor,
     CorruptURL = ?REMOTE_COUNTRY_CORRUPT_URL ++ "#" ++ RandomAnchor,
     BaseURL = ?REMOTE_COUNTRY_BASE_URL,
@@ -216,6 +218,7 @@ ipv6_invalid_addr_test(Config) ->
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
 
+-ifdef(POST_OTP_17).
 connect_timeout_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = connect_timeout_test,
@@ -224,6 +227,10 @@ connect_timeout_test(Config) ->
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_failed_to_start, {error, {failed_connect, _}}}}),
     ok = locus:stop_loader(Loader).
+-else.
+connect_timeout_test(_Config) ->
+    {skip, "Not working properly on OTP 17"}.
+-endif.
 
 download_start_timeout_test(Config) ->
     URL = proplists:get_value(url, Config),

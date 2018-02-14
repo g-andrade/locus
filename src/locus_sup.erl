@@ -50,16 +50,7 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
-% work around edoc annoyance
--ifdef(POST_OTP_18).
--type sup_flags() :: #{ strategy := one_for_one,
-                        intensity := 10,
-                        period := 5 }.
--else.
--type sup_flags() :: #{ strategy => one_for_one,
-                        intensity => 10,
-                        period => 5 }.
--endif.
+-type sup_flags() :: {one_for_one, 10, 5}.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -105,9 +96,7 @@ stop_child(DatabaseId) ->
 -spec init([]) -> {ok, {sup_flags(), []}}.
 init([]) ->
     % TODO consider simple_one_for_one strategy with transient children
-    SupFlags = #{ strategy => one_for_one,
-                  intensity => 10,
-                  period => 5 },
+    SupFlags = {one_for_one, 10, 5},
     {ok, {SupFlags, []}}.
 
 %% ------------------------------------------------------------------
@@ -116,9 +105,13 @@ init([]) ->
 
 child_spec(DatabaseId, DatabaseURL, Opts) ->
     Args = [DatabaseId, DatabaseURL, Opts],
-    #{ id => child_id(DatabaseId),
-       start => {locus_http_loader, start_link, Args}
-     }.
+    Id = child_id(DatabaseId),
+    Start = {locus_http_loader, start_link, Args},
+    Restart = permanent,
+    Shutdown = 5000,
+    Type = worker,
+    Modules = [locus_http_loader],
+    {Id, Start, Restart, Shutdown, Type, Modules}.
 
 child_id(DatabaseId) ->
     {http_loader, DatabaseId}.

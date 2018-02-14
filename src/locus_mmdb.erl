@@ -285,7 +285,7 @@ decode_data_payload(Type, Size, Data, Index)
               ?assert(is_utf8_text(Key), {invalid_map_key, Key}),
               ?assert(not maps:is_key(Key, MapAcc1), {repeated_map_key, Key}),
               {Value, IndexAcc3} = decode_data(Data, IndexAcc2),
-              MapAcc2 = MapAcc1#{ Key => Value },
+              MapAcc2 = maps:put(Key, Value, MapAcc1),
               {MapAcc2, IndexAcc3}
       end,
       {#{}, Index},

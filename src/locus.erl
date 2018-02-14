@@ -280,7 +280,8 @@ get_info(DatabaseId) ->
                  Error :: database_unknown | database_not_loaded.
 get_info(DatabaseId, Property) ->
     case get_info(DatabaseId) of
-        {ok, #{ Property := Value }} ->
+        {ok, Info} ->
+            Value = maps:get(Property, Info),
             {ok, Value};
         {error, Error} ->
             {error, Error}
