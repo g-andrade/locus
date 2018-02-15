@@ -27,7 +27,7 @@
 
 %% @private
 -module(locus_mmdb).
--compile([inline, inline_list_funcs]).
+-compile([inline_list_funcs]).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
