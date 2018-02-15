@@ -121,7 +121,7 @@ end_per_group(remote_tests, Config) ->
 
 -ifdef(BAD_HTTPC).
 cacheless_loading_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 cacheless_loading_test(Config) ->
     URL = proplists:get_value(url, Config),
@@ -146,7 +146,7 @@ cacheless_loading_test(Config) ->
 
 -ifdef(BAD_HTTPC).
 cold_remote_loading_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 cold_remote_loading_test(Config) ->
     URL = proplists:get_value(url, Config),
@@ -172,7 +172,7 @@ cold_remote_loading_test(Config) ->
 
 -ifdef(BAD_HTTPC).
 warm_remote_loading_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 warm_remote_loading_test(Config) ->
     URL = proplists:get_value(url, Config),
@@ -197,7 +197,7 @@ warm_remote_loading_test(Config) ->
 
 -ifdef(BAD_HTTPC).
 ipv4_country_lookup_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 ipv4_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
@@ -213,7 +213,7 @@ ipv4_country_lookup_test(Config) ->
 
 -ifdef(BAD_HTTPC).
 ipv4_invalid_addr_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 ipv4_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
@@ -226,7 +226,7 @@ ipv4_invalid_addr_test(Config) ->
 
 -ifdef(BAD_HTTPC).
 ipv6_country_lookup_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 ipv6_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
@@ -242,7 +242,7 @@ ipv6_country_lookup_test(Config) ->
 
 -ifdef(BAD_HTTPC).
 ipv6_invalid_addr_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 ipv6_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
@@ -278,7 +278,7 @@ download_start_timeout_test(Config) ->
 
 -ifdef(BAD_HTTPC).
 idle_download_timeout_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"};
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 idle_download_timeout_test(Config) ->
     URL = proplists:get_value(url, Config),
