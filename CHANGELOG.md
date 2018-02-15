@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 ### Added
-- OTP 17.5 support
+- OTP 17.4 and 17.5 support
 
 ## [1.1.3] - 2018-02-13
 ### Fixed
