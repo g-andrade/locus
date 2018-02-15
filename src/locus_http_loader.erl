@@ -75,6 +75,8 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
+-type from() :: {To :: pid(), Tag :: term()}.
+
 -type opt() ::
     {event_subscriber, module() | pid()} |
     {connect_timeout, timeout()} |
@@ -87,7 +89,7 @@
 -type state_data() ::
     #{ id := atom(),
        url := url(),
-       waiters := [?gen_statem:from()],
+       waiters := [from()],
        event_subscribers := [module(), ...],
        connect_timeout := timeout(),
        download_start_timeout := timeout(),
@@ -104,7 +106,7 @@
 -type state_data() ::
     #{ id => atom(),
        url => url(),
-       waiters => [?gen_statem:from()],
+       waiters => [from()],
        event_subscribers => [module(), ...],
        connect_timeout => timeout(),
        download_start_timeout => timeout(),
@@ -262,7 +264,7 @@ initializing(internal, maybe_load_from_cache, StateData) ->
 
 -spec ready(enter, atom(), state_data())
             -> {keep_state_and_data, {state_timeout, pos_integer(), update_database}};
-           ({call,?gen_statem:from()}, wait, state_data())
+           ({call,from()}, wait, state_data())
            -> {keep_state, state_data(), [?gen_statem:reply_action()]};
            (info, {'DOWN', reference(), process, pid(), term()}, state_data())
            -> {keep_state, state_data()};
@@ -295,7 +297,7 @@ ready(state_timeout, update_database, _StateData) ->
 
 -spec waiting_stream_start(enter, atom(), state_data())
                             -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
-                          ({call,?gen_statem:from()}, wait, state_data())
+                          ({call,from()}, wait, state_data())
                             -> {keep_state, state_data(), [?gen_statem:reply_action()]};
                           (info, {http, {reference(), stream_start, headers()}}, state_data())
                             -> {next_state, waiting_stream_end, state_data()};
@@ -354,7 +356,7 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
 
 -spec waiting_stream_end(enter, atom(), state_data())
                         -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
-                        ({call,?gen_statem:from()}, wait, state_data())
+                        ({call,from()}, wait, state_data())
                         -> {keep_state, state_data(), [?gen_statem:reply_action()]};
                         (info, {http, {reference(), stream, binary()}}, state_data())
                         -> {keep_state, state_data(), {state_timeout, pos_integer(), timeout}};
@@ -706,7 +708,7 @@ clear_inbox_of_late_http_messages(RequestId) ->
         1000 -> ok
     end.
 
--spec maybe_enqueue_waiter(?gen_statem:from(), state_data())
+-spec maybe_enqueue_waiter(from(), state_data())
         -> {state_data(), [?gen_statem:reply_action()]}.
 maybe_enqueue_waiter(From, #{ last_version := LastVersion } = StateData) ->
     {StateData, [{reply, From, {ok, LastVersion}}]};
