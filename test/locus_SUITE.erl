@@ -253,8 +253,11 @@ ipv6_invalid_addr_test(Config) ->
     ok = locus:stop_loader(Loader).
 -endif.
 
--ifdef(POST_OTP_17).
+-ifndef(POST_OTP_17).
 connect_timeout_test(_Config) ->
+    {skip, "Not working properly on OTP 17"}.
+-else.
+connect_timeout_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = connect_timeout_test,
     LoaderOpts = [no_cache, {connect_timeout, 0}, {event_subscriber, self()}],
@@ -262,9 +265,6 @@ connect_timeout_test(_Config) ->
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_failed_to_start, {error, {failed_connect, _}}}}),
     ok = locus:stop_loader(Loader).
--else.
-connect_timeout_test(_Config) ->
-    {skip, "Not working properly on OTP 17"}.
 -endif.
 
 download_start_timeout_test(Config) ->
