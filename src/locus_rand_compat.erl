@@ -33,7 +33,7 @@ seed() ->
     ok.
 -else.
 seed() ->
-    random:seed(erlang:now()),
+    _ = random:seed(erlang:now()),
     ok.
 -endif.
 

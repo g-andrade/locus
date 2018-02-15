@@ -1806,7 +1806,8 @@ cancel_timer(TimerRef) ->
 cancel_timer(TimerRef) ->
     % one more dirty hack for retro compatibility - simulate VM behaviour
     Result = erlang:cancel_timer(TimerRef) ,
-    self() ! {cancel_timer, TimerRef, Result}.
+    self() ! {cancel_timer, TimerRef, Result},
+    ok.
 -endif.
 
 -endif.
