@@ -1,14 +1,14 @@
 -module(locus_httpd).
 
--export([start/0]).
+-export([start/1]).
 -export([stop/1]).
 
-start() ->
+start(DocumentRoot) ->
     ServerName = "localhost",
     {ok, Pid} = inets:start(httpd, [{server_name, ServerName},
                                     {port, 0},
                                     {server_root, "."},
-                                    {document_root, "../../../../test/priv"},
+                                    {document_root, DocumentRoot},
                                     {modules,
                                      [% https://github.com/simplegeo/erlang/blob/master/lib/inets/examples/server_root/conf/httpd.conf
                                       mod_alias, mod_auth, mod_esi, mod_actions, mod_cgi, mod_responsecontrol, mod_trace,

@@ -33,6 +33,11 @@
 -export([start_link/3]).                    -ignore_xref({start_link, 3}).
 -export([wait/2]).
 
+-ifdef(TEST).
+-export([whereis/1]).
+-export([list_subscribers/1]).
+-endif.
+
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -125,6 +130,19 @@ wait(Id, Timeout) ->
         exit:{{shutdown,_Reason}, {gen_server,call, [ServerName|_]}} ->
             {error, database_unknown}
     end.
+
+-ifdef(TEST).
+%% @private
+whereis(Id) ->
+    ServerName = server_name(Id),
+    erlang:whereis(ServerName).
+
+%% @private
+list_subscribers(Id) ->
+    ServerName = server_name(Id),
+    State = sys:get_state(ServerName),
+    State#state.event_subscribers.
+-endif.
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions

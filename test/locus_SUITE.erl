@@ -26,6 +26,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+-define(PATH_WITH_TEST_TARBALLS, "../../../../test/priv").
+
 -define(REMOTE_COUNTRY_BASE_URL, "https://geolite.maxmind.com").
 -define(REMOTE_COUNTRY_URL, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz").
 -define(REMOTE_COUNTRY_CORRUPT_URL, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country-CSV.zip").
@@ -37,24 +39,29 @@
         ((fun () -> receive Msg -> ?assertMatch((Pattern), Msg)
                     after 30000 -> error(timeout) end end)())).
 
-%%%%%%%%%%%%%%%
+%% ------------------------------------------------------------------
+%% Setup
+%% ------------------------------------------------------------------
+
 all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
 groups() ->
-    case should_run_remote_tests() of
+    case should_run_remote_http_tests() of
         false ->
-            [{local_tests, [], all_test_cases()}];
+            [{filesystem_tests, [parallel], test_cases("_fstest")},
+             {local_http_tests, [], test_cases("_httptest")}];
         true ->
-            [{local_tests, [], all_test_cases()},
-             {remote_tests, [], all_test_cases()}]
+            [{filesystem_tests, [parallel], test_cases("_fstest")},
+             {local_http_tests, [], test_cases("_httptest")},
+             {remote_http_tests, [], test_cases("_httptest")}]
     end.
 
 -ifdef(RUNNING_ON_TRAVIS).
-should_run_remote_tests() ->
+should_run_remote_http_tests() ->
     false.
 -else.
-should_run_remote_tests() ->
+should_run_remote_http_tests() ->
     {ok, _} = application:ensure_all_started(locus),
     Apps = application:which_applications(),
     {locus, _Descr, Vsn} = lists:keyfind(locus, 1, Apps),
@@ -64,9 +71,13 @@ should_run_remote_tests() ->
     end.
 -endif.
 
-all_test_cases() ->
+test_cases(Suffix) ->
+    lists:usort( exported_functions_with_suffixes(["_test", Suffix]) ).
+
+exported_functions_with_suffixes(Suffixes) ->
     [Name || {Name, 1} <- exported_functions(),
-             lists:suffix("_test", atom_to_list(Name))].
+             lists:any(fun (Suffix) -> lists:suffix(Suffix, atom_to_list(Name)) end,
+                       Suffixes)].
 
 exported_functions() ->
     ModuleInfo = ?MODULE:module_info(),
@@ -74,10 +85,20 @@ exported_functions() ->
     Exports.
 
 %%%%%%%%%%%%%%%
-init_per_group(local_tests, Config) ->
+init_per_group(filesystem_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     ok = locus_logger:set_loglevel(debug),
-    {ok, HttpdPid, BaseURL} = locus_httpd:start(),
+    BaseURL = ?PATH_WITH_TEST_TARBALLS,
+    DatabaseURL = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
+    CorruptURL = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption.tar.gz"),
+    [{url, DatabaseURL},
+     {corrupt_url, CorruptURL},
+     {base_url, BaseURL}
+     | Config];
+init_per_group(local_http_tests, Config) ->
+    {ok, _} = application:ensure_all_started(locus),
+    ok = locus_logger:set_loglevel(debug),
+    {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
     locus_rand_compat:seed(),
     RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
     DatabaseURL = BaseURL ++ "/GeoLite2-Country.tar.gz" ++ "#" ++ RandomAnchor,
@@ -87,7 +108,7 @@ init_per_group(local_tests, Config) ->
      {corrupt_url, CorruptURL},
      {base_url, BaseURL}
      | Config];
-init_per_group(remote_tests, Config) ->
+init_per_group(remote_http_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     ok = locus_logger:set_loglevel(debug),
     locus_rand_compat:seed(),
@@ -100,7 +121,10 @@ init_per_group(remote_tests, Config) ->
      {corrupt_url, CorruptURL}
      | Config].
 
-end_per_group(local_tests, Config) ->
+end_per_group(filesystem_tests, Config) ->
+    ok = application:stop(locus),
+    Config;
+end_per_group(local_http_tests, Config) ->
     URL = proplists:get_value(url, Config),
     CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
     HttpdPid = proplists:get_value(httpd_pid, Config),
@@ -109,7 +133,7 @@ end_per_group(local_tests, Config) ->
     ok = locus_httpd:stop(HttpdPid),
     _ = file:delete(CacheFilename),
     Config;
-end_per_group(remote_tests, Config) ->
+end_per_group(remote_http_tests, Config) ->
     URL = proplists:get_value(url, Config),
     CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
 
@@ -117,13 +141,19 @@ end_per_group(remote_tests, Config) ->
     _ = file:delete(CacheFilename),
     Config.
 
-%%%
+%% ------------------------------------------------------------------
+%% Filesystem Test Cases
+%% ------------------------------------------------------------------
+
+%% ------------------------------------------------------------------
+%% Test Cases
+%% ------------------------------------------------------------------
 
 -ifdef(BAD_HTTPC).
-cacheless_loading_test(_Config) ->
+cacheless_loading_httptest(_Config) ->
     {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
-cacheless_loading_test(Config) ->
+cacheless_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = cacheless_loading_test,
     LoaderOpts = [no_cache, {event_subscriber, self()}],
@@ -145,10 +175,10 @@ cacheless_loading_test(Config) ->
 
 
 -ifdef(BAD_HTTPC).
-cold_remote_loading_test(_Config) ->
+cold_remote_loading_httptest(_Config) ->
     {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
-cold_remote_loading_test(Config) ->
+cold_remote_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = cold_regular_loading_test,
     LoaderOpts = [{event_subscriber, self()}],
@@ -171,10 +201,10 @@ cold_remote_loading_test(Config) ->
 -endif.
 
 -ifdef(BAD_HTTPC).
-warm_remote_loading_test(_Config) ->
+warm_remote_loading_httptest(_Config) ->
     {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
-warm_remote_loading_test(Config) ->
+warm_remote_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = warm_regular_loading_test,
     LoaderOpts = [{event_subscriber, self()}],
@@ -254,10 +284,10 @@ ipv6_invalid_addr_test(Config) ->
 -endif.
 
 -ifndef(POST_OTP_17).
-connect_timeout_test(_Config) ->
+connect_timeout_httptest(_Config) ->
     {skip, "Not working properly on OTP 17"}.
 -else.
-connect_timeout_test(Config) ->
+connect_timeout_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = connect_timeout_test,
     LoaderOpts = [no_cache, {connect_timeout, 0}, {event_subscriber, self()}],
@@ -267,7 +297,7 @@ connect_timeout_test(Config) ->
     ok = locus:stop_loader(Loader).
 -endif.
 
-download_start_timeout_test(Config) ->
+download_start_timeout_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = download_start_timeout_test,
     LoaderOpts = [no_cache, {download_start_timeout, 0}, {event_subscriber, self()}],
@@ -277,10 +307,10 @@ download_start_timeout_test(Config) ->
     ok = locus:stop_loader(Loader).
 
 -ifdef(BAD_HTTPC).
-idle_download_timeout_test(_Config) ->
+idle_download_timeout_httptest(_Config) ->
     {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
-idle_download_timeout_test(Config) ->
+idle_download_timeout_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = idle_download_timeout_test,
     LoaderOpts = [no_cache, {idle_download_timeout, 0}, {event_subscriber, self()}],
@@ -291,7 +321,17 @@ idle_download_timeout_test(Config) ->
     ok = locus:stop_loader(Loader).
 -endif.
 
-wrong_url_test(Config) ->
+wrong_url_fstest(Config) ->
+    BaseURL = proplists:get_value(base_url, Config),
+    URL = filename:join(BaseURL, "foobarbarfoofoobar"),
+    Loader = wrong_url_test,
+    LoaderOpts = [{event_subscriber, self()}],
+    ok = locus:start_loader(Loader, URL, LoaderOpts),
+    ?assertRecv({locus, Loader, {load_attempt_started, {filesystem,_}}}),
+    ?assertRecv({locus, Loader, {load_attempt_finished, {filesystem,_}, {error,_}}}),
+    ok = locus:stop_loader(Loader).
+
+wrong_url_httptest(Config) ->
     BaseURL = proplists:get_value(base_url, Config),
     URL = BaseURL ++ "/foobarbarfoofoobar",
     Loader = wrong_url_test,
@@ -302,7 +342,16 @@ wrong_url_test(Config) ->
                                  {http, {404 = _StatusCode, _StatusDesc}, _Headers, _Body}}}),
     ok = locus:stop_loader(Loader).
 
-corrupt_database_test(Config) ->
+corrupt_database_fstest(Config) ->
+    CorruptURL = proplists:get_value(corrupt_url, Config),
+    Loader = corrupt_database_test,
+    LoaderOpts = [{event_subscriber, self()}],
+    ok = locus:start_loader(Loader, CorruptURL, LoaderOpts),
+    ?assertRecv({locus, Loader, {load_attempt_started, {filesystem,_}}}),
+    ?assertRecv({locus, Loader, {load_attempt_finished, {filesystem,_}, {error, _}}}),
+    ok = locus:stop_loader(Loader).
+
+corrupt_database_httptest(Config) ->
     CorruptURL = proplists:get_value(corrupt_url, Config),
     Loader = corrupt_database_test,
     LoaderOpts = [no_cache, {event_subscriber, self()}],
@@ -322,7 +371,7 @@ database_unknown_test(_Config) ->
     ?assertEqual({error, database_unknown}, locus:get_info(Loader, source)),
     ?assertEqual({error, database_unknown}, locus:get_info(Loader, version)).
 
-database_still_loading_test(Config) ->
+database_still_loading_httptest(Config) ->
     BaseURL = proplists:get_value(base_url, Config),
     URL = BaseURL ++ "/foobarbarfoofoobar",
     Loader = database_still_loading_test,
@@ -348,17 +397,22 @@ invalid_args_test(Config) ->
     ?assertEqual({error, {invalid_opt, not_an_opt}}, locus:start_loader(Loader, URL, InvalidOpts)).
 
 subscriber_death_test(Config) ->
+    LoaderModule =
+        case proplists:get_value(httpd_pid, Config) of
+            undefined -> locus_filesystem_loader;
+            _ -> locus_http_loader
+        end,
     URL = proplists:get_value(url, Config),
     Loader = warm_regular_loading_test,
     Subscribers = [spawn(fun () -> timer:sleep(X*100) end) || X <- [2,3,4,5]],
     LoaderOpts = [{event_subscriber, Pid} || Pid <- Subscribers],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
-    OriginalPid = locus_http_loader:whereis(Loader),
+    OriginalPid = LoaderModule:whereis(Loader),
     ?assertEqual(lists:sort([locus_logger | Subscribers]),
-                 lists:sort(locus_http_loader:list_subscribers(Loader))),
+                 lists:sort(LoaderModule:list_subscribers(Loader))),
     timer:sleep(750),
-    ?assertEqual([locus_logger], locus_http_loader:list_subscribers(Loader)),
-    ?assertEqual(OriginalPid, locus_http_loader:whereis(Loader)),
+    ?assertEqual([locus_logger], LoaderModule:list_subscribers(Loader)),
+    ?assertEqual(OriginalPid, LoaderModule:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
 %%%
