@@ -26,9 +26,9 @@ Clone the repository and run `make console' to bring up a shell.
 <pre lang="erlang"  class="erlang">
 URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
 ok = locus:start_loader(country, URL).
-</pre>
 
-`URL' can also be a local path (e.g. `"/opt/MaxMind/GeoLite2-Country.tar.gz"'.)
+% URL can also be a local path, e.g. "/opt/MaxMind/GeoLite2-Country.tar.gz"
+</pre>
 
 ==== 2. Wait for the database to load (optional) ====
 
