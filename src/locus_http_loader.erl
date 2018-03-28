@@ -90,7 +90,7 @@
     #{ id := atom(),
        url := url(),
        waiters := [from()],
-       event_subscribers := [module(), ...],
+       event_subscribers := [module() | pid()],
        connect_timeout := timeout(),
        download_start_timeout := timeout(),
        idle_download_timeout := timeout(),
@@ -107,7 +107,7 @@
     #{ id => atom(),
        url => url(),
        waiters => [from()],
-       event_subscribers => [module(), ...],
+       event_subscribers => [module() | pid()],
        connect_timeout => timeout(),
        download_start_timeout => timeout(),
        idle_download_timeout => timeout(),
@@ -728,14 +728,14 @@ reply_to_waiters(Result, StateData) ->
     {StateData#{ waiters := [] }, Replies}.
 
 -spec report_event(event(), state_data()) -> ok.
-report_event(Event, #{ id := Id, event_subscribers := Modules }) ->
+report_event(Event, #{ id := Id, event_subscribers := Subscribers }) ->
     lists:foreach(
       fun (Module) when is_atom(Module) ->
               Module:report(Id, Event);
           (Pid) ->
               erlang:send(Pid, {locus, Id, Event}, [noconnect])
       end,
-      Modules).
+      Subscribers).
 
 handle_monitored_process_death(Pid, StateData) ->
     StateData2 =
