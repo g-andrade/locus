@@ -56,7 +56,10 @@
 -type database_metadata() :: #{ binary() => term() }.
 -export_type([database_metadata/0]).
 
--type database_source() :: {cache, string()} | {remote, string()}.
+-type database_source() ::
+        {cache, string()} |
+        {remote, string()} |
+        {filesystem, string()}.
 -export_type([database_source/0]).
 
 -type database_version() :: calendar:datetime().
