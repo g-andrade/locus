@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [1.3.0] - 2018-03-28
 ### Added
 - ability of loading databases from local file system
+- type spec of database entries
 
 ## [1.2.1] - 2018-02-15
 ### Fixed

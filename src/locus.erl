@@ -46,6 +46,17 @@
 -type database_error() :: database_unknown | database_not_loaded.
 -export_type([database_error/0]).
 
+-type database_entry() ::
+        #{ prefix => ip_address_prefix(),
+           binary() => term()
+         }.
+-export_type([database_entry/0]).
+
+-type ip_address_prefix() ::
+        {inet:ip4_address(), 0..32} |
+        {inet:ip6_address(), 0..128}.
+-export_type([ip_address_prefix/0]).
+
 -type database_info() ::
         #{ metadata => database_metadata(),
            source => database_source(),
@@ -209,10 +220,7 @@ wait_for_loader(DatabaseId, Timeout) ->
 -spec lookup(DatabaseId, Address) -> {ok, Entry} | {error, Error}
             when DatabaseId :: atom(),
                  Address :: inet:ip_address() | nonempty_string() | binary(),
-                 Entry :: #{ prefix => AddressPrefix,
-                             binary() => term() },
-                 AddressPrefix :: ({inet:ip4_address(), 0..32} |
-                                   {inet:ip6_address(), 0..128}),
+                 Entry :: database_entry(),
                  Error :: (not_found | invalid_address |
                            database_unknown | database_not_loaded |
                            ipv4_database).
