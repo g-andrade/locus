@@ -298,7 +298,7 @@ processing_update(internal, execute, StateData) ->
         {ok, Version} ->
             ?log_info("~p database version is now ~p", [Id, Version]),
             LastModified = extract_last_modified_datetime_from_response_headers(Headers),
-            StateData4 = StateData3#{ last_modified => max(LastModified, Version),
+            StateData4 = StateData3#{ last_modified => LastModified,
                                       last_version => Version },
             try_saving_cached_tarball(Body, LastModified, StateData4),
             {StateData5, Replies} = reply_to_waiters({ok, Version}, StateData4),
@@ -335,7 +335,7 @@ handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName,
     case load_database_from_tarball(Id, Content) of
         {ok, Version} ->
             ?log_info("~p database version is now ~p (loaded from cache)", [Id, Version]),
-            StateData#{ last_modified => max(ModificationDate, Version),
+            StateData#{ last_modified => ModificationDate,
                         last_version => Version };
         {error, Error} ->
             ?log_warning("failure loading ~p database from cache file ~p: ~p",
@@ -378,12 +378,13 @@ save_cached_tarball(Tarball, LastModified, StateData) ->
     Filename = cached_tarball_name(StateData),
     TmpSuffix = ".tmp." ++ integer_to_list(rand:uniform(1 bsl 32), 36),
     TmpFilename = Filename ++ TmpSuffix,
+    FileInfoMod = #file_info{ mtime = LastModified },
     try
         ok = filelib:ensure_dir(Filename),
         {ok, IoDevice} = file:open(TmpFilename, [write, exclusive, raw]),
         ok = file:write(IoDevice, Tarball),
         ok = file:close(IoDevice),
-        ok = file:change_time(TmpFilename, LastModified),
+        ok = file:write_file_info(TmpFilename, FileInfoMod, [{time,universal}]),
         ok = file:rename(TmpFilename, Filename),
         {ok, Filename}
     catch
@@ -426,7 +427,8 @@ update_period(#{} = _StateData) ->
     ?PRE_READINESS_UPDATE_PERIOD.
 
 request_headers(#{ last_modified := LastModified } = _StateData) ->
-    [{"if-modified-since", httpd_util:rfc1123_date(LastModified)}
+    LocalLastModified = calendar:universal_time_to_local_time(LastModified),
+    [{"if-modified-since", httpd_util:rfc1123_date(LocalLastModified)}
      | base_request_headers()];
 request_headers(#{} = _StateData) ->
     base_request_headers().
