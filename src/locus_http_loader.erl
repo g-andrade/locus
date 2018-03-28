@@ -224,8 +224,8 @@ whereis(Id) ->
 %% @private
 list_subscribers(Id) ->
     ServerName = server_name(Id),
-    {_State, StateName} = sys:get_state(ServerName),
-    maps:get(event_subscribers, StateName).
+    {_State, StateData} = sys:get_state(ServerName),
+    maps:get(event_subscribers, StateData).
 -endif.
 
 %% ------------------------------------------------------------------
