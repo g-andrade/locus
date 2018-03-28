@@ -204,6 +204,8 @@ init_opts([{event_subscriber, Pid} | Opts], State) when is_pid(Pid) ->
     UpdatedEventSubscribers = [Pid | EventSubscribers],
     UpdatedState = State#state{ event_subscribers = UpdatedEventSubscribers },
     init_opts(Opts, UpdatedState);
+init_opts([InvalidOpt | _], _StateData) ->
+    {stop, {invalid_opt, InvalidOpt}};
 init_opts([], State) ->
     self() ! attempt_load,
     {ok, State}.
