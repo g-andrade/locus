@@ -94,9 +94,11 @@ ok = locus:start_loader(country, URL).
 ==== Requirements ====
 
 <ul>
-<li>Erlang/OTP 17.4 or higher</li>
+<li>Erlang/OTP 17.4 or higher*</li>
 <li>rebar3</li>
 </ul>
+
+* OTP 20.3.1 implementation of gen_statem has <a target="_parent" href="http://erlang.org/pipermail/erlang-questions/2018-March/095080.html">issues</a>. These should be fixed on OTP 20.3.2.
 
 ==== Documentation ====
 
