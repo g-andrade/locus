@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - ability of loading databases from local file system
 - type spec of database entries
+### Fixed
+- wrong handling of timezones on cached tarballs
+- wrong handling of daylight saving time on conditional HTTP requests
 
 ## [1.2.1] - 2018-02-15
 ### Fixed
