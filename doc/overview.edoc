@@ -12,7 +12,7 @@
 city or ASN of IPv4 and IPv6 addresses.
 
 The free <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/geolite2/">MaxMind databases</a> you choose
-are downloaded on-demand, cached on the filesystem and updated automatically.
+are downloaded on-demand, cached on the filesystem (when loaded using HTTP) and updated automatically.
 
 You're encouraged to host your own private copies of the databases when using this library in production,
 both for reliability and netiquette towards MaxMind.
@@ -122,7 +122,7 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
 <li>The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a> is mostly complete</li>
 </ul>
 
-==== Downloads and updates ====
+==== Downloads and updates (HTTP URLs) ====
 
 <ul>
 <li>The downloaded tarballs are uncompressed in memory</li>
@@ -132,12 +132,12 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
 <li>The downloaded tarballs are cached on the filesystem in order to more quickly achieve readiness
   on future launches of the database loader
   </li>
-<li>Until the database loader achieves readiness, download attempts are made every minute;
+<li>Until a HTTP database loader achieves readiness, download attempts are made every minute;
   once readiness is achieved (either from cache or network), this interval increases to every 6 hours
   </li>
 </ul>
 
-==== Caching ====
+==== Caching (HTTP URLs) ====
 
 <ul>
 <li>Caching is a best-effort; the system falls back to relying exclusively on the network if needed</li>
@@ -147,6 +147,15 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
   and used to condition downloads on subsequent boots and save bandwidth
   </li>
 <li>Caching can be disabled by specifying the `no_cache' option when running `:start_loader'</li>
+</ul>
+
+==== Loads and updates (filesystem URLs) ====
+
+<ul>
+<li>The loaded tarballs are uncompressed in memory</li>
+<li>Until a filesystem database loader achieves readiness, load attempts are made every 5 seconds
+  once readiness is achieved, this interval increases to every 30 seconds
+  </li>
 </ul>
 
 ==== Logging ====

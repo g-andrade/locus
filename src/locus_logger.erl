@@ -130,6 +130,20 @@ report(MinWeight, DatabaseId, {download_finished, BodySize, {error, Error}}) ->
        true ->
            ok
     end;
+report(MinWeight, DatabaseId, {load_attempt_started, Source}) ->
+    if MinWeight =< ?debug ->
+           log_info("~p database load attempt started from ~p", [DatabaseId, Source]);
+       MinWeight =< ?info ->
+           log_info("~p database load attempt started (~p)", [DatabaseId, resumed_source(Source)]);
+       true ->
+           ok
+    end;
+report(MinWeight, DatabaseId, {load_attempt_dismissed, _Source}) ->
+    if MinWeight =< ?info ->
+           log_info("~p database load attempt dismissed", [DatabaseId]);
+       true ->
+           ok
+    end;
 report(MinWeight, DatabaseId, {load_attempt_finished, Source, {ok, Version}}) ->
     if MinWeight =< ?debug ->
            log_info("~p database version ~p loaded from ~p", [DatabaseId, Version, Source]);
@@ -176,6 +190,6 @@ log(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt ++ "~n",
     error_logger:(Fun)(FullFmt, Args).
 
--spec resumed_source(locus_mmdb:source()) -> cache | remote.
+-spec resumed_source(locus_mmdb:source()) -> cache | remote | filesystem.
 resumed_source({SourceType, _SourceLocation}) ->
     SourceType.

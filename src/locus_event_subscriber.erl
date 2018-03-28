@@ -44,5 +44,6 @@
 %% ------------------------------------------------------------------
 
 -type event() ::
-        locus_http_loader:event().
+        locus_http_loader:event() |
+        locus_filesystem_loader:event().
 -export_type([event/0]).

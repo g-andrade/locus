@@ -70,7 +70,7 @@
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
 %% </ul>
 %%
 %% Returns:
@@ -93,8 +93,8 @@ start_loader(DatabaseId, DatabaseURL) ->
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) URL.</li>
-%% <li>`Opts' must be a list of `locus_http_loader:opt()' values</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`Opts' must be either a list of `locus_http_loader:opt()' or a list of `locus_filesystem_loader:opt()' values</li>
 %% </ul>
 %%
 %% Returns:
@@ -109,15 +109,12 @@ start_loader(DatabaseId, DatabaseURL) ->
 -spec start_loader(DatabaseId, DatabaseURL, Opts) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseURL :: string() | binary(),
-                 Opts :: [locus_http_loader:opt()],
+                 Opts :: [locus_http_loader:opt()] | [locus_filesystem_loader:opt()],
                  Error :: invalid_url | already_started.
-start_loader(DatabaseId, BinDatabaseURL, Opts) when is_binary(BinDatabaseURL) ->
-    DatabaseURL = binary_to_list(BinDatabaseURL),
-    start_loader(DatabaseId, DatabaseURL, Opts);
 start_loader(DatabaseId, DatabaseURL, Opts) ->
     OptsWithDefaults = opts_with_defaults(Opts),
-    case is_url(DatabaseURL) of
-        true -> locus_sup:start_child(DatabaseId, DatabaseURL, OptsWithDefaults);
+    case parse_url(DatabaseURL) of
+        {URLType, ParsedURL} -> locus_sup:start_child(DatabaseId, URLType, ParsedURL, OptsWithDefaults);
         false -> {error, invalid_url}
     end.
 
@@ -180,7 +177,12 @@ wait_for_loader(DatabaseId) ->
                  Error :: database_unknown | timeout | {loading, LoadingError},
                  LoadingError :: term().
 wait_for_loader(DatabaseId, Timeout) ->
-    locus_http_loader:wait(DatabaseId, Timeout).
+    case locus_http_loader:wait(DatabaseId, Timeout) of
+        {error, Error} when Error =:= database_unknown ->
+            locus_filesystem_loader:wait(DatabaseId, Timeout);
+        Other ->
+            Other
+    end.
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses.
 %%
@@ -291,13 +293,38 @@ get_info(DatabaseId, Property) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-is_url(String) ->
+parse_url(DatabaseURL) ->
+    case parse_http_url(DatabaseURL) of
+        {http, ParsedURL} ->
+            {http, ParsedURL};
+        false ->
+            parse_filesystem_url(DatabaseURL)
+    end.
+
+parse_http_url(<<Binary/binary>>) ->
+    String = binary_to_list(Binary),
+    parse_http_url(String);
+parse_http_url(String) ->
     try io_lib:printable_latin1_list(String) andalso
         http_uri:parse(String)
     of
         false -> false;
-        {ok, _Result} -> true;
+        {ok, _Result} -> {http, String};
         {error, _Reason} -> false
+    catch
+        error:badarg -> false
+    end.
+
+parse_filesystem_url(DatabaseURL) ->
+    try unicode:characters_to_list(DatabaseURL) of
+        "file://" ++ Path ->
+            {filesystem, filename:absname(Path)};
+        Path when is_list(Path) ->
+            {filesystem, filename:absname(Path)};
+        {error, _Parsed, _RestData} ->
+            false;
+        {incomplete, _Parsed, _RestData} ->
+            false
     catch
         error:badarg -> false
     end.

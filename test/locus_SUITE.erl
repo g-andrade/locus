@@ -341,7 +341,7 @@ database_still_loading_test(Config) ->
 
 invalid_args_test(Config) ->
     URL = proplists:get_value(url, Config),
-    NotAnURL = "not an url",
+    NotAnURL = not_an_url,
     Loader = invalid_args_test,
     ?assertEqual({error, invalid_url}, locus:start_loader(Loader, NotAnURL)),
     InvalidOpts = [not_an_opt],

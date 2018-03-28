@@ -86,8 +86,19 @@
 -type bin_database() :: <<_:64,_:_*8>>.
 -export_type([bin_database/0]).
 
--type source() :: {cache, Path :: string()} | {remote, URL :: string()}.
+-type source() ::
+        http_loader_source() |
+        filesystem_loader_source().
 -export_type([source/0]).
+
+-type http_loader_source() ::
+        {cache, Path :: string()} |
+        {remote, URL :: string()}.
+-export_type([http_loader_source/0]).
+
+-type filesystem_loader_source() ::
+        {filesystem, Path :: string()}.
+-export_type([filesystem_loader_source/0]).
 
 -ifdef(POST_OTP_18).
 -type parts() ::

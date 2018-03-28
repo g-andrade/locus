@@ -26,8 +26,6 @@
 -module(locus_http_loader).
 -behaviour(?gen_statem).
 
--include_lib("kernel/include/file.hrl").
-
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -171,8 +169,8 @@
 -export_type([event_download_finished/0]).
 
 -type event_load_attempt_finished() ::
-        {load_attempt_finished, locus_mmdb:source(), {ok, Version :: calendar:datetime()}} |
-        {load_attempt_finished, locus_mmdb:source(), {error, term()}}.
+        {load_attempt_finished, locus_mmdb:http_loader_source(), {ok, Version :: calendar:datetime()}} |
+        {load_attempt_finished, locus_mmdb:http_loader_source(), {error, term()}}.
 -export_type([event_load_attempt_finished/0]).
 
 -type event_cache_attempt_finished() ::
@@ -258,7 +256,7 @@ initializing(internal, maybe_load_from_cache, #{ no_cache := true } = StateData)
     {next_state, ready, StateData, {next_event, internal, update_database}};
 initializing(internal, maybe_load_from_cache, StateData) ->
     CachedTarballName = cached_tarball_name(StateData),
-    CachedTarballLookup = read_file_and_its_modification_date(CachedTarballName),
+    CachedTarballLookup = locus_util:read_file_and_its_modification_date(CachedTarballName),
     StateData2 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
     {next_state, ready, StateData2, {next_event, internal, update_database}}.
 
@@ -434,7 +432,7 @@ processing_update(internal, execute, StateData) ->
     {Body, StateData3} = ?maps_take(last_response_body, StateData2),
     URL = maps:get(url, StateData),
     Source = {remote, URL},
-    case load_database_from_tarball(Id, Body, Source) of
+    case locus_util:load_database_from_tarball(Id, Body, Source) of
         {ok, Version} ->
             report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
             LastModified = extract_last_modified_datetime_from_response_headers(Headers),
@@ -541,7 +539,7 @@ cached_tarball_name_for_url(URL) ->
 handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, StateData) ->
     Id = maps:get(id, StateData),
     Source = {cache, CachedTarballName},
-    case load_database_from_tarball(Id, Content, Source) of
+    case locus_util:load_database_from_tarball(Id, Content, Source) of
         {ok, Version} ->
             report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
             StateData#{ last_modified => max(ModificationDate, Version),
@@ -554,19 +552,6 @@ handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
     Source = {cache, CachedTarballName},
     report_event({load_attempt_finished, Source, {error, Error}}, StateData),
     StateData.
-
--spec load_database_from_tarball(atom(), binary(), locus_mmdb:source())
-        -> {ok, calendar:datetime()} |
-           {error, {exception, atom(), term()}}.
-load_database_from_tarball(Id, Tarball, Source) ->
-    try
-        BinDatabase = extract_database_from_tarball(Tarball),
-        Version = locus_mmdb:decode_and_update(Id, BinDatabase, Source),
-        {ok, Version}
-    catch
-        Class:Reason ->
-            {error, {exception, Class, Reason}}
-    end.
 
 -spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
 maybe_try_saving_cached_tarball(_Tarball, _LastModified, #{ no_cache := true }) ->
@@ -611,22 +596,6 @@ bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
 bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
 
--spec read_file_and_its_modification_date(nonempty_string())
-        -> {ok, binary(), calendar:datetime()} |
-           {error, {read_file | read_file_info, term()}}.
-read_file_and_its_modification_date(Filename) ->
-    case file:read_file_info(Filename, [{time,universal}]) of
-        {ok, #file_info{ mtime = ModificationDate }} ->
-            case file:read_file(Filename) of
-                {ok, Content} ->
-                    {ok, Content, ModificationDate};
-                {error, Error} ->
-                    {error, {read_file, Error}}
-            end;
-        {error, Error} ->
-            {error, {read_file_info, Error}}
-    end.
-
 -spec update_period(state_data()) -> pos_integer().
 update_period(#{ last_modified := _ } = _StateData) ->
     ?POST_READINESS_UPDATE_PERIOD;
@@ -662,34 +631,6 @@ extract_last_modified_datetime_from_response_headers(Headers) ->
         false ->
             {{1970,1,1}, {0,0,0}}
     end.
-
--spec extract_database_from_tarball(binary()) -> binary().
-extract_database_from_tarball(Tarball) ->
-    {ok, ContainedPaths} = erl_tar:table({binary, Tarball}, [compressed]),
-    {true, DatabasePath} = lists_anymap(fun has_mmdb_extension/1, ContainedPaths),
-    {ok, [{DatabasePath, BinDatabase}]} =
-        erl_tar:extract({binary, Tarball}, [{files, [DatabasePath]}, memory, compressed]),
-    BinDatabase.
-
-lists_anymap(Fun, [H|T]) ->
-    case Fun(H) of
-        {true, Mapped} -> {true, Mapped};
-        true -> {true, H};
-        false -> lists_anymap(Fun, T)
-    end;
-lists_anymap(_Fun, []) ->
-    false.
-
-%-spec has_mmdb_extension(nonempty_string()) -> boolean().
-has_mmdb_extension({Filename, _Type, _Size, _MTime, _Mode, _Uid, _Gid}) ->
-    % FIXME: this a placeholder for OTP 20; due to the incomplete spec
-    % of erl_tar:table/2, Dialyzer comes to believe that no strings
-    % can be returned, only the above tuple, which in fact is only returned
-    % if the 'verbose' option is picked, something that we are definitely
-    % not doing.
-    filename:extension(Filename) =:= ".mmdb" andalso {true, Filename};
-has_mmdb_extension(Filename) ->
-    filename:extension(Filename) =:= ".mmdb".
 
 -spec clear_inbox_of_late_http_messages(reference()) -> ok.
 clear_inbox_of_late_http_messages(RequestId) ->

@@ -30,7 +30,7 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/0]).                      -ignore_xref({start_link,0}).
--export([start_child/3]).
+-export([start_child/4]).
 -export([stop_child/1]).
 
 %% ------------------------------------------------------------------
@@ -60,10 +60,11 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
--spec start_child(atom(), string(), [locus_http_loader:opt()])
+-spec start_child(atom(), http | filesystem, string(),
+                  [locus_http_loader:opt() | locus_filesystem_loader:opt()])
         -> ok | {error, term()}.
-start_child(DatabaseId, DatabaseURL, Opts) ->
-    ChildSpec = child_spec(DatabaseId, DatabaseURL, Opts),
+start_child(DatabaseId, URLType, DatabaseURL, Opts) ->
+    ChildSpec = child_spec(DatabaseId, URLType, DatabaseURL, Opts),
     case supervisor:start_child(?SERVER, ChildSpec) of
         {ok, _Pid} ->
             ok;
@@ -103,15 +104,22 @@ init([]) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-child_spec(DatabaseId, DatabaseURL, Opts) ->
+child_spec(DatabaseId, URLType, DatabaseURL, Opts) ->
     Args = [DatabaseId, DatabaseURL, Opts],
     Id = child_id(DatabaseId),
-    Start = {locus_http_loader, start_link, Args},
+    Module = child_module(URLType),
+    Start = {Module, start_link, Args},
     Restart = permanent,
     Shutdown = 5000,
     Type = worker,
-    Modules = [locus_http_loader],
+    Modules = [Module],
     {Id, Start, Restart, Shutdown, Type, Modules}.
 
 child_id(DatabaseId) ->
+    % FIXME this is incorrect for filesystem URLs.
+    % It was left like this so we wouldn't break interface.
+    % Fix it the next time we do break interface.
     {http_loader, DatabaseId}.
+
+child_module(http) -> locus_http_loader;
+child_module(filesystem) -> locus_filesystem_loader.
