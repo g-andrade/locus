@@ -124,7 +124,7 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
 <li>The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a> is mostly complete</li>
 </ul>
 
-==== Downloads and updates (HTTP URLs) ====
+==== HTTP URLs - Downloads and updates ====
 
 <ul>
 <li>The downloaded tarballs are uncompressed in memory</li>
@@ -139,7 +139,7 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
   </li>
 </ul>
 
-==== Caching (HTTP URLs) ====
+==== HTTP URLs - Caching ====
 
 <ul>
 <li>Caching is a best-effort; the system falls back to relying exclusively on the network if needed</li>
@@ -151,12 +151,13 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
 <li>Caching can be disabled by specifying the `no_cache' option when running `:start_loader'</li>
 </ul>
 
-==== Loads and updates (filesystem URLs) ====
+==== File system URLs - Loads and updates ====
 
 <ul>
 <li>The loaded tarballs are uncompressed in memory</li>
-<li>Until a filesystem database loader achieves readiness, load attempts are made every 5 seconds
-  once readiness is achieved, this interval increases to every 30 seconds
+<li>Until a filesystem database loader achieves readiness, load attempts are made every 5 seconds;
+  once readiness is achieved, this interval increases to every 30 seconds and load attempts are
+  dismissed as long as the tarball modification timestamp keeps unchanged
   </li>
 </ul>
 
