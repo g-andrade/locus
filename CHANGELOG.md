@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - wrong handling of timezones on cached tarballs
 - wrong handling of daylight saving time on conditional HTTP requests
 
+## [1.2.2] - 2018-03-28
+### Fixed
+- wrong handling of timezones on cached tarballs
+- wrong handling of daylight saving time on conditional HTTP requests
+
+## [1.1.4] - 2018-03-28
+### Fixed
+- wrong handling of timezones on cached tarballs
+- wrong handling of daylight saving time on conditional HTTP requests
+
+## [1.0.1] - 2018-03-28
+### Fixed
+- wrong handling of timezones on cached tarballs
+- wrong handling of daylight saving time on conditional HTTP requests
+
 ## [1.2.1] - 2018-02-15
 ### Fixed
 - undesirable inlining
