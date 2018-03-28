@@ -49,10 +49,10 @@ all() ->
 groups() ->
     case should_run_remote_http_tests() of
         false ->
-            [{filesystem_tests, [parallel], test_cases("_fstest")},
+            [{filesystem_tests, [], test_cases("_fstest")},
              {local_http_tests, [], test_cases("_httptest")}];
         true ->
-            [{filesystem_tests, [parallel], test_cases("_fstest")},
+            [{filesystem_tests, [], test_cases("_fstest")},
              {local_http_tests, [], test_cases("_httptest")},
              {remote_http_tests, [], test_cases("_httptest")}]
     end.
