@@ -248,15 +248,15 @@ init([Id, URL, Opts]) ->
 
 -spec initializing(enter, atom(), state_data())
                    -> keep_state_and_data;
-                  (internal, maybe_load_from_cache, state_data())
+                  (info, maybe_load_from_cache, state_data())
                    -> {next_state, ready, state_data(),
                        {next_event, internal, update_database}}.
 %% @private
 initializing(enter, _PrevState, _StateData) ->
     keep_state_and_data;
-initializing(internal, maybe_load_from_cache, #{ no_cache := true } = StateData) ->
+initializing(info, maybe_load_from_cache, #{ no_cache := true } = StateData) ->
     {next_state, ready, StateData, {next_event, internal, update_database}};
-initializing(internal, maybe_load_from_cache, StateData) ->
+initializing(info, maybe_load_from_cache, StateData) ->
     CachedTarballName = cached_tarball_name(StateData),
     CachedTarballLookup = read_file_and_its_modification_date(CachedTarballName),
     StateData2 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
@@ -518,8 +518,8 @@ init_opts([no_cache | Opts], StateData) ->
 init_opts([InvalidOpt | _], _StateData) ->
     {stop, {invalid_opt, InvalidOpt}};
 init_opts([], StateData) ->
-    Actions = [{next_event, internal, maybe_load_from_cache}],
-    {ok, initializing, StateData, Actions}.
+    self() ! maybe_load_from_cache,
+    {ok, initializing, StateData}.
 
 -spec cached_tarball_name(state_data()) -> nonempty_string().
 cached_tarball_name(StateData) ->
