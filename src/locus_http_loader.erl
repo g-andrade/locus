@@ -124,15 +124,16 @@ callback_mode() -> [state_functions, state_enter].
 init([Id, URL]) ->
     locus_mmdb:create_table(Id),
     StateData = #{ id => Id, url => URL, waiters => [] },
-    {ok, initializing, StateData, {next_event, internal, load_from_cache}}.
+    self() ! load_from_cache,
+    {ok, initializing, StateData}.
 
 -spec initializing(enter, atom(), state_data())
                    -> keep_state_and_data;
-                  (internal, load_from_cache, state_data())
+                  (info, load_from_cache, state_data())
                    -> {next_state, ready, state_data(), {next_event, internal, update_database}}.
 initializing(enter, _PrevState, _StateData) ->
     keep_state_and_data;
-initializing(internal, load_from_cache, StateData) ->
+initializing(info, load_from_cache, StateData) ->
     CachedTarballName = cached_tarball_name(StateData),
     CachedTarballLookup = read_file_and_its_modification_date(CachedTarballName),
     StateData2 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
