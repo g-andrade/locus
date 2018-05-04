@@ -42,7 +42,7 @@ groups() ->
     % This suite is too heavy for Travis. It runs ok but screws up
     % locus_SUITE which runs right after, e.g. with unexpected timeouts.
     % Probably CPU throttling of some sort.
-    [];
+    [].
 -else.
 groups() ->
     GroupPathsPattern = filename:join([?PROJECT_ROOT, ?TESTS_GROUPS_REL_PATH, "*.json"]),
