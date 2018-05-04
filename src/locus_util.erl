@@ -33,8 +33,28 @@
 -export(
    [read_file_and_its_modification_date/1,
     maybe_read_file_and_its_modification_date/2,
-    load_database_from_tarball/3
+    load_database_from_tarball/3,
+    parse_ip_address/1
    ]).
+
+%% ------------------------------------------------------------------
+%% Macro Definitions
+%% ------------------------------------------------------------------
+
+-define(is_ip_address(V), (?is_ip4_address((V)) orelse ?is_ip6_address((V)))).
+
+-define(is_ip4_address(V), (is_tuple((V)) andalso tuple_size((V)) =:= 4 andalso
+                            ?is_uint8(element(1, ((V)))) andalso ?is_uint8(element(2, (V))) andalso
+                            ?is_uint8(element(3, ((V)))) andalso ?is_uint8(element(4, (V))))).
+
+-define(is_ip6_address(V), (is_tuple((V)) andalso tuple_size((V)) =:= 8 andalso
+                            ?is_uint16(element(1, ((V)))) andalso ?is_uint16(element(2, (V))) andalso
+                            ?is_uint16(element(3, ((V)))) andalso ?is_uint16(element(4, (V))) andalso
+                            ?is_uint16(element(5, ((V)))) andalso ?is_uint16(element(7, (V))) andalso
+                            ?is_uint16(element(6, ((V)))) andalso ?is_uint16(element(8, (V))))).
+
+-define(is_uint8(V), (is_integer((V)) andalso ((V) band 16#FF =:= (V)))).
+-define(is_uint16(V), (is_integer((V)) andalso ((V) band 16#FFFF =:= (V)))).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -79,6 +99,25 @@ load_database_from_tarball(Id, Tarball, Source) ->
         Class:Reason ->
             {error, {exception, Class, Reason}}
     end.
+
+-spec parse_ip_address(binary() | string() | inet:ip_address())
+        -> {ok, inet:ip_address()} | {error, einval}.
+parse_ip_address(Address) when ?is_ip_address(Address) ->
+    {ok, Address};
+parse_ip_address(Binary) when is_binary(Binary) ->
+    String = binary_to_list(Binary),
+    parse_ip_address(String);
+parse_ip_address(String) when length(String) >= 0 ->
+    case string:tokens(String, "/") of
+        [StrAddress] ->
+            inet:parse_address(StrAddress);
+        [StrAddress, _PrefixLenStr] ->
+            inet:parse_address(StrAddress);
+        _ ->
+            {error, einval}
+    end;
+parse_ip_address(_Invalid) ->
+    {error, einval}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

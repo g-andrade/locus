@@ -38,24 +38,14 @@
 -export([lookup/2]).
 -export([get_parts/1]).
 
+-ifdef(TEST).
+-export([decode_database_parts/2]).
+-export([lookup_/2]).
+-endif.
+
 %% ------------------------------------------------------------------
 %% Macro Definitions
 %% ------------------------------------------------------------------
-
--define(is_ip_address(V), (?is_ip4_address((V)) orelse ?is_ip6_address((V)))).
-
--define(is_ip4_address(V), (is_tuple((V)) andalso tuple_size((V)) =:= 4 andalso
-                            ?is_uint8(element(1, ((V)))) andalso ?is_uint8(element(2, (V))) andalso
-                            ?is_uint8(element(3, ((V)))) andalso ?is_uint8(element(4, (V))))).
-
--define(is_ip6_address(V), (is_tuple((V)) andalso tuple_size((V)) =:= 8 andalso
-                            ?is_uint16(element(1, ((V)))) andalso ?is_uint16(element(2, (V))) andalso
-                            ?is_uint16(element(3, ((V)))) andalso ?is_uint16(element(4, (V))) andalso
-                            ?is_uint16(element(5, ((V)))) andalso ?is_uint16(element(7, (V))) andalso
-                            ?is_uint16(element(6, ((V)))) andalso ?is_uint16(element(8, (V))))).
-
--define(is_uint8(V), (is_integer((V)) andalso ((V) band 16#FF =:= (V)))).
--define(is_uint16(V), (is_integer((V)) andalso ((V) band 16#FFFF =:= (V)))).
 
 -define(METADATA_MARKER, "\xab\xcd\xefMaxMind.com").
 -define(pointer, 1).
@@ -147,23 +137,16 @@ decode_and_update(Id, BinDatabase, Source) ->
                    binary() => term() }} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
-lookup(Id, Address) when ?is_ip_address(Address) ->
-    Table = table_name(Id),
-    DatabaseLookup = (ets:info(Table, name) =:= Table andalso
-                      ets:lookup(Table, database)),
-    lookup_(DatabaseLookup, Address);
-lookup(Id, Binary) when is_binary(Binary) ->
-    String = binary_to_list(Binary),
-    lookup(Id, String);
-lookup(Id, String) when is_list(String) ->
-    case inet:parse_strict_address(String) of
-        {ok, Address} ->
-            lookup(Id, Address);
+lookup(Id, Address) ->
+    case locus_util:parse_ip_address(Address) of
+        {ok, ParsedAddress} ->
+            Table = table_name(Id),
+            DatabaseLookup = (ets:info(Table, name) =:= Table andalso
+                              ets:lookup(Table, database)),
+            lookup_(DatabaseLookup, ParsedAddress);
         {error, einval} ->
             {error, invalid_address}
-    end;
-lookup(_Id, _Other) ->
-    {error, invalid_address}.
+    end.
 
 -spec get_parts(atom()) -> {ok, parts()} | {error, database_unknown | database_not_loaded}.
 get_parts(Id) ->
