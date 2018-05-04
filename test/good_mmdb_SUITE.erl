@@ -37,6 +37,13 @@
 all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
+-ifdef(RUNNING_ON_TRAVIS).
+groups() ->
+    % This suite is too heavy for Travis. It runs ok but screws up
+    % locus_SUITE which runs right after, e.g. with unexpected timeouts.
+    % Probably CPU throttling of some sort.
+    [];
+-else.
 groups() ->
     GroupPathsPattern = filename:join([?PROJECT_ROOT, ?TESTS_GROUPS_REL_PATH, "*.json"]),
     GroupPaths = filelib:wildcard(GroupPathsPattern),
@@ -48,10 +55,11 @@ groups() ->
               {Group, [], test_cases()}
       end,
       GroupPaths).
+-endif.
 
 test_cases() ->
     Exports = ?MODULE:module_info(exports),
-    [Function || {Function,1} <- Exports, 
+    [Function || {Function,1} <- Exports,
                  lists:suffix("_test", atom_to_list(Function))].
 
 %%%%%%%%%%%%%%%
