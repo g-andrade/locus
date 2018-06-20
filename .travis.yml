@@ -15,4 +15,5 @@ otp_release:
     - 20.1
     - 20.2
     - 20.3
+#    - 21.0 FIXME wait for Travis to get OTP 21 -compatible rebar3
 script: make travis_test
