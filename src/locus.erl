@@ -37,7 +37,7 @@
 -export([get_info/1]).                    -ignore_xref({get_info,1}).
 -export([get_info/2]).                    -ignore_xref({get_info,2}).
 
-%-deprecated([{get_version,1,eventually}]). % TODO Uncomment this on next major release
+-deprecated([{get_version,1,eventually}]).
 
 %% ------------------------------------------------------------------
 %% Type Definitions

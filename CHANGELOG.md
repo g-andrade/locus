@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - official test cases for good data at https://github.com/maxmind/MaxMind-DB/
 ### Changed
 - string and binary IP address parsing to handle ranges and shortened addresses
+### Deprecated
+- :get_version/1 (use :get_info/2)
 
 ## [1.3.1] - 2018-05-04
 ### Fixed
