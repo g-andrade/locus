@@ -52,7 +52,7 @@ groups() ->
               GroupFilename = filename:basename(GroupPath),
               GroupName = filename:rootname(GroupFilename),
               Group = list_to_atom(GroupName),
-              {Group, [], test_cases()}
+              {Group, [parallel], test_cases()}
       end,
       GroupPaths).
 -endif.
