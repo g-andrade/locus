@@ -9,9 +9,3 @@
 -define(maps_update_with3, (fun locus_maps_compat:update_with/3)).
 -define(maps_update_with4, (fun locus_maps_compat:update_with/4)).
 -endif.
-
--ifdef(NO_GEN_STATEM).
--define(gen_statem, locus_gen_statem_compat).
--else.
--define(gen_statem, gen_statem).
--endif.
