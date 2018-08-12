@@ -272,14 +272,12 @@ update_works_httptest(_IsRemote, Config) ->
     ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
     ?assert(MillisecondsElapsedA / PostReadinessUpdatePeriod >= 0.90),
-    ?assert(MillisecondsElapsedA / PostReadinessUpdatePeriod =< 1.10),
     %%
     {TimeElapsedB, _} = timer:tc(fun () -> ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}) end),
     MillisecondsElapsedB = TimeElapsedB / 1000,
     ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedB]),
     ?assertRecv({locus, Loader, {download_dismissed, {http, {304,_}, _Headers, _Body}}}),
     ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod >= 0.90),
-    ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod =< 1.10),
     %%
     ok = locus:stop_loader(Loader).
 -endif.
