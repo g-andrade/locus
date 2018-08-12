@@ -368,13 +368,24 @@ connect_timeout_httptest(Config) ->
 -endif.
 
 download_start_timeout_httptest(Config) ->
+    %% Undeterministic test case
     URL = proplists:get_value(url, Config),
     Loader = download_start_timeout_httptest,
     LoaderOpts = [no_cache, {download_start_timeout, 0}, {event_subscriber, self()}],
-    ok = locus:start_loader(Loader, URL, LoaderOpts),
-    ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_failed_to_start, timeout}}),
-    ok = locus:stop_loader(Loader).
+    MaxAttempts = max_undeterministic_attempts(Config),
+    (fun F(AttemptsLeft) ->
+             ok = locus:start_loader(Loader, URL, LoaderOpts),
+             ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+             try ?assertRecv({locus, Loader, {download_failed_to_start, timeout}}) of
+                 _ ->
+                     ok = locus:stop_loader(Loader)
+             catch
+                 _Class:_Reason when AttemptsLeft >= 1 ->
+                     ct:pal("~p re-attempts left...", [AttemptsLeft - 1]),
+                     ok = locus:stop_loader(Loader),
+                     F(AttemptsLeft - 1)
+             end
+     end)(MaxAttempts).
 
 -ifdef(BAD_HTTPC).
 idle_download_timeout_httptest(_Config) ->
