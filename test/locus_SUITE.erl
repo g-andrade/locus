@@ -25,6 +25,7 @@
 -compile(export_all).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("kernel/include/file.hrl").
 
 -define(PATH_WITH_TEST_TARBALLS, "../../../../test/priv").
 
@@ -38,6 +39,9 @@
 -define(assertRecv(Pattern),
         ((fun () -> receive Msg -> ?assertMatch((Pattern), Msg)
                     after 30000 -> error(timeout) end end)())).
+
+-define(VERSION1_TIMESTAMP, {{2018,01,01}, {00,00,00}}).
+-define(VERSION2_TIMESTAMP, {{2018,02,01}, {00,00,00}}).
 
 %% ------------------------------------------------------------------
 %% Setup
@@ -91,11 +95,12 @@ init_per_group(filesystem_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     ok = locus_logger:set_loglevel(debug),
     BaseURL = ?PATH_WITH_TEST_TARBALLS,
-    DatabaseURL = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
-    CorruptURL = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption.tar.gz"),
+    DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
+    CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption.tar.gz"),
     [{is_http, false},
-     {url, DatabaseURL},
-     {corrupt_url, CorruptURL},
+     {url, DatabasePath},
+     {path, DatabasePath},
+     {corrupt_url, CorruptPath},
      {base_url, BaseURL}
      | Config];
 init_per_group(local_http_tests, Config) ->
@@ -103,13 +108,16 @@ init_per_group(local_http_tests, Config) ->
     ok = locus_logger:set_loglevel(debug),
     {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
     locus_rand_compat:seed(),
+    DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
     RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
     DatabaseURL = BaseURL ++ "/GeoLite2-Country.tar.gz" ++ "#" ++ RandomAnchor,
     CorruptURL = BaseURL ++ "/corruption.tar.gz",
+    ok = set_file_mtime(DatabasePath, ?VERSION1_TIMESTAMP),
     [{is_http, true},
      {is_remote, false},
      {httpd_pid, HttpdPid},
      {url, DatabaseURL},
+     {path, DatabasePath},
      {corrupt_url, CorruptURL},
      {base_url, BaseURL}
      | Config];
@@ -231,6 +239,50 @@ warm_remote_loading_httptest(Config) ->
     ok = locus:stop_loader(Loader).
 -endif.
 
+-ifdef(BAD_HTTPC).
+update_works_httptest(_Config) ->
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
+-else.
+update_works_httptest(Config) ->
+    IsRemote = proplists:get_value(is_remote, Config),
+    update_works_httptest(IsRemote, Config).
+
+update_works_httptest(IsRemote, _Config) when IsRemote ->
+    {skip, "Unable to tweak modification time of remote files"};
+update_works_httptest(_IsRemote, Config) ->
+    URL = proplists:get_value(url, Config),
+    Path = proplists:get_value(path, Config),
+    Loader = update_works_httptest,
+    PostReadinessUpdatePeriod = 100,
+    LoaderOpts = [no_cache, {post_readiness_update_period, PostReadinessUpdatePeriod},
+                  {event_subscriber, self()}],
+    %%
+    ok = set_file_mtime(Path, ?VERSION1_TIMESTAMP),
+    ok = locus:start_loader(Loader, URL, LoaderOpts),
+    ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+    ?assertRecv({locus, Loader, {download_started, _Headers}}),
+    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+    ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
+    %%
+    ok = set_file_mtime(Path, ?VERSION2_TIMESTAMP),
+    {TimeElapsedA, _} = timer:tc(fun () -> ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}) end),
+    MillisecondsElapsedA = TimeElapsedA / 1000,
+    ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedA]),
+    ?assertRecv({locus, Loader, {download_started, _Headers}}),
+    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+    ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
+    ?assert(MillisecondsElapsedA / PostReadinessUpdatePeriod >= 0.90),
+    ?assert(MillisecondsElapsedA / PostReadinessUpdatePeriod =< 1.10),
+    %%
+    {TimeElapsedB, _} = timer:tc(fun () -> ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}) end),
+    MillisecondsElapsedB = TimeElapsedB / 1000,
+    ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedB]),
+    ?assertRecv({locus, Loader, {download_dismissed, {http, {304,_}, _Headers, _Body}}}),
+    ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod >= 0.90),
+    ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod =< 1.10),
+    %%
+    ok = locus:stop_loader(Loader).
+-endif.
 
 -ifdef(BAD_HTTPC).
 ipv4_country_lookup_test(_Config) ->
@@ -456,3 +508,7 @@ max_undeterministic_attempts(Config) ->
         true -> 10;
         false -> 1000
     end.
+
+set_file_mtime(Path, DateTime) ->
+    FileInfoMod = #file_info{ mtime = DateTime },
+    file:write_file_info(Path, FileInfoMod, [{time,universal}]).
