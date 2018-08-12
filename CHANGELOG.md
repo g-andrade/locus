@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Changed
 - gen_statem code was changed into gen_server for simplified backward compatibility with OTP 17 and OTP 18
+### Fixed
+- undeterministic test cases which sometimes broke
 
 ## [1.4.0] - 2018-06-20
 ### Added
