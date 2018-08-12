@@ -107,6 +107,7 @@ init_per_group(local_http_tests, Config) ->
     DatabaseURL = BaseURL ++ "/GeoLite2-Country.tar.gz" ++ "#" ++ RandomAnchor,
     CorruptURL = BaseURL ++ "/corruption.tar.gz",
     [{is_http, true},
+     {is_remote, false},
      {httpd_pid, HttpdPid},
      {url, DatabaseURL},
      {corrupt_url, CorruptURL},
@@ -121,6 +122,7 @@ init_per_group(remote_http_tests, Config) ->
     CorruptURL = ?REMOTE_COUNTRY_CORRUPT_URL,
     BaseURL = ?REMOTE_COUNTRY_BASE_URL,
     [{is_http, true},
+     {is_remote, true},
      {url, URL},
      {base_url, BaseURL},
      {corrupt_url, CorruptURL}
@@ -297,7 +299,7 @@ connect_timeout_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = connect_timeout_httptest,
     LoaderOpts = [no_cache, {connect_timeout, 0}, {event_subscriber, self()}],
-    MaxAttempts = 100,
+    MaxAttempts = max_undeterministic_attempts(Config),
     (fun F(AttemptsLeft) ->
              ok = locus:start_loader(Loader, URL, LoaderOpts),
              ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
@@ -331,7 +333,7 @@ idle_download_timeout_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = idle_download_timeout_httptest,
     LoaderOpts = [no_cache, {idle_download_timeout, 0}, {event_subscriber, self()}],
-    MaxAttempts = 100,
+    MaxAttempts = max_undeterministic_attempts(Config),
     (fun F(AttemptsLeft) ->
              ok = locus:start_loader(Loader, URL, LoaderOpts),
              ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
@@ -448,3 +450,9 @@ address_forms(StrAddr) ->
     BinAddr = list_to_binary(StrAddr),
     {ok, Addr} = inet:parse_address(StrAddr),
     {StrAddr, BinAddr, Addr}.
+
+max_undeterministic_attempts(Config) ->
+    case proplists:get_value(is_remote, Config) of
+        true -> 10;
+        false -> 1000
+    end.
