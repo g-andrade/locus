@@ -293,13 +293,24 @@ connect_timeout_httptest(_Config) ->
     {skip, "Not working properly on OTP 17"}.
 -else.
 connect_timeout_httptest(Config) ->
+    % Undeterministic test case
     URL = proplists:get_value(url, Config),
     Loader = connect_timeout_httptest,
     LoaderOpts = [no_cache, {connect_timeout, 0}, {event_subscriber, self()}],
-    ok = locus:start_loader(Loader, URL, LoaderOpts),
-    ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_failed_to_start, {error, {failed_connect, _}}}}),
-    ok = locus:stop_loader(Loader).
+    MaxAttempts = 100,
+    (fun F(AttemptsLeft) ->
+             ok = locus:start_loader(Loader, URL, LoaderOpts),
+             ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+             try ?assertRecv({locus, Loader, {download_failed_to_start, {error, {failed_connect, _}}}}) of
+                 _ ->
+                     ok = locus:stop_loader(Loader)
+             catch
+                 _Class:_Reason when AttemptsLeft >= 1 ->
+                     ct:pal("~p re-attempts left...", [AttemptsLeft - 1]),
+                     ok = locus:stop_loader(Loader),
+                     F(AttemptsLeft - 1)
+             end
+     end(MaxAttempts)).
 -endif.
 
 download_start_timeout_httptest(Config) ->
@@ -316,14 +327,25 @@ idle_download_timeout_httptest(_Config) ->
     {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
 -else.
 idle_download_timeout_httptest(Config) ->
+    % Undeterministic test case
     URL = proplists:get_value(url, Config),
     Loader = idle_download_timeout_httptest,
     LoaderOpts = [no_cache, {idle_download_timeout, 0}, {event_subscriber, self()}],
-    ok = locus:start_loader(Loader, URL, LoaderOpts),
-    ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_started, _Headers}}),
-    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {error, timeout}}}),
-    ok = locus:stop_loader(Loader).
+    MaxAttempts = 100,
+    (fun F(AttemptsLeft) ->
+             ok = locus:start_loader(Loader, URL, LoaderOpts),
+             ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+             ?assertRecv({locus, Loader, {download_started, _Headers}}),
+             try ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {error, timeout}}}) of
+                 _ ->
+                     ok = locus:stop_loader(Loader)
+             catch
+                 _Class:_Reason when AttemptsLeft >= 1 ->
+                     ct:pal("~p re-attempts left...", [AttemptsLeft - 1]),
+                     ok = locus:stop_loader(Loader),
+                     F(AttemptsLeft - 1)
+             end
+     end(MaxAttempts)).
 -endif.
 
 wrong_url_fstest(Config) ->
