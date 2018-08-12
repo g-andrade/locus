@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- ability of tweaking pre- and post-readiness database update periods
 ### Changed
 - gen_statem code was changed into gen_server for simplified backward compatibility with OTP 17 and OTP 18
 ### Fixed

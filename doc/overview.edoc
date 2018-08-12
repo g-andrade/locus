@@ -135,7 +135,9 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
   on future launches of the database loader
   </li>
 <li>Until a HTTP database loader achieves readiness, download attempts are made every minute;
-  once readiness is achieved (either from cache or network), this interval increases to every 6 hours
+  once readiness is achieved (either from cache or network), this interval increases to every 6 hours.
+  These can be tweaked using the 'pre_readiness_update_period' and 'POST_OTP_17' loader settings
+  (in milliseconds.)
   </li>
 </ul>
 
