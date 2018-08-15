@@ -360,6 +360,7 @@ connect_timeout_httptest(Config) ->
                  _Class:_Reason when AttemptsLeft >= 1 ->
                      ct:pal("~p re-attempts left...", [AttemptsLeft - 1]),
                      ok = locus:stop_loader(Loader),
+                     clear_proc_inbox_of_events(Loader),
                      F(AttemptsLeft - 1)
              end
      end(MaxAttempts)).
@@ -381,6 +382,7 @@ download_start_timeout_httptest(Config) ->
                  _Class:_Reason when AttemptsLeft >= 1 ->
                      ct:pal("~p re-attempts left...", [AttemptsLeft - 1]),
                      ok = locus:stop_loader(Loader),
+                     clear_proc_inbox_of_events(Loader),
                      F(AttemptsLeft - 1)
              end
      end)(MaxAttempts).
@@ -406,6 +408,7 @@ idle_download_timeout_httptest(Config) ->
                  _Class:_Reason when AttemptsLeft >= 1 ->
                      ct:pal("~p re-attempts left...", [AttemptsLeft - 1]),
                      ok = locus:stop_loader(Loader),
+                     clear_proc_inbox_of_events(Loader),
                      F(AttemptsLeft - 1)
              end
      end(MaxAttempts)).
@@ -521,3 +524,12 @@ max_undeterministic_attempts(Config) ->
 set_file_mtime(Path, DateTime) ->
     FileInfoMod = #file_info{ mtime = DateTime },
     file:write_file_info(Path, FileInfoMod, [{time,universal}]).
+
+clear_proc_inbox_of_events(Loader) ->
+    receive
+        {locus, Loader, _Event} ->
+            clear_proc_inbox_of_events(Loader)
+    after
+        0 ->
+            ok
+    end.
