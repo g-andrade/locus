@@ -21,11 +21,12 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+-include("locus_pre_otp19_compat.hrl").
+
 -module(locus_http_loader).
--behaviour(gen_server).
+-behaviour(?gen_statem).
 
 -include_lib("kernel/include/file.hrl").
--include("locus_pre_otp19_compat.hrl").
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -41,27 +42,25 @@
 -endif.
 
 %% ------------------------------------------------------------------
-%% gen_server Function Exports
+%% gen_statem Function Exports
 %% ------------------------------------------------------------------
 
--export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3,
-    %%
-    code_change/4
-   ]).
-
--ignore_xref(
-   [code_change/4
-   ]).
+-export([callback_mode/0]).
+-export([init/1]).
+%% states
+-export([initializing/3]).                  -ignore_xref({initializing,3}).
+-export([ready/3]).                         -ignore_xref({ready,3}).
+-export([waiting_stream_start/3]).          -ignore_xref({waiting_stream_start,3}).
+-export([waiting_stream_end/3]).            -ignore_xref({waiting_stream_end,3}).
+-export([processing_update/3]).             -ignore_xref({processing_update,3}).
+%%
+-export([code_change/4]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
 %% ------------------------------------------------------------------
+
+-define(CB_MODULE, ?MODULE).
 
 -define(PRE_READINESS_UPDATE_PERIOD, (timer:minutes(1))).
 -define(POST_READINESS_UPDATE_PERIOD, (timer:hours(6))).
@@ -86,52 +85,42 @@
     no_cache.
 -export_type([opt/0]).
 
--record(state, {
-          id :: atom(),
-          url :: url(),
-          waiters :: [from()],
-          event_subscribers :: [module() | pid()],
-          connect_timeout :: timeout(),
-          download_start_timeout :: timeout(),
-          idle_download_timeout :: timeout(),
-          no_cache :: boolean(),
-          %%,
-          load_state :: load_state(),
-          last_modified :: undefined | calendar:datetime(),
-          last_version :: undefined | calendar:datetime()
-         }).
--type state() :: #state{}.
+-ifdef(POST_OTP_18).
+-type state_data() ::
+    #{ id := atom(),
+       url := url(),
+       waiters := [from()],
+       event_subscribers := [module() | pid()],
+       connect_timeout := timeout(),
+       download_start_timeout := timeout(),
+       idle_download_timeout := timeout(),
+       no_cache => true,
 
--type load_state() ::
-        initializing() |
-        idle() |
-        waiting_stream_start() |
-        waiting_stream_end().
+       request_id => reference(),
+       last_response_headers => headers(),
+       last_response_body => binary(),
+       last_modified => calendar:datetime(),
+       last_version => calendar:datetime()
+     }.
+-else.
+-type state_data() ::
+    #{ id => atom(),
+       url => url(),
+       waiters => [from()],
+       event_subscribers => [module() | pid()],
+       connect_timeout => timeout(),
+       download_start_timeout => timeout(),
+       idle_download_timeout => timeout(),
+       no_cache => true,
 
--record(initializing, {
-         }).
--type initializing() :: #initializing{}.
+       request_id => reference(),
+       last_response_headers => headers(),
+       last_response_body => binary(),
+       last_modified => calendar:datetime(),
+       last_version => calendar:datetime()
+     }.
+-endif.
 
--record(idle, {
-          timeout_timer :: reference()
-         }).
--type idle() :: #idle{}.
-
--record(waiting_stream_start, {
-          request_id :: reference(),
-          timeout_timer :: reference()
-         }).
--type waiting_stream_start() :: #waiting_stream_start{}.
-
--record(waiting_stream_end, {
-          request_id :: reference(),
-          response_headers :: headers(),
-          response_body :: binary(),
-          timeout_timer :: reference()
-         }).
--type waiting_stream_end() :: #waiting_stream_end{}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -type filename() :: string().
 -export_type([filename/0]).
 
@@ -199,7 +188,7 @@
 %% @private
 start_link(Id, URL, Opts) ->
     ServerName = server_name(Id),
-    gen_server:start_link({local, ServerName}, ?MODULE, [Id, URL, Opts], []).
+    ?gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL, Opts], []).
 
 -spec wait(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
@@ -207,24 +196,24 @@ start_link(Id, URL, Opts) ->
 %% @private
 wait(Id, Timeout) ->
     ServerName = server_name(Id),
-    try gen_server:call(ServerName, wait, Timeout) of
+    try ?gen_statem:call(ServerName, wait, Timeout) of
         {ok, LoadedVersion} ->
             {ok, LoadedVersion};
         {error, LoadingError} ->
             {error, {loading, LoadingError}}
     catch
-        exit:{timeout, {gen_server,call,[ServerName|_]}} when Timeout =/= infinity ->
+        exit:{timeout, {?gen_statem,call,[ServerName|_]}} when Timeout =/= infinity ->
             {error, timeout};
-        %exit:{{nodedown,_RemoteNode}, {gen_server,call,[ServerName|_}} ->
+        %exit:{{nodedown,_RemoteNode}, {?gen_statem,call,[ServerName|_}} ->
         %    % Cannot happen (loader is always local)
         %    {error, database_unknown};
-        exit:{noproc, {gen_server,call,[ServerName|_]}} ->
+        exit:{noproc, {?gen_statem,call,[ServerName|_]}} ->
             {error, database_unknown};
-        exit:{normal, {gen_server,call, [ServerName|_]}} ->
+        exit:{normal, {?gen_statem,call, [ServerName|_]}} ->
             {error, database_unknown};
-        exit:{shutdown, {gen_server,call, [ServerName|_]}} ->
+        exit:{shutdown, {?gen_statem,call, [ServerName|_]}} ->
             {error, database_unknown};
-        exit:{{shutdown,_Reason}, {gen_server,call, [ServerName|_]}} ->
+        exit:{{shutdown,_Reason}, {?gen_statem,call, [ServerName|_]}} ->
             {error, database_unknown}
     end.
 
@@ -237,213 +226,244 @@ whereis(Id) ->
 %% @private
 list_subscribers(Id) ->
     ServerName = server_name(Id),
-    State = sys:get_state(ServerName),
-    State#state.event_subscribers.
+    {_State, StateData} = sys:get_state(ServerName),
+    maps:get(event_subscribers, StateData).
 -endif.
 
 %% ------------------------------------------------------------------
-%% gen_server Function Definitions
+%% gen_statem Function Definitions
 %% ------------------------------------------------------------------
 
+-spec callback_mode() -> [state_functions | state_enter, ...].
+%% @private
+callback_mode() -> [state_functions, state_enter].
+
 -spec init([atom() | string() | opt(), ...])
-        -> {ok, state()} |
-           {stop, {invalid_opt,term()}}.
+        -> ?gen_statem:init_result(initializing).
 %% @private
 init([Id, URL, Opts]) ->
     locus_rand_compat:seed(),
     locus_mmdb:create_table(Id),
     init(Id, URL, Opts).
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {reply, {ok,calendar:datetime()}, state()} |
-           {noreply, state()} |
-           {stop, unexpected_call, state()}.
+-spec initializing(enter, atom(), state_data())
+                   -> keep_state_and_data;
+                  (info, maybe_load_from_cache, state_data())
+                   -> {next_state, ready, state_data(),
+                       {next_event, internal, update_database}}.
 %% @private
-handle_call(wait, From, State) ->
-    maybe_enqueue_waiter(From, State);
-handle_call(_Call, _From, State) ->
-    {stop, unexpected_call, State}.
-
--spec handle_cast(term(), state()) -> {stop, unexpected_cast, state()}.
-%% @private
-handle_cast(_Cast, State) ->
-    {stop, unexpected_cast, State}.
-
--spec handle_info(term(), state())
-        -> {noreply, state()} |
-           {stop, unexpected_info, state()}.
-%% @private
-handle_info(maybe_load_from_cache, State)
-  when is_record(State#state.load_state, initializing),
-       State#state.no_cache ->
-    NewLoadState = #idle{ timeout_timer = start_timer(0, idle_timeout) },
-    UpdatedState = State#state{ load_state = NewLoadState },
-    {noreply, UpdatedState};
-handle_info(maybe_load_from_cache, State)
-  when is_record(State#state.load_state, initializing) ->
-    NewLoadState = #idle{ timeout_timer = start_timer(0, idle_timeout) },
-    State2 = State#state{ load_state = NewLoadState },
-    CachedTarballName = cached_tarball_name(State2),
+initializing(enter, _PrevState, _StateData) ->
+    keep_state_and_data;
+initializing(info, maybe_load_from_cache, #{ no_cache := true } = StateData) ->
+    {next_state, ready, StateData, {next_event, internal, update_database}};
+initializing(info, maybe_load_from_cache, StateData) ->
+    CachedTarballName = cached_tarball_name(StateData),
     CachedTarballLookup = locus_util:read_file_and_its_modification_date(CachedTarballName),
-    State3 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, State2),
-    {noreply, State3};
-%%%%%%%%
-handle_info(idle_timeout, State)
-  when is_record(State#state.load_state, idle) ->
-    URL = State#state.url,
-    Headers = request_headers(State),
+    StateData2 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
+    {next_state, ready, StateData2, {next_event, internal, update_database}}.
+
+-spec ready(enter, atom(), state_data())
+            -> {keep_state_and_data, {state_timeout, pos_integer(), update_database}};
+           ({call,from()}, wait, state_data())
+           -> {keep_state, state_data(), [?gen_statem:reply_action()]};
+           (info, {'DOWN', reference(), process, pid(), term()}, state_data())
+           -> {keep_state, state_data()};
+           (internal, update_database, state_data())
+            -> {next_state, waiting_stream_start, state_data()};
+           (state_timeout, update_database, state_data())
+            -> {repeat_state_and_data, {next_event, internal, update_database}}.
+%% @private
+ready(enter, _PrevState, StateData) ->
+    {keep_state_and_data, {state_timeout, update_period(StateData), update_database}};
+ready({call,From}, wait, StateData) ->
+    {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
+    {keep_state, StateData2, Actions};
+ready(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
+    handle_monitored_process_death(Pid, StateData);
+ready(internal, update_database, StateData) ->
+    URL = maps:get(url, StateData),
+    Headers = request_headers(StateData),
     Request = {URL, Headers},
-    ConnectTimeout = State#state.connect_timeout,
+    ConnectTimeout = maps:get(connect_timeout, StateData),
     HTTPOptions = [{connect_timeout, ConnectTimeout}],
     Options = [{sync, false}, {stream, self}],
     {ok, RequestId} = httpc:request(get, Request, HTTPOptions, Options),
     true = is_reference(RequestId),
-    NewLoadState =
-        #waiting_stream_start{
-           request_id = RequestId,
-           timeout_timer = start_timer(State#state.download_start_timeout, download_start_timeout)
-          },
-    UpdatedState = State#state{ load_state = NewLoadState },
-    report_event({request_sent, URL, Headers}, State),
-    {noreply, UpdatedState};
-%%%%%%%%
-handle_info({http, {RequestId, stream_start, Headers}}, State)
-  when RequestId =:= (State#state.load_state)#waiting_stream_start.request_id ->
-    report_event({download_started, Headers}, State),
-    LoadState = State#state.load_state,
-    true = cancel_timer(LoadState#waiting_stream_start.timeout_timer, stream_start_timeout),
-    %%
-    NewLoadState =
-        #waiting_stream_end{
-           request_id = LoadState#waiting_stream_start.request_id,
-           response_headers = Headers,
-           response_body = <<>>,
-           timeout_timer = start_timer(State#state.idle_download_timeout, idle_download_timeout)
-          },
-    UpdatedState = State#state{ load_state = NewLoadState },
-    {noreply, UpdatedState};
-handle_info({http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}}, State)
-  when RequestId =:= (State#state.load_state)#waiting_stream_start.request_id,
-       StatusCode =:= 304 ->
-    report_event({download_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, State),
-    LoadState = State#state.load_state,
-    true = cancel_timer(LoadState#waiting_stream_start.timeout_timer, download_start_timeout),
-    %%
-    NewLoadState = #idle{ timeout_timer = start_timer(update_period(State), idle_timeout) },
-    UpdatedState = State#state{ load_state = NewLoadState },
-    {noreply, UpdatedState};
-handle_info({http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}}, State)
-  when RequestId =:= (State#state.load_state)#waiting_stream_start.request_id ->
-    report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, State),
-    LoadState = State#state.load_state,
-    true = cancel_timer(LoadState#waiting_stream_start.timeout_timer, download_start_timeout),
-    %%
-    State2 = reply_to_waiters({error, {http, StatusCode, StatusDesc}}, State),
-    NewLoadState = #idle{ timeout_timer = start_timer(update_period(State), idle_timeout) },
-    State3 = State2#state{ load_state = NewLoadState },
-    {noreply, State3};
-handle_info({http, {RequestId, {error, Reason}}}, State)
-  when RequestId =:= (State#state.load_state)#waiting_stream_start.request_id ->
-    report_event({download_failed_to_start, {error, Reason}}, State),
-    LoadState = State#state.load_state,
-    true = cancel_timer(LoadState#waiting_stream_start.timeout_timer, download_start_timeout),
-    %%
-    State2 = reply_to_waiters({error, {http, Reason}}, State),
-    NewLoadState = #idle{ timeout_timer = start_timer(update_period(State), idle_timeout) },
-    State3 = State2#state{ load_state = NewLoadState },
-    {noreply, State3};
-handle_info(download_start_timeout, State)
-  when is_record(State#state.load_state, waiting_stream_start) ->
-    report_event({download_failed_to_start, timeout}, State),
-    State2 = reply_to_waiters({error, {timeout, waiting_stream_start}}, State),
-    LoadState = State#state.load_state,
-    false = cancel_timer(LoadState#waiting_stream_start.timeout_timer, download_start_timeout),
-    %%
-    RequestId = LoadState#waiting_stream_start.request_id,
+    UpdatedStateData = StateData#{ request_id => RequestId },
+    report_event({request_sent, URL, Headers}, StateData),
+    {next_state, waiting_stream_start, UpdatedStateData};
+ready(state_timeout, update_database, _StateData) ->
+    {repeat_state_and_data, {next_event, internal, update_database}}.
+
+-spec waiting_stream_start(enter, atom(), state_data())
+                            -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
+                          ({call,from()}, wait, state_data())
+                            -> {keep_state, state_data(), [?gen_statem:reply_action()]};
+                          (info, {http, {reference(), stream_start, headers()}}, state_data())
+                            -> {next_state, waiting_stream_end, state_data()};
+                          (info, {http, {reference(), {{string(), integer(), string()},
+                                                       headers(), binary()}}}, state_data())
+                            -> {next_state, ready, state_data()} |
+                               {next_state, ready, state_data(), [?gen_statem:reply_action()]};
+                          (info, {http, {reference(), {error, term()}}}, state_data())
+                            -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
+                          (info, {'DOWN', reference(), process, pid(), term()}, state_data())
+                          -> {keep_state, state_data()};
+                          (state_timeout, timeout, state_data())
+                            -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
+%% @private
+waiting_stream_start(enter, _PrevState, StateData) ->
+    StreamStartTimeout = maps:get(download_start_timeout, StateData),
+    {keep_state_and_data, {state_timeout, StreamStartTimeout, timeout}};
+waiting_stream_start({call,From}, wait, StateData) ->
+    {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
+    {keep_state, StateData2, Actions};
+waiting_stream_start(info, {http, {RequestId, stream_start, Headers}},
+                     #{ request_id := RequestId } = StateData) ->
+    report_event({download_started, Headers}, StateData),
+    UpdatedStateData = StateData#{ last_response_headers => Headers,
+                                   last_response_body => <<>> },
+    {next_state, waiting_stream_end, UpdatedStateData};
+waiting_stream_start(info,
+                     {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
+                     #{ request_id := RequestId } = StateData)
+  when StatusCode =:= 304 ->
+    report_event({download_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
+    UpdatedStateData = maps:remove(request_id, StateData),
+    {next_state, ready, UpdatedStateData};
+waiting_stream_start(info,
+                     {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
+                     #{ request_id := RequestId } = StateData) ->
+    report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
+    StateData2 = maps:remove(request_id, StateData),
+    {StateData3, Replies} = reply_to_waiters({error, {http, StatusCode, StatusDesc}}, StateData2),
+    {next_state, ready, StateData3, Replies};
+waiting_stream_start(info, {http, {RequestId, {error, Reason}}},
+                     #{ request_id := RequestId } = StateData) ->
+    report_event({download_failed_to_start, {error, Reason}}, StateData),
+    StateData2 = maps:remove(request_id, StateData),
+    {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
+    {next_state, ready, StateData3, Replies};
+waiting_stream_start(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
+    handle_monitored_process_death(Pid, StateData);
+waiting_stream_start(state_timeout, timeout, StateData) ->
+    report_event({download_failed_to_start, timeout}, StateData),
+    {RequestId, StateData2} = ?maps_take(request_id, StateData),
+    {StateData3, Replies} = reply_to_waiters({error, {timeout, waiting_stream_start}}, StateData2),
     ok = httpc:cancel_request(RequestId),
     clear_inbox_of_late_http_messages(RequestId),
-    NewLoadState = #idle{ timeout_timer = start_timer(update_period(State), idle_timeout) },
-    State3 = State2#state{ load_state = NewLoadState },
-    {noreply, State3};
-%%%%%%%%
-handle_info({http, {RequestId, stream, BinBodyPart}}, State)
-  when RequestId =:= (State#state.load_state)#waiting_stream_end.request_id ->
-    LoadState = State#state.load_state,
-    true = cancel_timer(LoadState#waiting_stream_end.timeout_timer, idle_download_timeout),
-    %%
-    BodyAcc = LoadState#waiting_stream_end.response_body,
-    UpdatedBodyAcc = <<BodyAcc/binary, BinBodyPart/binary>>,
-    UpdatedLoadState =
-        LoadState#waiting_stream_end{
-          response_body = UpdatedBodyAcc,
-          timeout_timer = start_timer(State#state.idle_download_timeout, idle_download_timeout)
-         },
-    UpdatedState = State#state{ load_state = UpdatedLoadState },
-    {noreply, UpdatedState};
-handle_info({http, {RequestId, stream_end, ExtraHeaders}}, State) % no chunked encoding
-  when RequestId =:= (State#state.load_state)#waiting_stream_end.request_id ->
-    LoadState = State#state.load_state,
-    true = cancel_timer(LoadState#waiting_stream_end.timeout_timer, idle_download_timeout),
-    %%
-    ResponseHeaders = lists:usort(LoadState#waiting_stream_end.response_headers ++ ExtraHeaders),
-    ResponseBody = LoadState#waiting_stream_end.response_body,
-    ResponseBodySize = byte_size(ResponseBody),
-    report_event({download_finished, ResponseBodySize, {ok, ExtraHeaders}}, State),
-    State2 = process_update(ResponseHeaders, ResponseBody, State),
-    NewLoadState = #idle{ timeout_timer = start_timer(update_period(State2), idle_timeout) },
-    State3 = State2#state{ load_state = NewLoadState },
-    {noreply, State3};
-handle_info({http, {RequestId, {error, Reason}}}, State)
-  when RequestId =:= (State#state.load_state)#waiting_stream_end.request_id ->
-    LoadState = State#state.load_state,
-    true = cancel_timer(LoadState#waiting_stream_end.timeout_timer, idle_download_timeout),
-    ResponseBodySoFar = LoadState#waiting_stream_end.response_body,
-    ResponseBodySizeSoFar = byte_size(ResponseBodySoFar),
-    report_event({download_finished, ResponseBodySizeSoFar, {error, Reason}}, State),
-    %%
-    State2 = reply_to_waiters({error, {http, Reason}}, State),
-    NewLoadState = #idle{ timeout_timer = start_timer(update_period(State2), idle_timeout) },
-    State3 = State2#state{ load_state = NewLoadState },
-    {noreply, State3};
-handle_info(idle_download_timeout, State)
-  when is_record(State#state.load_state, waiting_stream_end) ->
-    LoadState = State#state.load_state,
-    false = cancel_timer(LoadState#waiting_stream_end.timeout_timer, idle_download_timeout),
-    ResponseBodySoFar = LoadState#waiting_stream_end.response_body,
-    ResponseBodySizeSoFar = byte_size(ResponseBodySoFar),
-    report_event({download_finished, ResponseBodySizeSoFar, {error, timeout}}, State),
-    %%
-    RequestId = LoadState#waiting_stream_end.request_id,
+    {next_state, ready, StateData3, Replies}.
+
+-spec waiting_stream_end(enter, atom(), state_data())
+                        -> {keep_state_and_data, {state_timeout, pos_integer(), timeout}};
+                        ({call,from()}, wait, state_data())
+                        -> {keep_state, state_data(), [?gen_statem:reply_action()]};
+                        (info, {http, {reference(), stream, binary()}}, state_data())
+                        -> {keep_state, state_data(), {state_timeout, pos_integer(), timeout}};
+                        (info, {http, {reference(), stream_end, headers()}}, state_data())
+                        -> {next_state, processing_update, state_data(),
+                            {next_event, internal, execute}};
+                        (info, {http, {reference(), {error, term()}}}, state_data())
+                        -> {next_state, ready, state_data(), [?gen_statem:reply_action()]};
+                        (info, {'DOWN', reference(), process, pid(), term()}, state_data())
+                        -> {keep_state, state_data()};
+                        (state_timeout, timeout, state_data())
+                        -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
+%% @private
+waiting_stream_end(enter, _PrevState, StateData) ->
+    IdleStreamTimeout = maps:get(idle_download_timeout, StateData),
+    {keep_state_and_data, {state_timeout, IdleStreamTimeout, timeout}};
+waiting_stream_end({call,From}, wait, StateData) ->
+    {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
+    {keep_state, StateData2, Actions};
+waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
+                   #{ request_id := RequestId } = StateData) ->
+    UpdatedStateData =
+        ?maps_update_with3(
+          last_response_body,
+          fun (Body) -> <<Body/binary, BinBodyPart/binary>> end,
+          StateData),
+    %?log_info("~p database download in progress - ~.3f MiB received so far",
+    %          [maps:get(id, StateData),
+    %           byte_size(maps:get(last_response_body, UpdatedStateData)) / (1 bsl 20)]),
+    IdleStreamTimeout = maps:get(idle_download_timeout, StateData),
+    {keep_state, UpdatedStateData, {state_timeout, IdleStreamTimeout, timeout}};
+waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked encoding
+                   #{ request_id := RequestId } = StateData) ->
+    BodySize = byte_size(maps:get(last_response_body, StateData)),
+    report_event({download_finished, BodySize, {ok, Headers}}, StateData),
+    StateData2 =
+        ?maps_update_with4(
+          last_response_headers,
+          fun (PrevHeaders) -> lists:usort(PrevHeaders ++ Headers) end,
+          Headers, StateData),
+    StateData3 = maps:remove(request_id, StateData2),
+    {next_state, processing_update, StateData3,
+     {next_event, internal, execute}};
+waiting_stream_end(info, {http, {RequestId, {error, Reason}}},
+                   #{ request_id := RequestId } = StateData) ->
+    BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
+    report_event({download_finished, BodySizeSoFar, {error, Reason}}, StateData),
+    StateData2 =
+        maps:without([request_id, last_response_headers, last_response_body],
+                     StateData),
+    {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
+    {next_state, ready, {StateData3, Replies}};
+waiting_stream_end(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
+    handle_monitored_process_death(Pid, StateData);
+waiting_stream_end(state_timeout, timeout, StateData) ->
+    BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
+    report_event({download_finished, BodySizeSoFar, {error, timeout}}, StateData),
+    {RequestId, StateData2} = ?maps_take(request_id, StateData),
+    StateData3 = maps:without([last_response_headers, last_response_body], StateData2),
+    {StateData4, Replies} = reply_to_waiters({error, {timeout, waiting_stream_end}}, StateData3),
     ok = httpc:cancel_request(RequestId),
     clear_inbox_of_late_http_messages(RequestId),
-    State2 = reply_to_waiters({error, {timeout, waiting_stream_end}}, State),
-    NewLoadState = #idle{ timeout_timer = start_timer(update_period(State2), idle_timeout) },
-    State3 = State2#state{ load_state = NewLoadState },
-    {noreply, State3};
-%%%%%%%%
-handle_info({'DOWN', _Ref, process, Pid, _Reason}, State) ->
-    handle_monitored_process_death(Pid, State);
-%%%%%%%%
-handle_info(_Info, State) ->
-    {stop, unexpected_info, State}.
+    {next_state, ready, StateData4, Replies}.
 
--spec terminate(term(), state()) -> ok.
+-spec processing_update(enter, atom(), state_data())
+                        -> keep_state_and_data;
+                       (internal, execute, state_data())
+                       -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
-terminate(_Reason, _State) ->
-    ok.
+processing_update(enter, _PrevState, _StateData) ->
+    keep_state_and_data;
+processing_update(internal, execute, StateData) ->
+    Id = maps:get(id, StateData),
+    {Headers, StateData2} = ?maps_take(last_response_headers, StateData),
+    {Body, StateData3} = ?maps_take(last_response_body, StateData2),
+    URL = maps:get(url, StateData),
+    Source = {remote, URL},
+    case locus_util:load_database_from_tarball(Id, Body, Source) of
+        {ok, Version} ->
+            report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
+            LastModified = extract_last_modified_datetime_from_response_headers(Headers),
+            StateData4 = StateData3#{ last_modified => LastModified,
+                                      last_version => Version },
+            maybe_try_saving_cached_tarball(Body, LastModified, StateData4),
+            {StateData5, Replies} = reply_to_waiters({ok, Version}, StateData4),
+            {next_state, ready, StateData5, Replies};
+        {error, Error} ->
+            report_event({load_attempt_finished, Source, {error, Error}}, StateData),
+            {StateData4, Replies} = reply_to_waiters({error, Error}, StateData3),
+            {next_state, ready, StateData4, Replies}
+    end.
 
--spec code_change(term(), state(), term()) -> {ok, state()}.
+-spec code_change(term(), atom(), state_data(), term()) -> {ok, atom(), state_data()}.
 %% @private
-code_change(_OldVsn, State, _Extra) when is_record(State, state) ->
-    {ok, State}.
-
--spec code_change(term(), atom(), map(), term()) -> no_return().
-%% @private
-code_change(_OldVsn, OldState, OldStateData, _Extra)
-  when is_atom(OldState), is_map(OldStateData) ->
-    % old version which used gen_statem with maps for state; force restart
-    % (not sure if this will actually work)
-    exit({shutdown, upgrading}).
+code_change(_OldVsn, OldState, OldStateData, _Extra) ->
+    case OldStateData of
+        #{ id := _, url := _, waiters := _, event_subscribers := _ } ->
+            {ok, OldState, OldStateData};
+        #{ id := _, url := _, waiters := _ } ->
+            % lib was at version 1.0.0; ensure everything works as before
+            EventSubscribers = [locus_logger],
+            StateData = OldStateData#{ event_subscribers => EventSubscribers,
+                                       connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
+                                       download_start_timeout => ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
+                                       idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT },
+            {ok, OldState, StateData}
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -454,66 +474,56 @@ server_name(Id) ->
     list_to_atom(atom_to_list(?MODULE) ++ "_" ++ atom_to_list(Id)).
 
 -spec init(atom(), string(), [opt()])
-        -> {ok, state()} |
+        -> ?gen_statem:init_result(initializing) |
            {stop, {invalid_opt, term()}}.
 init(Id, URL, Opts) ->
-    BaseState =
-        #state{
-           id = Id,
-           url = URL,
-           waiters = [],
-           event_subscribers = [],
-           connect_timeout = ?DEFAULT_HTTP_CONNECT_TIMEOUT,
-           download_start_timeout = ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
-           idle_download_timeout = ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT,
-           no_cache = false,
-           load_state = #initializing{}
-          },
-    init_opts(Opts, BaseState).
+    BaseStateData =
+        #{ id => Id,
+           url => URL,
+           waiters => [],
+           event_subscribers => [],
+           connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
+           download_start_timeout => ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
+           idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT
+         },
+    init_opts(Opts, BaseStateData).
 
-init_opts([{event_subscriber, Module} | NextOpts], State) when is_atom(Module), Module =/= undefined ->
-    EventSubscribers = State#state.event_subscribers,
-    UpdatedEventSubscribers = [Module | EventSubscribers],
-    UpdatedState = State#state{ event_subscribers = UpdatedEventSubscribers },
-    init_opts(NextOpts, UpdatedState);
-init_opts([{event_subscriber, Pid} | NextOpts], State) when is_pid(Pid) ->
+init_opts([{event_subscriber, Module} | Opts], StateData) when is_atom(Module), Module =/= undefined ->
+    NewStateData =
+        ?maps_update_with3(
+          event_subscribers,
+          fun (PrevSubscribers) -> [Module | PrevSubscribers] end,
+          StateData),
+    init_opts(Opts, NewStateData);
+init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
     _ = monitor(process, Pid),
-    EventSubscribers = State#state.event_subscribers,
-    UpdatedEventSubscribers = [Pid | EventSubscribers],
-    UpdatedState = State#state{ event_subscribers = UpdatedEventSubscribers },
-    init_opts(NextOpts, UpdatedState);
-init_opts([{connect_timeout, Timeout} | NextOpts], State) when ?is_timeout(Timeout) ->
-    UpdatedState = State#state{ connect_timeout = Timeout },
-    init_opts(NextOpts, UpdatedState);
-init_opts([{download_start_timeout, Timeout} | NextOpts], State) when ?is_timeout(Timeout) ->
-    UpdatedState = State#state{ download_start_timeout = Timeout },
-    init_opts(NextOpts, UpdatedState);
-init_opts([{idle_download_timeout, Timeout} | NextOpts], State) when ?is_timeout(Timeout) ->
-    UpdatedState = State#state{ idle_download_timeout = Timeout },
-    init_opts(NextOpts, UpdatedState);
-init_opts([no_cache | Opts], State) ->
-    UpdatedState = State#state{ no_cache = true },
-    init_opts(Opts, UpdatedState);
-init_opts([InvalidOpt | _], _State) ->
+    NewStateData =
+        ?maps_update_with3(
+          event_subscribers,
+          fun (PrevSubscribers) -> [Pid | PrevSubscribers] end,
+          StateData),
+    init_opts(Opts, NewStateData);
+init_opts([{connect_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ connect_timeout := Timeout },
+    init_opts(Opts, NewStateData);
+init_opts([{download_start_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ download_start_timeout := Timeout },
+    init_opts(Opts, NewStateData);
+init_opts([{idle_download_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
+    NewStateData = StateData#{ idle_download_timeout := Timeout },
+    init_opts(Opts, NewStateData);
+init_opts([no_cache | Opts], StateData) ->
+    NewStateData = StateData#{ no_cache => true },
+    init_opts(Opts, NewStateData);
+init_opts([InvalidOpt | _], _StateData) ->
     {stop, {invalid_opt, InvalidOpt}};
-init_opts([], State) ->
+init_opts([], StateData) ->
     self() ! maybe_load_from_cache,
-    {ok, State}.
+    {ok, initializing, StateData}.
 
-start_timer(Interval, Message) ->
-    erlang:send_after(Interval, self(), Message).
-
-cancel_timer(Timer, Message) ->
-    is_integer( erlang:cancel_timer(Timer) )
-    orelse receive
-               Message -> true
-           after
-               0 -> false
-           end.
-
--spec cached_tarball_name(state()) -> nonempty_string().
-cached_tarball_name(State) ->
-    URL = State#state.url,
+-spec cached_tarball_name(state_data()) -> nonempty_string().
+cached_tarball_name(StateData) ->
+    #{ url := URL } = StateData,
     cached_tarball_name_for_url(URL).
 
 -spec cached_tarball_name_for_url(string()) -> nonempty_string().
@@ -525,44 +535,42 @@ cached_tarball_name_for_url(URL) ->
     UserCachePath = ?filename_basedir(user_cache, "locus_erlang"),
     filename:join(UserCachePath, Filename).
 
--spec handle_cached_tarball_lookup(LookupResult, nonempty_string(), state())
-        -> state() when LookupResult :: ({ok, binary(), calendar:datetime()} |
+-spec handle_cached_tarball_lookup(LookupResult, nonempty_string(), state_data())
+        -> state_data() when LookupResult :: ({ok, binary(), calendar:datetime()} |
                                               {error, term()}).
-handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, State) ->
-    Id = State#state.id,
+handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, StateData) ->
+    Id = maps:get(id, StateData),
     Source = {cache, CachedTarballName},
     case locus_util:load_database_from_tarball(Id, Content, Source) of
         {ok, Version} ->
-            report_event({load_attempt_finished, Source, {ok, Version}}, State),
-            State#state{ last_modified = ModificationDate,
-                         last_version = Version
-                       };
+            report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
+            StateData#{ last_modified => ModificationDate,
+                        last_version => Version };
         {error, Error} ->
-            report_event({load_attempt_finished, Source, {error, Error}}, State),
-            State
+            report_event({load_attempt_finished, Source, {error, Error}}, StateData),
+            StateData
     end;
-handle_cached_tarball_lookup({error, Error}, CachedTarballName, State) ->
+handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
     Source = {cache, CachedTarballName},
-    report_event({load_attempt_finished, Source, {error, Error}}, State),
-    State.
+    report_event({load_attempt_finished, Source, {error, Error}}, StateData),
+    StateData.
 
--spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state()) -> ok.
-maybe_try_saving_cached_tarball(_Tarball, _LastModified, State)
-  when State#state.no_cache ->
+-spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
+maybe_try_saving_cached_tarball(_Tarball, _LastModified, #{ no_cache := true }) ->
     ok;
-maybe_try_saving_cached_tarball(Tarball, LastModified, State) ->
-    case save_cached_tarball(Tarball, LastModified, State) of
+maybe_try_saving_cached_tarball(Tarball, LastModified, StateData) ->
+    case save_cached_tarball(Tarball, LastModified, StateData) of
         {ok, Filename} ->
-            report_event({cache_attempt_finished, Filename, ok}, State);
+            report_event({cache_attempt_finished, Filename, ok}, StateData);
         {{error, Error}, Filename} ->
-            report_event({cache_attempt_finished, Filename, {error, Error}}, State)
+            report_event({cache_attempt_finished, Filename, {error, Error}}, StateData)
     end.
 
--spec save_cached_tarball(binary(), calendar:datetime(), state())
+-spec save_cached_tarball(binary(), calendar:datetime(), state_data())
         -> {Status, Filename} when Status :: ok | {error, {exception, atom(), term()}},
                                    Filename :: nonempty_string().
-save_cached_tarball(Tarball, LastModified, State) ->
-    Filename = cached_tarball_name(State),
+save_cached_tarball(Tarball, LastModified, StateData) ->
+    Filename = cached_tarball_name(StateData),
     TmpSuffix = ".tmp." ++ integer_to_list(locus_rand_compat:uniform(1 bsl 32), 36),
     TmpFilename = Filename ++ TmpSuffix,
     FileInfoMod = #file_info{ mtime = LastModified },
@@ -591,23 +599,18 @@ bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
 bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
 
-update_period(State) ->
-    case State#state.last_modified of
-        undefined ->
-            ?PRE_READINESS_UPDATE_PERIOD;
-        _LastModified ->
-            ?POST_READINESS_UPDATE_PERIOD
-    end.
+-spec update_period(state_data()) -> pos_integer().
+update_period(#{ last_modified := _ } = _StateData) ->
+    ?POST_READINESS_UPDATE_PERIOD;
+update_period(#{} = _StateData) ->
+    ?PRE_READINESS_UPDATE_PERIOD.
 
-request_headers(State) ->
-    case State#state.last_modified of
-        undefined ->
-            base_request_headers();
-        LastModified ->
-            LocalLastModified = calendar:universal_time_to_local_time(LastModified),
-            [{"if-modified-since", httpd_util:rfc1123_date(LocalLastModified)}
-             | base_request_headers()]
-    end.
+request_headers(#{ last_modified := LastModified } = _StateData) ->
+    LocalLastModified = calendar:universal_time_to_local_time(LastModified),
+    [{"if-modified-since", httpd_util:rfc1123_date(LocalLastModified)}
+     | base_request_headers()];
+request_headers(#{} = _StateData) ->
+    base_request_headers().
 
 base_request_headers() ->
     [{"accept", join_header_values(
@@ -633,25 +636,6 @@ extract_last_modified_datetime_from_response_headers(Headers) ->
             {{1970,1,1}, {0,0,0}}
     end.
 
-process_update(Headers, Body, State) ->
-    Id = State#state.id,
-    URL = State#state.url,
-    Source = {remote, URL},
-    case locus_util:load_database_from_tarball(Id, Body, Source) of
-        {ok, Version} ->
-            report_event({load_attempt_finished, Source, {ok, Version}}, State),
-            LastModified = extract_last_modified_datetime_from_response_headers(Headers),
-            State2 = State#state{
-                       last_modified = LastModified,
-                       last_version = Version
-                      },
-            maybe_try_saving_cached_tarball(Body, LastModified, State2),
-            reply_to_waiters({ok, Version}, State2);
-        {error, Reason} ->
-            report_event({load_attempt_finished, Source, {error, Reason}}, State),
-            reply_to_waiters({error, Reason}, State)
-    end.
-
 -spec clear_inbox_of_late_http_messages(reference()) -> ok.
 clear_inbox_of_late_http_messages(RequestId) ->
     % Only a best effort. It's possible that a delayed message could
@@ -669,36 +653,39 @@ clear_inbox_of_late_http_messages(RequestId) ->
         1000 -> ok
     end.
 
-maybe_enqueue_waiter(From, State) ->
-    case State#state.last_version of
-        undefined ->
-            Waiters = State#state.waiters,
-            UpdatedWaiters = [From | Waiters],
-            UpdatedState = State#state{ waiters = UpdatedWaiters },
-            {noreply, UpdatedState};
-        LastVersion ->
-            {reply, {ok, LastVersion}, State}
-    end.
+-spec maybe_enqueue_waiter(from(), state_data())
+        -> {state_data(), [?gen_statem:reply_action()]}.
+maybe_enqueue_waiter(From, #{ last_version := LastVersion } = StateData) ->
+    {StateData, [{reply, From, {ok, LastVersion}}]};
+maybe_enqueue_waiter(From, StateData) ->
+    StateData2 =
+        ?maps_update_with3(
+          waiters,
+          fun (PrevWaiters) -> [From | PrevWaiters] end,
+          StateData),
+    {StateData2, []}.
 
--spec reply_to_waiters({ok, calendar:datetime()} | {error, term()}, state()) -> state().
-reply_to_waiters(Result, State) ->
-    Waiters = State#state.waiters,
-    lists:foreach(fun (Waiter) -> gen_server:reply(Waiter, Result) end, Waiters),
-    State#state{ waiters = [] }.
+-spec reply_to_waiters({ok, calendar:datetime()} | {error, term()}, state_data())
+        -> {state_data(), [?gen_statem:reply_action()]}.
+reply_to_waiters(Result, StateData) ->
+    Waiters = maps:get(waiters, StateData),
+    Replies = [{reply, From, Result} || From <- Waiters],
+    {StateData#{ waiters := [] }, Replies}.
 
--spec report_event(event(), state()) -> ok.
-report_event(Event, State) ->
-    Id = State#state.id,
+-spec report_event(event(), state_data()) -> ok.
+report_event(Event, #{ id := Id, event_subscribers := Subscribers }) ->
     lists:foreach(
       fun (Module) when is_atom(Module) ->
               Module:report(Id, Event);
           (Pid) ->
               erlang:send(Pid, {locus, Id, Event}, [noconnect])
       end,
-      State#state.event_subscribers).
+      Subscribers).
 
-handle_monitored_process_death(Pid, State) ->
-    Subscribers = State#state.event_subscribers,
-    UpdatedSubscribers = lists:delete(Pid, Subscribers),
-    UpdatedState = State#state{ event_subscribers = UpdatedSubscribers },
-    {noreply, UpdatedState}.
+handle_monitored_process_death(Pid, StateData) ->
+    StateData2 =
+        ?maps_update_with3(
+          event_subscribers,
+          fun (Subscribers) -> lists:delete(Pid, Subscribers) end,
+          StateData),
+    {keep_state, StateData2}.
