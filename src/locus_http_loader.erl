@@ -62,14 +62,14 @@
 
 -define(CB_MODULE, ?MODULE).
 
--define(PRE_READINESS_UPDATE_PERIOD, (timer:minutes(1))).
--define(POST_READINESS_UPDATE_PERIOD, (timer:hours(6))).
-
 -define(DEFAULT_HTTP_CONNECT_TIMEOUT, (timer:seconds(8))).
 -define(DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT, (timer:seconds(5))).
 -define(DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT, (timer:seconds(5))).
+-define(DEFAULT_PRE_READINESS_UPDATE_PERIOD, (timer:minutes(1))).
+-define(DEFAULT_POST_READINESS_UPDATE_PERIOD, (timer:hours(6))).
 
 -define(is_timeout(V), ((is_integer((V)) andalso ((V) >= 0)) orelse ((V) =:= infinity))).
+-define(is_pos_integer(V), ((is_integer((V)) andalso ((V) >= 1)))).
 
 %% ------------------------------------------------------------------
 %% Type Definitions
@@ -82,6 +82,8 @@
     {connect_timeout, timeout()} |
     {download_start_timeout, timeout()} |
     {idle_download_timeout, timeout()} |
+    {pre_readiness_update_period, pos_integer()} |
+    {post_readiness_update_period, pos_integer()} |
     no_cache.
 -export_type([opt/0]).
 
@@ -94,6 +96,8 @@
        connect_timeout := timeout(),
        download_start_timeout := timeout(),
        idle_download_timeout := timeout(),
+       pre_readiness_update_period := pos_integer(),
+       post_readiness_update_period := pos_integer(),
        no_cache => true,
 
        request_id => reference(),
@@ -453,8 +457,19 @@ processing_update(internal, execute, StateData) ->
 %% @private
 code_change(_OldVsn, OldState, OldStateData, _Extra) ->
     case OldStateData of
-        #{ id := _, url := _, waiters := _, event_subscribers := _ } ->
+        #{ id := _, url := _, waiters := _, event_subscribers := _,
+           pre_readiness_update_period := _, post_readiness_update_period := _
+         } ->
             {ok, OldState, OldStateData};
+
+        #{ id := _, url := _, waiters := _, event_subscribers := _
+         } ->
+            % lib was at a version between 1.1.x and 1.4.x
+            StateData = OldStateData#{ pre_readiness_update_period => ?DEFAULT_PRE_READINESS_UPDATE_PERIOD,
+                                       post_readiness_update_period => ?DEFAULT_POST_READINESS_UPDATE_PERIOD
+                                     },
+            {ok, OldState, StateData};
+
         #{ id := _, url := _, waiters := _ } ->
             % lib was at version 1.0.0; ensure everything works as before
             EventSubscribers = [locus_logger],
@@ -484,7 +499,9 @@ init(Id, URL, Opts) ->
            event_subscribers => [],
            connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
            download_start_timeout => ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
-           idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT
+           idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT,
+           pre_readiness_update_period => ?DEFAULT_PRE_READINESS_UPDATE_PERIOD,
+           post_readiness_update_period => ?DEFAULT_POST_READINESS_UPDATE_PERIOD
          },
     init_opts(Opts, BaseStateData).
 
@@ -511,6 +528,12 @@ init_opts([{download_start_timeout, Timeout} | Opts], StateData) when ?is_timeou
     init_opts(Opts, NewStateData);
 init_opts([{idle_download_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
     NewStateData = StateData#{ idle_download_timeout := Timeout },
+    init_opts(Opts, NewStateData);
+init_opts([{pre_readiness_update_period, Interval} | Opts], StateData) when ?is_pos_integer(Interval) ->
+    NewStateData = StateData#{ pre_readiness_update_period := Interval },
+    init_opts(Opts, NewStateData);
+init_opts([{post_readiness_update_period, Interval} | Opts], StateData) when ?is_pos_integer(Interval) ->
+    NewStateData = StateData#{ post_readiness_update_period := Interval },
     init_opts(Opts, NewStateData);
 init_opts([no_cache | Opts], StateData) ->
     NewStateData = StateData#{ no_cache => true },
@@ -600,10 +623,10 @@ bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
 
 -spec update_period(state_data()) -> pos_integer().
-update_period(#{ last_modified := _ } = _StateData) ->
-    ?POST_READINESS_UPDATE_PERIOD;
-update_period(#{} = _StateData) ->
-    ?PRE_READINESS_UPDATE_PERIOD.
+update_period(#{ last_modified := _ } = StateData) ->
+    maps:get(post_readiness_update_period, StateData);
+update_period(#{} = StateData) ->
+    maps:get(pre_readiness_update_period, StateData).
 
 request_headers(#{ last_modified := LastModified } = _StateData) ->
     LocalLastModified = calendar:universal_time_to_local_time(LastModified),
