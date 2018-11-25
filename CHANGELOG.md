@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Added
 - ability of tweaking pre- and post-readiness database update periods
+- test coverage of HTTP-loaded database updates
 ### Fixed
 - undeterministic test cases which sometimes broke
 
