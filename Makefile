@@ -4,7 +4,11 @@ ifeq ($(wildcard rebar3),rebar3)
 	REBAR3 = $(CURDIR)/rebar3
 endif
 
+ifdef RUNNING_ON_TRAVIS
+REBAR3 = ./rebar3
+else
 REBAR3 ?= $(shell test -e `which rebar3` 2>/dev/null && which rebar3 || echo "./rebar3")
+endif
 
 ifeq ($(REBAR3),)
 	REBAR3 = $(CURDIR)/rebar3
