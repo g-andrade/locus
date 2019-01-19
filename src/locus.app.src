@@ -6,9 +6,14 @@
   {applications,
    [kernel,
     stdlib,
+    % OTP dependencies
+    crypto,
     inets,
+    public_key,
     ssl,
-    crypto
+    % External dependencies
+    certifi,
+    ssl_verify_fun
    ]},
   {modules, []},
 

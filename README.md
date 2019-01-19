@@ -138,6 +138,12 @@ complete
     or network), this interval increases to every 6 hours. These can be
     tweaked using the 'pre\_readiness\_update\_period' and
     'post\_readiness\_update\_period' loader settings (in milliseconds.)
+  - When downloading from a HTTPS URL, the remote certificate will be
+    authenticated against a [list of known
+    CAs](https://github.com/certifi/erlang-certifi) and connection
+    negotiation will fail in case of expired certificates, mismatched
+    hosts, and so on. These checks can be disabled using the `insecure`
+    loader option.
 
 ##### <span id="HTTP_URLs_-_Caching">HTTP URLs - Caching</span>
 

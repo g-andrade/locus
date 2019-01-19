@@ -139,6 +139,11 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/locus/">
   These can be tweaked using the 'pre_readiness_update_period' and 'post_readiness_update_period'
   loader settings (in milliseconds.)
   </li>
+<li>When downloading from a HTTPS URL, the remote certificate will be authenticated
+  against a <a href="https://github.com/certifi/erlang-certifi">list of known CAs</a>
+  and connection negotiation will fail in case of expired certificates, mismatched hosts,
+  and so on. These checks can be disabled using the `insecure' loader option.
+  </li>
 </ul>
 
 ==== HTTP URLs - Caching ====

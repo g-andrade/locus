@@ -84,7 +84,8 @@
     {idle_download_timeout, timeout()} |
     {pre_readiness_update_period, pos_integer()} |
     {post_readiness_update_period, pos_integer()} |
-    no_cache.
+    no_cache |
+    insecure.
 -export_type([opt/0]).
 
 -ifdef(POST_OTP_18).
@@ -99,6 +100,7 @@
        pre_readiness_update_period := pos_integer(),
        post_readiness_update_period := pos_integer(),
        no_cache => true,
+       insecure => true,
 
        request_id => reference(),
        last_response_headers => headers(),
@@ -116,6 +118,7 @@
        download_start_timeout => timeout(),
        idle_download_timeout => timeout(),
        no_cache => true,
+       insecure => true,
 
        request_id => reference(),
        last_response_headers => headers(),
@@ -242,7 +245,7 @@ list_subscribers(Id) ->
 %% @private
 callback_mode() -> [state_functions, state_enter].
 
--spec init([atom() | string() | opt(), ...])
+-spec init([atom() | string() | [opt()], ...])
         -> ?gen_statem:init_result(initializing).
 %% @private
 init([Id, URL, Opts]) ->
@@ -289,7 +292,14 @@ ready(internal, update_database, StateData) ->
     Headers = request_headers(StateData),
     Request = {URL, Headers},
     ConnectTimeout = maps:get(connect_timeout, StateData),
-    HTTPOptions = [{connect_timeout, ConnectTimeout}],
+    BaseHTTPOptions = [{connect_timeout, ConnectTimeout}],
+    ExtraHTTPOptions =
+        case maps:is_key(insecure, StateData) orelse URL of
+            true -> [];
+            "http://" ++ _ -> [];
+            "https://" ++ _ -> [{ssl,locus_https_requests:ssl_opts_for_ca_authentication(URL)}]
+        end,
+    HTTPOptions = BaseHTTPOptions  ++ ExtraHTTPOptions,
     Options = [{sync, false}, {stream, self}],
     {ok, RequestId} = httpc:request(get, Request, HTTPOptions, Options),
     true = is_reference(RequestId),
@@ -537,6 +547,9 @@ init_opts([{post_readiness_update_period, Interval} | Opts], StateData) when ?is
     init_opts(Opts, NewStateData);
 init_opts([no_cache | Opts], StateData) ->
     NewStateData = StateData#{ no_cache => true },
+    init_opts(Opts, NewStateData);
+init_opts([insecure | Opts], StateData) ->
+    NewStateData = StateData#{ insecure => true },
     init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->
     {stop, {invalid_opt, InvalidOpt}};
