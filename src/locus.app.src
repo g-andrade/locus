@@ -18,5 +18,7 @@
 
   {maintainers, ["Guilherme Andrade"]},
   {licenses, ["MIT"]},
-  {links, [{"Github", "https://github.com/g-andrade/locus"}]}
+  {links, [{"Github", "https://github.com/g-andrade/locus"},
+           {"GitLab", "https://gitlab.com/g-andrade/locus"}
+          ]}
  ]}.
