@@ -63,6 +63,7 @@ README.md: doc
 	@tail -n  2  <"README.md_" >>"README.md"
 	@rm "README.md_"
 
+publish: export PUBLISHING_TO_HEX = true
 publish: $(REBAR3)
-	@$(REBAR3) as publish hex publish
-	@$(REBAR3) as publish hex docs
+	@$(REBAR3) hex publish
+	@$(REBAR3) hex docs
