@@ -17,7 +17,7 @@
    ]},
 
   {licenses, ["MIT"]},
-  {links, [{"Github", "https://github.com/g-andrade/locus"},
+  {links, [{"GitHub", "https://github.com/g-andrade/locus"},
            {"GitLab", "https://gitlab.com/g-andrade/locus"}
           ]}
  ]}.
