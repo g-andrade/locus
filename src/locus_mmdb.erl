@@ -506,50 +506,63 @@ analyze_robustness_([{database, DatabaseParts}]) ->
            max_depth => MaxDepth
          },
 
-    case analyze_robustness_recur(Params, 0, 0, []) of
-        [] ->
+    case analyze_robustness_recur(Params, 0, 0, [], gb_sets:empty()) of
+        {[], _} ->
             ok;
-        RevFrailties ->
+        {RevFrailties, _} ->
             Frailties = lists:reverse(RevFrailties),
             {error, {frail, Frailties}}
     end.
 
-analyze_robustness_recur(#{max_depth := MaxDepth}, NodeIndex, Depth, Acc)
+analyze_robustness_recur(#{max_depth := MaxDepth}, NodeIndex, Depth,
+                         FrailtiesAcc, VisitedDataRecordsAcc)
   when Depth > MaxDepth ->
-    [{max_depth_exceeded, #{ node_index => NodeIndex, depth => Depth }}
-     | Acc];
-analyze_robustness_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Acc)
+    {[{max_depth_exceeded, #{ node_index => NodeIndex, depth => Depth }}
+      | FrailtiesAcc],
+     VisitedDataRecordsAcc};
+analyze_robustness_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth,
+                         FrailtiesAcc, VisitedDataRecordsAcc)
   when NodeIndex < NodeCount ->
     % regular node
     #{tree := Tree, node_size := NodeSize, record_size := RecordSize} = Params,
     try binary:part(Tree, {NodeIndex * NodeSize, NodeSize}) of
         Node ->
             {LeftNodeIndex, RightNodeIndex} = extrace_node_records(Node, RecordSize),
-            Acc2 = analyze_robustness_recur(Params, LeftNodeIndex, Depth + 1, Acc),
-            analyze_robustness_recur(Params, RightNodeIndex, Depth + 1, Acc2)
+            {FrailtiesAcc2, VisitedDataRecordsAcc2} =
+                analyze_robustness_recur(Params, LeftNodeIndex, Depth + 1, FrailtiesAcc, VisitedDataRecordsAcc),
+            analyze_robustness_recur(Params, RightNodeIndex, Depth + 1, FrailtiesAcc2, VisitedDataRecordsAcc2)
     catch
         Class:Reason ->
-            [{node_dereference_failed, #{ node_index => NodeIndex, class => Class, reason => Reason }}
-             | Acc]
+            {[{node_dereference_failed, #{ node_index => NodeIndex, class => Class, reason => Reason }}
+              | FrailtiesAcc],
+             VisitedDataRecordsAcc}
     end;
-analyze_robustness_recur(#{node_count := NodeCount}, NodeIndex, _Depth, Acc)
+analyze_robustness_recur(#{node_count := NodeCount}, NodeIndex, _Depth,
+                         FrailtiesAcc, VisitedDataRecordsAcc)
   when NodeIndex =:= NodeCount ->
     % leaf node
-    Acc;
-analyze_robustness_recur(#{node_count := NodeCount, data_section := DataSection},
-                            NodeIndex, _Depth, Acc) ->
+    {FrailtiesAcc, VisitedDataRecordsAcc};
+analyze_robustness_recur(#{node_count := NodeCount, data_section := DataSection}, NodeIndex, _Depth,
+                         FrailtiesAcc, VisitedDataRecordsAcc) ->
     % pointer to the data section
     DataIndex = (NodeIndex - NodeCount) - 16,
-    try decode_data(DataSection, DataIndex) of
-        {#{} = _DecodedData, _NewDataIndex} ->
-            Acc;
-        {DecodedDataOfWrongType, _NewDataIndex} ->
-            [{bad_data_record_type, #{ data_index => DataIndex, data_record => DecodedDataOfWrongType}}
-             | Acc]
+    try gb_sets:is_element(DataIndex, VisitedDataRecordsAcc) orelse
+        {first_visit, decode_data(DataSection, DataIndex)}
+    of
+        true ->
+            % we've already visited the data record referenced by DataIndex
+            {FrailtiesAcc, VisitedDataRecordsAcc};
+        {first_visit, {#{} = _DecodedData, _NewDataIndex}} ->
+            {FrailtiesAcc, VisitedDataRecordsAcc};
+        {first_visit, {DecodedDataOfWrongType, _NewDataIndex}} ->
+            {[{bad_data_record_type, #{ data_index => DataIndex, data_record => DecodedDataOfWrongType}}
+              | FrailtiesAcc],
+             gb_sets:add(DataIndex, VisitedDataRecordsAcc)}
     catch
         Class:Reason ->
-            [{data_record_decoding_failed, #{ data_index => DataIndex, class => Class, reason => Reason }}
-             | Acc]
+            {[{data_record_decoding_failed, #{ data_index => DataIndex, class => Class, reason => Reason }}
+              | FrailtiesAcc],
+             gb_sets:add(DataIndex, VisitedDataRecordsAcc)}
     end.
 
 extrace_node_records(Node, RecordSize) when byte_size(Node) band 1 =:= 0 ->
