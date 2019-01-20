@@ -123,23 +123,27 @@
 -export_type([frailty/0]).
 
 -type max_depth_exceeded() ::
-        {max_depth_exceeded, #{ node_index := non_neg_integer(),
+        {max_depth_exceeded, #{ tree_prefix := {inet:ip_address(), 0..128},
+                                node_index := non_neg_integer(),
                                 depth := 33 | 129 }}.
 -export_type([max_depth_exceeded/0]).
 
 -type node_dereference_failed() ::
-        {node_dereference_failed, #{ node_index := non_neg_integer(),
+        {node_dereference_failed, #{ tree_prefix := {inet:ip_address(), 0..128},
+                                     node_index := non_neg_integer(),
                                      class := error | throw | exit,
                                      reason := term() }}.
 -export_type([node_dereference_failed/0]).
 
 -type bad_data_record_type() ::
-         {bad_data_record_type, #{ data_index := non_neg_integer(),
+         {bad_data_record_type, #{ tree_prefix := {inet:ip_address(), 0..128},
+                                   data_index := non_neg_integer(),
                                    data_record := term() }}.
 -export_type([bad_data_record_type/0]).
 
 -type data_record_decoding_failed() ::
-        {data_record_decoding_failed, #{ data_index := non_neg_integer(),
+        {data_record_decoding_failed, #{ tree_prefix := {inet:ip_address(), 0..128},
+                                         data_index := non_neg_integer(),
                                          class := error | throw | exit,
                                          reason := term() }}.
 -export_type([data_record_decoding_failed/0]).
@@ -506,7 +510,7 @@ analyze_robustness_([{database, DatabaseParts}]) ->
            max_depth => MaxDepth
          },
 
-    case analyze_robustness_recur(Params, 0, 0, [], gb_sets:empty()) of
+    case analyze_robustness_recur(Params, 0, 0, 0, [], gb_sets:empty()) of
         {[], _} ->
             ok;
         {RevFrailties, _} ->
@@ -514,13 +518,14 @@ analyze_robustness_([{database, DatabaseParts}]) ->
             {error, {frail, Frailties}}
     end.
 
-analyze_robustness_recur(#{max_depth := MaxDepth}, NodeIndex, Depth,
+analyze_robustness_recur(#{max_depth := MaxDepth} = Params, NodeIndex, Depth, Prefix,
                          FrailtiesAcc, VisitedDataRecordsAcc)
   when Depth > MaxDepth ->
-    {[{max_depth_exceeded, #{ node_index => NodeIndex, depth => Depth }}
+    {[{max_depth_exceeded, #{ tree_prefix => frailty_prefix(Params, Depth, Prefix),
+                              node_index => NodeIndex }}
       | FrailtiesAcc],
      VisitedDataRecordsAcc};
-analyze_robustness_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth,
+analyze_robustness_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Prefix,
                          FrailtiesAcc, VisitedDataRecordsAcc)
   when NodeIndex < NodeCount ->
     % regular node
@@ -529,20 +534,26 @@ analyze_robustness_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth,
         Node ->
             {LeftNodeIndex, RightNodeIndex} = extrace_node_records(Node, RecordSize),
             {FrailtiesAcc2, VisitedDataRecordsAcc2} =
-                analyze_robustness_recur(Params, LeftNodeIndex, Depth + 1, FrailtiesAcc, VisitedDataRecordsAcc),
-            analyze_robustness_recur(Params, RightNodeIndex, Depth + 1, FrailtiesAcc2, VisitedDataRecordsAcc2)
+                analyze_robustness_recur(Params, LeftNodeIndex, Depth + 1, Prefix bsl 1,
+                                         FrailtiesAcc, VisitedDataRecordsAcc),
+            analyze_robustness_recur(Params, RightNodeIndex, Depth + 1, (Prefix bsl 1) bor 1,
+                                     FrailtiesAcc2, VisitedDataRecordsAcc2)
     catch
         Class:Reason ->
-            {[{node_dereference_failed, #{ node_index => NodeIndex, class => Class, reason => Reason }}
+            {[{node_dereference_failed, #{ tree_prefix => frailty_prefix(Params, Depth, Prefix),
+                                           node_index => NodeIndex,
+                                           class => Class,
+                                           reason => Reason }}
               | FrailtiesAcc],
              VisitedDataRecordsAcc}
     end;
-analyze_robustness_recur(#{node_count := NodeCount}, NodeIndex, _Depth,
+analyze_robustness_recur(#{node_count := NodeCount}, NodeIndex, _Depth, _Prefix,
                          FrailtiesAcc, VisitedDataRecordsAcc)
   when NodeIndex =:= NodeCount ->
     % leaf node
     {FrailtiesAcc, VisitedDataRecordsAcc};
-analyze_robustness_recur(#{node_count := NodeCount, data_section := DataSection}, NodeIndex, _Depth,
+analyze_robustness_recur(#{node_count := NodeCount, data_section := DataSection} = Params,
+                         NodeIndex, Depth, Prefix,
                          FrailtiesAcc, VisitedDataRecordsAcc) ->
     % pointer to the data section
     DataIndex = (NodeIndex - NodeCount) - 16,
@@ -555,12 +566,17 @@ analyze_robustness_recur(#{node_count := NodeCount, data_section := DataSection}
         {first_visit, {#{} = _DecodedData, _NewDataIndex}} ->
             {FrailtiesAcc, VisitedDataRecordsAcc};
         {first_visit, {DecodedDataOfWrongType, _NewDataIndex}} ->
-            {[{bad_data_record_type, #{ data_index => DataIndex, data_record => DecodedDataOfWrongType}}
+            {[{bad_data_record_type, #{ tree_prefix => frailty_prefix(Params, Depth, Prefix),
+                                        data_index => DataIndex,
+                                        data_record => DecodedDataOfWrongType }}
               | FrailtiesAcc],
              gb_sets:add(DataIndex, VisitedDataRecordsAcc)}
     catch
         Class:Reason ->
-            {[{data_record_decoding_failed, #{ data_index => DataIndex, class => Class, reason => Reason }}
+            {[{data_record_decoding_failed, #{ tree_prefix => frailty_prefix(Params, Depth, Prefix),
+                                               data_index => DataIndex,
+                                               class => Class,
+                                               reason => Reason }}
               | FrailtiesAcc],
              gb_sets:add(DataIndex, VisitedDataRecordsAcc)}
     end.
@@ -574,3 +590,9 @@ extrace_node_records(Node, RecordSize) ->
     <<LeftLow:LeftWholeSz, LeftHigh:LeftRemainderSz, Right:RecordSize>> = Node,
     Left = (LeftHigh bsl LeftWholeSz) bor LeftLow,
     {Left, Right}.
+
+frailty_prefix(#{max_depth := MaxDepth}, Depth, Prefix) ->
+    ShiftAmount = MaxDepth - Depth,
+    ShiftedPrefix = Prefix bsl ShiftAmount,
+    BitAddress = <<ShiftedPrefix:MaxDepth>>,
+    ip_address_prefix(BitAddress, ShiftAmount).
