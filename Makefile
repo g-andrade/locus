@@ -16,7 +16,7 @@ endif
 
 .PHONY: all build clean check dialyzer xref test travis_test cover console doc publish
 
-.NOTPARALLEL: check
+.NOTPARALLEL: check cover
 
 all: build
 
@@ -39,13 +39,13 @@ xref: $(REBAR3)
 	@$(REBAR3) xref
 
 test: $(REBAR3)
-	@$(REBAR3) as test ct
+	@$(REBAR3) ct
 
 travis_test: $(REBAR3)
 	@$(REBAR3) as travis_test ct
 
-cover:$(REBAR3) test
-	@$(REBAR3) as test cover
+cover: $(REBAR3) test
+	@$(REBAR3) cover
 
 console: export ERL_FLAGS =? +pc unicode
 console:
