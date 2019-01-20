@@ -6,8 +6,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## UNRELEASED
 ### Added
-- authentication of presented TLS certificates against a list of known CAs
-  when loading the database from HTTPS URLs
+- two new dependencies:
+    - certifi
+    - ssl_verify_fun
+### Changed
+- when loading databases using HTTPS, the load attempt will now fail
+  under any of the following conditions:
+    - the server certificate has expired
+    - the server certificate does not pertain to the hostname in the URL
+    - the server certificate is self-signed
+    - the server certificate was signed by an unknown CA
 
 ## [1.5.1] - 2019-01-19
 ### Fixed
