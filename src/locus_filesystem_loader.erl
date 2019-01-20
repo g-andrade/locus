@@ -67,7 +67,8 @@
 -type from() :: {To :: pid(), Tag :: term()}.
 
 -type opt() ::
-    {event_subscriber, module() | pid()}.
+    {event_subscriber, module() | pid()} |
+    {async_waiter, {pid(),reference()}}.
 -export_type([opt/0]).
 
 -record(state, {
@@ -222,6 +223,9 @@ init_opts([{event_subscriber, Pid} | Opts], State) when is_pid(Pid) ->
     UpdatedEventSubscribers = [Pid | EventSubscribers],
     UpdatedState = State#state{ event_subscribers = UpdatedEventSubscribers },
     init_opts(Opts, UpdatedState);
+init_opts([{async_waiter, {Pid,Ref}=From} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
+    {noreply, NewStateData} = enqueue_waiter(From, StateData),
+    init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->
     {stop, {invalid_opt, InvalidOpt}};
 init_opts([], State) ->
@@ -245,6 +249,9 @@ handle_monitored_process_death(Pid, State) ->
 maybe_enqueue_waiter(_From, State) when State#state.last_version =/= undefined ->
     {reply, {ok, State#state.last_version}, State};
 maybe_enqueue_waiter(From, State) ->
+    enqueue_waiter(From, State).
+
+enqueue_waiter(From, State) ->
     Waiters = State#state.waiters,
     UpdatedWaiters = [From | Waiters],
     UpdatedState = State#state{ waiters = UpdatedWaiters },

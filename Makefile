@@ -14,7 +14,10 @@ ifeq ($(REBAR3),)
 	REBAR3 = $(CURDIR)/rebar3
 endif
 
-.PHONY: all build clean check dialyzer xref test travis_test cover console doc publish
+CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
+
+.PHONY: all build clean check dialyzer xref test travis_test cover
+.PHONY: console doc publish cli
 
 .NOTPARALLEL: check cover
 
@@ -66,3 +69,7 @@ README.md: doc
 publish: $(REBAR3)
 	@$(REBAR3) as publish hex publish
 	@$(REBAR3) as publish hex docs
+
+cli:
+	@$(REBAR3) as escriptize escriptize
+	cp -p "$(CLI_ARTIFACT_PATH)" ./

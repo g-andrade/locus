@@ -508,6 +508,25 @@ subscriber_death_test(Config) ->
     ?assertEqual(OriginalPid, LoaderModule:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
+async_waiter_success_test(Config) ->
+    URL = proplists:get_value(url, Config),
+    Loader = async_waiter_success_test,
+    Ref = make_ref(),
+    LoaderOpts = [{async_waiter, {self(),Ref}}],
+    ok = locus:start_loader(Loader, URL, LoaderOpts),
+    ?assertRecv({Ref, {ok, _LoadedVersion}}),
+    ok = locus:stop_loader(Loader).
+
+async_waiter_failure_test(Config) ->
+    BaseURL = proplists:get_value(base_url, Config),
+    URL = BaseURL ++ "/foobarbarfoofoobar",
+    Loader = async_waiter_failure_test,
+    Ref = make_ref(),
+    LoaderOpts = [{async_waiter, {self(),Ref}}],
+    ok = locus:start_loader(Loader, URL, LoaderOpts),
+    ?assertRecv({Ref, {error, _Reason}}),
+    ok = locus:stop_loader(Loader).
+
 %%%
 
 address_forms(StrAddr) ->

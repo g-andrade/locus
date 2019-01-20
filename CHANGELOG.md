@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## UNRELEASED
 ### Added
+- ability of checking for database compatibility using a command line tool
+- ability of waiting asynchronously for the result of database loader first attempts
 - two new dependencies:
     - certifi
     - ssl_verify_fun

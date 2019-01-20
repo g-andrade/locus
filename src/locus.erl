@@ -40,6 +40,14 @@
 -deprecated([{get_version,1,eventually}]).
 
 %% ------------------------------------------------------------------
+%% CLI-only Function Exports
+%% ------------------------------------------------------------------
+
+-ifdef(ESCRIPTIZING).
+-export([main/1]).                        -ignore_xref({main,1}).
+-endif.
+
+%% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
 
@@ -299,6 +307,16 @@ get_info(DatabaseId, Property) ->
         {error, Error} ->
             {error, Error}
     end.
+
+%% ------------------------------------------------------------------
+%% CLI-only Function Definitions
+%% ------------------------------------------------------------------
+
+-ifdef(ESCRIPTIZING).
+-spec main([string()]) -> no_return().
+main(Args) ->
+    locus_cli:main(Args).
+-endif.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

@@ -85,7 +85,7 @@
     {pre_readiness_update_period, pos_integer()} |
     {post_readiness_update_period, pos_integer()} |
     no_cache |
-    insecure.
+    {async_waiter, {pid(),reference()}}.
 -export_type([opt/0]).
 
 -ifdef(POST_OTP_18).
@@ -266,8 +266,8 @@ initializing(info, maybe_load_from_cache, #{ no_cache := true } = StateData) ->
 initializing(info, maybe_load_from_cache, StateData) ->
     CachedTarballName = cached_tarball_name(StateData),
     CachedTarballLookup = locus_util:read_file_and_its_modification_date(CachedTarballName),
-    StateData2 = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
-    {next_state, ready, StateData2, {next_event, internal, update_database}}.
+    {StateData2, Replies} = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
+    {next_state, ready, StateData2, Replies ++ [{next_event, internal, update_database}]}.
 
 -spec ready(enter, atom(), state_data())
             -> {keep_state_and_data, {state_timeout, pos_integer(), update_database}};
@@ -551,6 +551,9 @@ init_opts([no_cache | Opts], StateData) ->
 init_opts([insecure | Opts], StateData) ->
     NewStateData = StateData#{ insecure => true },
     init_opts(Opts, NewStateData);
+init_opts([{async_waiter, {Pid,Ref}=From} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
+    {NewStateData, []} = enqueue_waiter(From, StateData),
+    init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->
     {stop, {invalid_opt, InvalidOpt}};
 init_opts([], StateData) ->
@@ -572,24 +575,27 @@ cached_tarball_name_for_url(URL) ->
     filename:join(UserCachePath, Filename).
 
 -spec handle_cached_tarball_lookup(LookupResult, nonempty_string(), state_data())
-        -> state_data() when LookupResult :: ({ok, binary(), calendar:datetime()} |
-                                              {error, term()}).
+        -> {state_data(), [?gen_statem:reply_action()]}
+             when LookupResult :: ({ok, binary(), calendar:datetime()} |
+                                   {error, term()}).
 handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, StateData) ->
     Id = maps:get(id, StateData),
     Source = {cache, CachedTarballName},
     case locus_util:load_database_from_tarball(Id, Content, Source) of
         {ok, Version} ->
             report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
-            StateData#{ last_modified => ModificationDate,
-                        last_version => Version };
+            {StateData2, Replies} = reply_to_waiters({ok, Version}, StateData),
+            {StateData2#{ last_modified => ModificationDate,
+                          last_version => Version },
+             Replies};
         {error, Error} ->
             report_event({load_attempt_finished, Source, {error, Error}}, StateData),
-            StateData
+            {StateData, []}
     end;
 handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
     Source = {cache, CachedTarballName},
     report_event({load_attempt_finished, Source, {error, Error}}, StateData),
-    StateData.
+    {StateData, []}.
 
 -spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
 maybe_try_saving_cached_tarball(_Tarball, _LastModified, #{ no_cache := true }) ->
@@ -694,6 +700,9 @@ clear_inbox_of_late_http_messages(RequestId) ->
 maybe_enqueue_waiter(From, #{ last_version := LastVersion } = StateData) ->
     {StateData, [{reply, From, {ok, LastVersion}}]};
 maybe_enqueue_waiter(From, StateData) ->
+    enqueue_waiter(From, StateData).
+
+enqueue_waiter(From, StateData) ->
     StateData2 =
         ?maps_update_with3(
           waiters,
