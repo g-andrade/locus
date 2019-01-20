@@ -6,7 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## UNRELEASED
 ### Added
-- ability of checking for database compatibility using a command line tool
+- new API method for detecting database corruption or incompatibility (`locus:analyze_robustness/1`)
+- new command line tool for checking for database corruption or incompatibility
 - ability of waiting asynchronously for the result of database loader first attempts
 - two new dependencies:
     - certifi

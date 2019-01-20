@@ -25,7 +25,6 @@
 %%
 %% * [MaxMind DB File Format Specification](https://maxmind.github.io/MaxMind-DB/)
 
-%% @private
 -module(locus_mmdb).
 -compile([inline_list_funcs]).
 
@@ -37,6 +36,7 @@
 -export([decode_and_update/3]).
 -export([lookup/2]).
 -export([get_parts/1]).
+-export([analyze_robustness/1]).
 
 -ifdef(TEST).
 -export([decode_database_parts/2]).
@@ -115,17 +115,48 @@
         #{ binary() => term() }.
 -export_type([metadata/0]).
 
+-type frailty() ::
+        max_depth_exceeded() |
+        node_dereference_failed() |
+        bad_data_record_type() |
+        data_record_decoding_failed().
+-export_type([frailty/0]).
+
+-type max_depth_exceeded() ::
+        {max_depth_exceeded, #{ node_index := non_neg_integer(),
+                                depth := 33 | 129 }}.
+-export_type([max_depth_exceeded/0]).
+
+-type node_dereference_failed() ::
+        {node_dereference_failed, #{ node_index := non_neg_integer(),
+                                     class := error | throw | exit,
+                                     reason := term() }}.
+-export_type([node_dereference_failed/0]).
+
+-type bad_data_record_type() ::
+         {bad_data_record_type, #{ data_index := non_neg_integer(),
+                                   data_record := term() }}.
+-export_type([bad_data_record_type/0]).
+
+-type data_record_decoding_failed() ::
+        {data_record_decoding_failed, #{ data_index := non_neg_integer(),
+                                         class := error | throw | exit,
+                                         reason := term() }}.
+-export_type([data_record_decoding_failed/0]).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
 -spec create_table(atom()) -> ok.
+%% @private
 create_table(Id) ->
     Table = table_name(Id),
     _ = ets:new(Table, [named_table, protected, {read_concurrency,true}]),
     ok.
 
 -spec decode_and_update(atom(), bin_database(), source()) -> calendar:datetime().
+%% @private
 decode_and_update(Id, BinDatabase, Source) ->
     Table = table_name(Id),
     {DatabaseParts, Version} = decode_database_parts(BinDatabase, Source),
@@ -137,6 +168,7 @@ decode_and_update(Id, BinDatabase, Source) ->
                    binary() => term() }} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
+%% @private
 lookup(Id, Address) ->
     case locus_util:parse_ip_address(Address) of
         {ok, ParsedAddress} ->
@@ -149,6 +181,7 @@ lookup(Id, Address) ->
     end.
 
 -spec get_parts(atom()) -> {ok, parts()} | {error, database_unknown | database_not_loaded}.
+%% @private
 get_parts(Id) ->
     Table = table_name(Id),
     case ets:info(Table, name) =:= Table andalso
@@ -161,6 +194,17 @@ get_parts(Id) ->
         [{database, Parts}] ->
             {ok, Parts}
     end.
+
+-spec analyze_robustness(atom())
+        -> ok |
+           {error, {frail, [frailty(), ...]}} |
+           {error, database_unknown} |
+           {error, database_not_loaded}.
+%% @private
+analyze_robustness(Id) ->
+    Table = table_name(Id),
+    DatabaseLookup = ets:info(Table, name) =:= Table andalso ets:lookup(Table, database),
+    analyze_robustness_(DatabaseLookup).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Initialization
@@ -433,3 +477,87 @@ ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 128 ->
     BitBaseAddress = <<Prefix/bits, 0:SuffixSize>>,
     <<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>> = BitBaseAddress,
     {{A,B,C,D,E,F,G,H}, PrefixSize}.
+
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Walking
+%% ------------------------------------------------------------------
+
+analyze_robustness_(false) ->
+    {error, database_unknown};
+analyze_robustness_([]) ->
+    {error, database_not_loaded};
+analyze_robustness_([{database, DatabaseParts}]) ->
+    #{ tree := Tree, data_section := DataSection } = DatabaseParts,
+    NodeCount = metadata_get(<<"node_count">>, DatabaseParts),
+    RecordSize = metadata_get(<<"record_size">>, DatabaseParts),
+    NodeSize = (RecordSize * 2) div 8,
+    MaxDepth =
+        case metadata_get(<<"ip_version">>, DatabaseParts) of
+            4 -> 32;
+            6 -> 128
+        end,
+    Params =
+        #{ tree => Tree,
+           data_section => DataSection,
+           node_size => NodeSize,
+           record_size => RecordSize ,
+           node_count => NodeCount,
+           max_depth => MaxDepth
+         },
+
+    case analyze_robustness_recur(Params, 0, 0, []) of
+        [] ->
+            ok;
+        RevFrailties ->
+            Frailties = lists:reverse(RevFrailties),
+            {error, {frail, Frailties}}
+    end.
+
+analyze_robustness_recur(#{max_depth := MaxDepth}, NodeIndex, Depth, Acc)
+  when Depth > MaxDepth ->
+    [{max_depth_exceeded, #{ node_index => NodeIndex, depth => Depth }}
+     | Acc];
+analyze_robustness_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Acc)
+  when NodeIndex < NodeCount ->
+    % regular node
+    #{tree := Tree, node_size := NodeSize, record_size := RecordSize} = Params,
+    try binary:part(Tree, {NodeIndex * NodeSize, NodeSize}) of
+        Node ->
+            {LeftNodeIndex, RightNodeIndex} = extrace_node_records(Node, RecordSize),
+            Acc2 = analyze_robustness_recur(Params, LeftNodeIndex, Depth + 1, Acc),
+            analyze_robustness_recur(Params, RightNodeIndex, Depth + 1, Acc2)
+    catch
+        Class:Reason ->
+            [{node_dereference_failed, #{ node_index => NodeIndex, class => Class, reason => Reason }}
+             | Acc]
+    end;
+analyze_robustness_recur(#{node_count := NodeCount}, NodeIndex, _Depth, Acc)
+  when NodeIndex =:= NodeCount ->
+    % leaf node
+    Acc;
+analyze_robustness_recur(#{node_count := NodeCount, data_section := DataSection},
+                            NodeIndex, _Depth, Acc) ->
+    % pointer to the data section
+    DataIndex = (NodeIndex - NodeCount) - 16,
+    try decode_data(DataSection, DataIndex) of
+        {#{} = _DecodedData, _NewDataIndex} ->
+            Acc;
+        {DecodedDataOfWrongType, _NewDataIndex} ->
+            [{bad_data_record_type, #{ data_index => DataIndex, data_record => DecodedDataOfWrongType}}
+             | Acc]
+    catch
+        Class:Reason ->
+            [{data_record_decoding_failed, #{ data_index => DataIndex, class => Class, reason => Reason }}
+             | Acc]
+    end.
+
+extrace_node_records(Node, RecordSize) when byte_size(Node) band 1 =:= 0 ->
+    <<Left:RecordSize, Right:RecordSize>> = Node,
+    {Left, Right};
+extrace_node_records(Node, RecordSize) ->
+    LeftWholeSz = (RecordSize bsr 3) bsl 3,
+    LeftRemainderSz = RecordSize band 2#111,
+    <<LeftLow:LeftWholeSz, LeftHigh:LeftRemainderSz, Right:RecordSize>> = Node,
+    Left = (LeftHigh bsl LeftWholeSz) bor LeftLow,
+    {Left, Right}.

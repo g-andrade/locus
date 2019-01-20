@@ -39,15 +39,15 @@
 main(Args) ->
     ensure_apps_are_started([locus, getopt]),
     case Args of
-        ["check-compatibility" | CmdArgs] ->
-            handle_compatibility_check_command(CmdArgs);
+        ["analyze-robustness" | CmdArgs] ->
+            handle_robustness_analysis_command(CmdArgs);
         _ ->
             fall_from_grace(
               "~n"
               "Usage: locus [<command>] [<command_args>]~n"
               "~n"
               "Available commands:~n"
-              "  check-compatibility")
+              "  analyze-robustness")
     end.
 
 %% ------------------------------------------------------------------
@@ -61,9 +61,9 @@ ensure_apps_are_started(Apps) ->
       end,
       Apps).
 
-handle_compatibility_check_command(CmdArgs) ->
+handle_robustness_analysis_command(CmdArgs) ->
     OptSpecList =
-        [{load_timeout, undefined, "load-timeout", {integer,5}, "Database load timeout (in seconds)"},
+        [{load_timeout, undefined, "load-timeout", {integer,30}, "Database load timeout (in seconds)"},
          {log_level,    undefined, "log-level",    {string,"error"}, "debug | info | warning | error"},
          {url,          undefined, undefined,      utf8_binary, "Database URL (local or remote)"}],
 
@@ -75,14 +75,14 @@ handle_compatibility_check_command(CmdArgs) ->
             LoadTimeout = timer:seconds(LoadTimeoutSecs),
             LogLevel = list_to_atom(StrLogLevel),
             ok = locus_logger:set_loglevel(LogLevel),
-            perform_compatibility_check(DatabaseURL, LoadTimeout);
+            prepare_robustness_analysis(DatabaseURL, LoadTimeout);
         _ ->
-            getopt:usage(OptSpecList, "locus check-compatibility"),
+            getopt:usage(OptSpecList, "locus analyze-robustness"),
             fall_from_grace()
     end.
 
-perform_compatibility_check(DatabaseURL, LoadTimeout) ->
-    DatabaseId = cli_compatibility_check,
+prepare_robustness_analysis(DatabaseURL, LoadTimeout) ->
+    DatabaseId = cli_robustness_check,
     WaitRef = make_ref(),
     BaseOpts = [{async_waiter, {self(),WaitRef}}],
     ExtraOpts =
@@ -91,21 +91,33 @@ perform_compatibility_check(DatabaseURL, LoadTimeout) ->
             {error, _} -> []
         end,
 
+    stderr_println("Loading database from \"~ts\"...", [DatabaseURL]),
     case locus:start_loader(DatabaseId, DatabaseURL, BaseOpts ++ ExtraOpts) of
         ok ->
-            wait_for_compatibility_check_load(DatabaseId, WaitRef, LoadTimeout)
+            wait_for_robustness_analysis_database_load(DatabaseId, WaitRef, LoadTimeout)
     end.
 
-wait_for_compatibility_check_load(DatabaseId, WaitRef, LoadTimeout) ->
+wait_for_robustness_analysis_database_load(DatabaseId, WaitRef, LoadTimeout) ->
     receive
         {WaitRef, {ok, LoadedVersion}} ->
             stderr_println("Database version ~p successfully loaded", [LoadedVersion]),
-            ok = locus:stop_loader(DatabaseId);
+            perform_robustness_analysis(DatabaseId);
         {WaitRef, {error, Reason}} ->
             fall_from_grace("Failed to load database: ~p", [Reason])
     after
         LoadTimeout ->
             fall_from_grace("Timeout loading the database")
+    end.
+
+perform_robustness_analysis(DatabaseId) ->
+    stderr_println("Checking database robustness..."),
+    case locus:analyze_robustness(DatabaseId) of
+        ok ->
+            stderr_println("Database is wholesome.");
+        {error, {frail, Frailties}} ->
+            fall_from_grace("Database is corrupt or incompatible:~n"
+                            ++ lists:flatten(["* ~p~n" || _ <- Frailties]),
+                            Frailties)
     end.
 
 fall_from_grace() ->
@@ -115,8 +127,11 @@ fall_from_grace(MsgFmt) ->
     fall_from_grace(MsgFmt, []).
 
 fall_from_grace(MsgFmt, MsgArgs) ->
-    _ = MsgFmt =/= "" andalso stderr_println(MsgFmt, MsgArgs),
+    _ = MsgFmt =/= "" andalso stderr_println("[ERROR] " ++ MsgFmt, MsgArgs),
     erlang:halt(255, [{flush,true}]).
+
+stderr_println(Fmt) ->
+    stderr_println(Fmt, []).
 
 stderr_println(Fmt, Args) ->
     io:format(standard_error, Fmt ++ "~n", Args).
