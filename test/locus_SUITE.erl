@@ -508,6 +508,10 @@ subscriber_death_test(Config) ->
     ?assertEqual(OriginalPid, LoaderModule:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
+-ifdef(BAD_HTTPC).
+async_waiter_success_test(_Config) ->
+    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
+-else.
 async_waiter_success_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = async_waiter_success_test,
@@ -516,6 +520,7 @@ async_waiter_success_test(Config) ->
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     ?assertRecv({Ref, {ok, _LoadedVersion}}),
     ok = locus:stop_loader(Loader).
+-endif.
 
 async_waiter_failure_test(Config) ->
     BaseURL = proplists:get_value(base_url, Config),
