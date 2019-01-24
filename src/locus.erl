@@ -36,7 +36,7 @@
 -export([get_version/1]).                 -ignore_xref({get_version,1}).
 -export([get_info/1]).                    -ignore_xref({get_info,1}).
 -export([get_info/2]).                    -ignore_xref({get_info,2}).
--export([analyze_robustness/1]).          -ignore_xref({analyze_robustness,1}).
+-export([analyze/1]).                     -ignore_xref({analyze,1}).
 
 -deprecated([{get_version,1,eventually}]).
 
@@ -318,19 +318,19 @@ get_info(DatabaseId, Property) ->
 %% Returns:
 %% <ul>
 %% <li>`ok' if the database is wholesome</li>
-%% <li>`{error, {frail, Frailties]}}' in case of corruption or incompatibility
-%%    (check the @link{locus_mmdb:frailty/0.definition of Frailty} for specifics.)
+%% <li>`{error, {flawed, [Flaw, ...]]}}' in case of corruption or incompatibility
+%%    (check the @link{locus_mmdb:analysis_flaw/0.definition of Flaw} for specifics.)
 %% </li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
 %% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
 %% </ul>
--spec analyze_robustness(DatabaseId) -> ok | {error, Error}
+-spec analyze(DatabaseId) -> ok | {error, Error}
             when DatabaseId :: atom(),
-                 Error :: ({frail, [locus_mmdb:frailty(), ...]} |
+                 Error :: ({flawed, [locus_mmdb:analysis_flaw(), ...]} |
                            database_unknown |
                            database_not_loaded).
-analyze_robustness(DatabaseId) ->
-    locus_mmdb:analyze_robustness(DatabaseId).
+analyze(DatabaseId) ->
+    locus_mmdb:analyze(DatabaseId).
 
 %% ------------------------------------------------------------------
 %% CLI-only Function Definitions
