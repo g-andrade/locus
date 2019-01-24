@@ -41,6 +41,7 @@
 -ifdef(TEST).
 -export([decode_database_parts/2]).
 -export([lookup_/2]).
+-export([analyze_/1]).
 -endif.
 
 %% ------------------------------------------------------------------
