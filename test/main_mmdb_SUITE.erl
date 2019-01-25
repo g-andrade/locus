@@ -21,14 +21,17 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
--module(good_mmdb_SUITE).
+-module(main_mmdb_SUITE).
 -compile(export_all).
 
 -include_lib("eunit/include/eunit.hrl").
 
 -define(PROJECT_ROOT, "../../../../").
--define(TESTS_GROUPS_REL_PATH, "test/MaxMind-DB/source-data/").
+-define(TEST_SOURCES_REL_PATH, "test/MaxMind-DB/source-data/").
 -define(TEST_DBS_REL_PATH, "test/MaxMind-DB/test-data/").
+
+-define(BLACKLIST, ["MaxMind-DB-no-ipv4-search-tree",
+                    "MaxMind-DB-test-metadata-pointers"]).
 
 %% ------------------------------------------------------------------
 %% Setup
@@ -45,16 +48,19 @@ groups() ->
     [].
 -else.
 groups() ->
-    GroupPathsPattern = filename:join([?PROJECT_ROOT, ?TESTS_GROUPS_REL_PATH, "*.json"]),
-    GroupPaths = filelib:wildcard(GroupPathsPattern),
-    lists:map(
-      fun (GroupPath) ->
-              GroupFilename = filename:basename(GroupPath),
-              GroupName = filename:rootname(GroupFilename),
-              Group = list_to_atom(GroupName),
-              {Group, [parallel], test_cases()}
+    DatabasePathsPattern = filename:join([?PROJECT_ROOT, ?TEST_DBS_REL_PATH, "*.mmdb"]),
+    DatabasePaths = filelib:wildcard(DatabasePathsPattern),
+    lists:filtermap(
+      fun (DatabasePath) ->
+              DatabaseFilename = filename:basename(DatabasePath),
+              GroupName = filename:rootname(DatabaseFilename),
+              (not lists:member(GroupName, ?BLACKLIST) andalso
+               begin
+                   Group = list_to_atom(GroupName),
+                   {true, {Group, [parallel], test_cases()}}
+               end)
       end,
-      GroupPaths).
+      DatabasePaths).
 -endif.
 
 test_cases() ->
@@ -67,45 +73,74 @@ init_per_group(Group, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     {ok, _} = application:ensure_all_started(jsx),
     GroupName = atom_to_list(Group),
-    GroupFilename = GroupName ++ ".json",
-    GroupPath = filename:join([?PROJECT_ROOT, ?TESTS_GROUPS_REL_PATH, GroupFilename]),
+    IsBroken = guess_brokenness(GroupName),
+    SourceFilename = GroupName ++ ".json",
+    SourcePath = filename:join([?PROJECT_ROOT, ?TEST_SOURCES_REL_PATH, SourceFilename]),
     DatabaseFilename = GroupName ++ ".mmdb",
     DatabasePath = filename:join([?PROJECT_ROOT, ?TEST_DBS_REL_PATH, DatabaseFilename]),
-    %%
-    {ok, BinGroupDef} = file:read_file(GroupPath),
-    JsonGroupDef = jsx:decode(BinGroupDef, [return_maps]),
-    %%
-    {ok, BinDatabase} = file:read_file(DatabasePath),
-    %%
-    [{json_group_def, JsonGroupDef},
-     {bin_database, BinDatabase}
-     | Config].
 
-end_per_group(_Group, Config) ->
-    Config.
+    {ok, BinDatabase} = file:read_file(DatabasePath),
+    case file:read_file(SourcePath) of
+        {ok, BinGroupDef} when not IsBroken ->
+            JsonGroupDef = jsx:decode(BinGroupDef, [return_maps]),
+            [{json_group_def, JsonGroupDef},
+             {bin_database, BinDatabase}
+             | Config];
+        {error, enoent} ->
+            [{bin_database, BinDatabase},
+             {is_broken, IsBroken}
+             | Config]
+    end.
+
+end_per_group(_Group, _Config) ->
+    ok = application:stop(locus).
 
 %% ------------------------------------------------------------------
 %% Test Cases
 %% ------------------------------------------------------------------
 
 load_database_test(Config) ->
-    ?assertMatch(
-       {#{tree := _} = _DatabaseParts, {{_,_,_},{_,_,_}} = _DatabaseVersion},
-       decode_database_parts(Config)).
+    case lists:member({is_broken,true}, Config) of
+        false ->
+            ?assertMatch(
+               {#{tree := _} = _DatabaseParts, {{_,_,_},{_,_,_}} = _DatabaseVersion},
+               decode_database_parts(Config));
+        true ->
+            ?assertError(
+               _,
+               begin
+                   {DatabaseParts, DatabaseVersion} = decode_database_parts(Config),
+                   ct:pal("Loaded version ~p", [DatabaseVersion]),
+                   ok = locus_mmdb:analyze_([{database,DatabaseParts}])
+               end)
+    end.
 
 expected_lookup_results_test(Config) ->
-    {DatabaseParts, DatabaseVersion} = decode_database_parts(Config),
-    ct:pal("Database version: ~p", [DatabaseVersion]),
-    lists:foreach(
-      fun ({Address, Expectation}) ->
-              Reality = determine_lookup_reality(DatabaseParts, Address),
-              ?assertEqual(Expectation, Reality)
-      end,
-      expected_lookup_results(Config)).
+    case lists:keymember(json_group_def, 1, Config) of
+        true ->
+            {DatabaseParts, DatabaseVersion} = decode_database_parts(Config),
+            ct:pal("Database version: ~p", [DatabaseVersion]),
+            lists:foreach(
+              fun ({Address, Expectation}) ->
+                      Reality = determine_lookup_reality(DatabaseParts, Address),
+                      ?assertEqual(Expectation, Reality)
+              end,
+              expected_lookup_results(Config));
+        false ->
+            {skip, "No source available for comparison."}
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal
 %% ------------------------------------------------------------------
+
+guess_brokenness(GroupName) ->
+    LowerCase = string:lowercase(GroupName),
+    lists:any(
+      fun (Pattern) ->
+              string:str(LowerCase, Pattern) > 0
+      end,
+      ["-broken-", "-invalid-"]).
 
 decode_database_parts(Config) ->
     BinDatabase = proplists:get_value(bin_database, Config),
