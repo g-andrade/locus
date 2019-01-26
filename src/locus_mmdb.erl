@@ -297,7 +297,7 @@ decode_data_payload(Type, Size, Data, Index)
   when Type =:= ?utf8_string ->
     Text = binary:part(Data, {Index, Size}),
     CopiedText = binary:copy(Text),
-    ?assert(is_utf8_text(CopiedText), {not_utf8_text, CopiedText}),
+    ?assert(is_utf8_text(CopiedText), {not_utf8_printable_text, CopiedText}),
     {CopiedText, Index + Size};
 decode_data_payload(Type, Size, Data, Index)
   when (Type =:= ?double andalso Size =:= 8);
