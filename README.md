@@ -92,7 +92,7 @@ ok = locus:start_loader(country, URL).
 1.  [File Formats](#file-formats)
 2.  [Database Types and Loading](#database-types-and-loading)
 3.  [Database Validation](#database-validation)
-4.  [HTTP URLS: Downloading and
+4.  [HTTP URLs: Downloading and
     Updating](#http-urls-downloading-and-updating)
 5.  [HTTP URLs: Caching](#http-urls-caching)
 6.  [Filesystem URLs: Loading and
