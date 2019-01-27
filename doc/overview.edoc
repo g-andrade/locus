@@ -110,14 +110,15 @@ ok = locus:start_loader(country, URL).
 <ul>
 <li>Only gzip-compressed tarballs are supported as of this moment</li>
 <li>The first file to be found, within the tarball, with an .mmdb extension, is the one that's chosen for loading</li>
-<li>The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a> is complete</li>
+<li>The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a>
+is mostly complete</li>
 </ul>
 
 <h5 id="database-types-and-loading">Database Types and Loading</h5>
 
 <ul>
 <li>The free GeoLite2 <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/geolite2/">Country, City and ASN databases</a>
-  were all successfully tested; presumably `locus' can deal with any MaxMind DB -formatted database that maps
+  were all successfully tested; presumably `locus' can deal with any MaxMind DB 2.x database that maps
   IP address prefixes to arbitrary data, but no <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
   commercial databases</a> have yet been tested
   </li>
@@ -135,19 +136,16 @@ function after they've been loaded (see <a href="#api-reference">function refere
 Alternatively, they can also be checked from the command line by use of the `locus' CLI utility:
 <ol>
 <li>Run `make cli' to build the script, named `locus', which will be deployed to the current directory.</li>
-<li>Run analysis:<br/>
-<pre>
-<![CDATA[
+<li>Run analysis:
+<pre lang="shell" class="shell">
 ./locus analyze https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz
 # Loading database from "https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz"...
 # Database version {{2019,1,22},{11,42,28}} successfully loaded
 # Analyzing database for flaws...
 # Database is wholesome.
-]]>
 </pre>
 </li>
 </ol>
-
 The script will exit with code 1 in case of failure, and 0 otherwise.
 Run `./locus analyze --help' for a description of supported options and arguments.
 

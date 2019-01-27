@@ -111,15 +111,15 @@ ok = locus:start_loader(country, URL).
   - The first file to be found, within the tarball, with an .mmdb
     extension, is the one that's chosen for loading
   - The implementation of [MaxMind DB
-    format](https://maxmind.github.io/MaxMind-DB/) is complete
+    format](https://maxmind.github.io/MaxMind-DB/) is mostly complete
 
 ##### Database Types and Loading
 
   - The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
     successfully tested; presumably `locus` can deal with any MaxMind DB
-    -formatted database that maps IP address prefixes to arbitrary data,
-    but no [commercial
+    2.x database that maps IP address prefixes to arbitrary data, but no
+    [commercial
     databases](https://dev.maxmind.com/geoip/geoip2/downloadable/) have
     yet been tested
   - The databases are loaded into memory (mostly) as-is; reference
@@ -140,10 +140,10 @@ the `locus` CLI utility:
 1.  Run `make cli` to build the script, named `locus`, which will be
     deployed to the current directory.
 
-2.  Run analysis:  
+2.  Run
+    analysis:
     
-    ``` 
-    
+    ``` shell
     ./locus analyze https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz
     # Loading database from "https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz"...
     # Database version {{2019,1,22},{11,42,28}} successfully loaded
