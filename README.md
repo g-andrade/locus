@@ -3,10 +3,8 @@
 [![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 [![](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)
 
-### <span id="locus_-_Geolocation_and_ASN_lookup_of_IP_addresses_using_MaxMind_GeoIP2">locus - Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2</span>
-
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
-the country, city or ASN of IPv4 and IPv6 addresses.
+the country, city or ASN of IP addresses using MaxMind GeoIP2.
 
 The free [MaxMind
 databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) you choose
@@ -17,12 +15,12 @@ You're encouraged to host your own private copies of the databases when
 using this library in production, both for reliability and netiquette
 towards MaxMind.
 
-#### <span id="Usage">Usage</span>
+#### Usage
 
 Clone the repository and run `make console` to bring up a
 shell.
 
-##### <span id="1._Start_the_database_loader">1. Start the database loader</span>
+##### 1\. Start the database loader
 
 ``` erlang
 URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
@@ -31,7 +29,7 @@ ok = locus:start_loader(country, URL).
 % URL can also be a local path, e.g. "/opt/MaxMind/GeoLite2-Country.tar.gz"
 ```
 
-##### <span id="2._Wait_for_the_database_to_load_(optional)">2. Wait for the database to load (optional)</span>
+##### 2\. Wait for the database to load (optional)
 
 ``` erlang
 % Either block indefinitely
@@ -43,7 +41,7 @@ ok = locus:start_loader(country, URL).
 {ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 ```
 
-##### <span id="3._Lookup_IP_addresses">3. Lookup IP addresses</span>
+##### 3\. Lookup IP addresses
 
 ``` erlang
 
@@ -89,18 +87,24 @@ ok = locus:start_loader(country, URL).
                   <<"zh-CN">> => <<"美国"/utf8>>}}}}
 ```
 
-#### <span id="Details">Details</span>
+#### Documentation
 
-##### <span id="Requirements">Requirements</span>
+1.  [On Databases](#on-databases)
+2.  [On Formats](#on-formats)
+3.  [On HTTP URLS: Downloading and
+    Updating](#on-http-urls-downloading-and-updating)
+4.  [On HTTP URLs: Caching](#on-http-urls-caching)
+5.  [On Filesystem URLs: Loading and
+    Updating](#on-filesystem-urls-loading-and-updating)
+6.  [Logging](#logging)
+7.  [Event Subscriptions](#event-subscriptions)
+8.  [API Reference](#api-reference)
+9.  [Tested Setup](#tested-setup)
+10. [License](#license)
+11. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
+12. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
 
-  - Erlang/OTP 17.4 or higher
-  - rebar3
-
-##### <span id="Documentation">Documentation</span>
-
-Documentation is hosted on [HexDocs](https://hexdocs.pm/locus/).
-
-##### <span id="Databases">Databases</span>
+##### On Databases
 
   - The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
@@ -115,16 +119,15 @@ Documentation is hosted on [HexDocs](https://hexdocs.pm/locus/).
     addresses. The data for each entry is decoded on the fly upon
     successful lookups.
 
-##### <span id="Formats">Formats</span>
+##### On Formats
 
   - Only gzip-compressed tarballs are supported at this moment
   - The first file to be found, within the tarball, with an .mmdb
     extension, is the one that's chosen for loading
   - The implementation of [MaxMind DB
-    format](https://maxmind.github.io/MaxMind-DB/) is mostly
-complete
+    format](https://maxmind.github.io/MaxMind-DB/) is mostly complete
 
-##### <span id="HTTP_URLs_-_Downloads_and_updates">HTTP URLs - Downloads and updates</span>
+##### On HTTP URLs: Downloading and Updating
 
   - The downloaded tarballs are uncompressed in memory
   - The 'last-modified' response header, if present, is used to
@@ -145,7 +148,7 @@ complete
     hosts, and so on. These checks can be disabled using the `insecure`
     loader option.
 
-##### <span id="HTTP_URLs_-_Caching">HTTP URLs - Caching</span>
+##### On HTTP URLs: Caching
 
   - Caching is a best-effort; the system falls back to relying
     exclusively on the network if needed
@@ -157,10 +160,9 @@ complete
     response header (when present) and used to condition downloads on
     subsequent boots and save bandwidth
   - Caching can be disabled by specifying the `no_cache` option when
-    running
-`:start_loader`
+    running `:start_loader`
 
-##### <span id="File_system_URLs_-_Loads_and_updates">File system URLs - Loads and updates</span>
+##### On Filesystem URLs: Loading and Updating
 
   - The loaded tarballs are uncompressed in memory
   - Until a filesystem database loader achieves readiness, load attempts
@@ -168,7 +170,7 @@ complete
     increases to every 30 seconds and load attempts are dismissed as
     long as the tarball modification timestamp keeps unchanged
 
-##### <span id="Logging">Logging</span>
+##### Logging
 
   - Five logging levels are supported: `debug`, `info`, `warning`,
     `error` and `none`
@@ -179,7 +181,7 @@ complete
     application's `env` config
   - To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
 
-##### <span id="Event_subscription">Event subscription</span>
+##### Event Subscription
 
   - Any number of event subscribers can be attached to a database loader
     by specifying the `{event_subscriber, Subscriber}` option when
@@ -191,38 +193,16 @@ complete
     in the loader pipeline are reported (download started, download
     succeeded, download failed, caching succeeded, loading failed, etc.)
 
-#### <span id="Alternatives_(Erlang)">Alternatives (Erlang)</span>
+##### API Reference
 
-  - [egeoip](https://github.com/mochi/egeoip): IP Geolocation module,
-    currently supporting the MaxMind GeoLite City Database
-  - [geodata2](https://github.com/brigadier/geodata2): Application for
-    working with MaxMind geoip2 (.mmdb) databases
-  - [geoip](https://github.com/manifest/geoip): Returns the location of
-    an IP address; based on the ipinfodb.com web service
-  - [geolite2data](https://hex.pm/packages/geolite2data): Periodically
-    fetches the free MaxMind GeoLite2
-    databases
-  - [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
-    Uses IP2Location geolocation database
+The API reference can be found on [HexDocs](https://hexdocs.pm/locus/).
 
-#### <span id="Alternatives_(Elixir)">Alternatives (Elixir)</span>
+##### Tested setup
 
-  - [asn](https://hex.pm/packages/asn): IP-to-AS-to-ASname lookup
-  - [freegeoip](https://hex.pm/packages/freegeoip): Simple wrapper for
-    freegeoip.net HTTP API
-  - [freegeoipx](https://hex.pm/packages/freegeoipx): API Client for
-    freegeoip.net
-  - [geoip](https://hex.pm/packages/geoip): Lookup the geo location for
-    a given IP address, hostname or Plug.Conn instance
-  - [geolix](https://hex.pm/packages/geolix): MaxMind GeoIP2 database
-    reader/decoder
-  - [plug\_geoip2](https://hex.pm/packages/plug_geoip2): Adds geo
-    location to a Plug connection based upon the client IP address by
-    using MaxMind's GeoIP2 database
-  - [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
-    from a location efficiently using PostGIS and Ecto
+  - Erlang/OTP 17.4 or newer
+  - rebar3
 
-#### <span id="License">License</span>
+##### License
 
 MIT License
 
@@ -251,8 +231,39 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 sponsored, or otherwise approved by MaxMind.
 
 `locus` includes code extracted from OTP source code, by Ericsson AB,
-released under the Apache License
-2.0.
+released under the Apache License 2.0.
+
+##### Alternative Libraries (Erlang)
+
+  - [egeoip](https://github.com/mochi/egeoip): IP Geolocation module,
+    currently supporting the MaxMind GeoLite City Database
+  - [geodata2](https://github.com/brigadier/geodata2): Application for
+    working with MaxMind geoip2 (.mmdb) databases
+  - [geoip](https://github.com/manifest/geoip): Returns the location of
+    an IP address; based on the ipinfodb.com web service
+  - [geolite2data](https://hex.pm/packages/geolite2data): Periodically
+    fetches the free MaxMind GeoLite2
+    databases
+  - [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
+    Uses IP2Location geolocation database
+
+##### Alternative Libraries (Elixir)
+
+  - [asn](https://hex.pm/packages/asn): IP-to-AS-to-ASname lookup
+  - [freegeoip](https://hex.pm/packages/freegeoip): Simple wrapper for
+    freegeoip.net HTTP API
+  - [freegeoipx](https://hex.pm/packages/freegeoipx): API Client for
+    freegeoip.net
+  - [geoip](https://hex.pm/packages/geoip): Lookup the geo location for
+    a given IP address, hostname or Plug.Conn instance
+  - [geolix](https://hex.pm/packages/geolix): MaxMind GeoIP2 database
+    reader/decoder
+  - [plug\_geoip2](https://hex.pm/packages/plug_geoip2): Adds geo
+    location to a Plug connection based upon the client IP address by
+    using MaxMind's GeoIP2 database
+  - [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
+    from a location efficiently using PostGIS and
+Ecto
 
 -----
 
