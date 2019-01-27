@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - new API method for validating the database (`locus:analyze/1`)
 - new command line tool supporting database validation
 - new dependencies:
-    - certifi 2.4.2
-    - ssl_verify_fun 1.1.4
-    - stacktrace_transform 1.0.2
+    - `certifi` 2.4.2
+    - `ssl_verify_fun` 1.1.4
+    - `stacktrace_transform` 1.0.2
 ### Changed
 - safety of database HTTPS downloads was substantially improved
   by now rejecting expired certificates, mismatched certificate hostnames,
