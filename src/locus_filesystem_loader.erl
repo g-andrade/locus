@@ -71,7 +71,7 @@
 
 -type opt() ::
     {event_subscriber, module() | pid()} |
-    internal_opt().
+    {internal, internal_opt()}.
 -export_type([opt/0]).
 
 -opaque internal_opt() ::
@@ -230,7 +230,7 @@ init_opts([{event_subscriber, Pid} | Opts], State) when is_pid(Pid) ->
     UpdatedEventSubscribers = [Pid | EventSubscribers],
     UpdatedState = State#state{ event_subscribers = UpdatedEventSubscribers },
     init_opts(Opts, UpdatedState);
-init_opts([{async_waiter, {Pid,Ref}=From} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
+init_opts([{internal, {async_waiter, {Pid,Ref}=From}} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
     {noreply, NewStateData} = enqueue_waiter(From, StateData),
     init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->

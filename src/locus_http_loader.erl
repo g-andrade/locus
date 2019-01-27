@@ -88,7 +88,7 @@
     {pre_readiness_update_period, pos_integer()} |
     {post_readiness_update_period, pos_integer()} |
     no_cache |
-    internal_opt().
+    {internal, internal_opt()}.
 -export_type([opt/0]).
 
 -opaque internal_opt() ::
@@ -558,7 +558,7 @@ init_opts([no_cache | Opts], StateData) ->
 init_opts([insecure | Opts], StateData) ->
     NewStateData = StateData#{ insecure => true },
     init_opts(Opts, NewStateData);
-init_opts([{async_waiter, {Pid,Ref}=From} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
+init_opts([{internal, {async_waiter, {Pid,Ref}=From}} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
     {NewStateData, []} = enqueue_waiter(From, StateData),
     init_opts(Opts, NewStateData);
 init_opts([InvalidOpt | _], _StateData) ->
