@@ -88,8 +88,12 @@
     {pre_readiness_update_period, pos_integer()} |
     {post_readiness_update_period, pos_integer()} |
     no_cache |
-    {async_waiter, {pid(),reference()}}.
+    internal_opt().
 -export_type([opt/0]).
+
+-opaque internal_opt() ::
+    {async_waiter, {pid(),reference()}}.
+-export_type([internal_opt/0]).
 
 -ifdef(POST_OTP_18).
 -type state_data() ::

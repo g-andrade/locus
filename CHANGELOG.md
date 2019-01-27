@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - new API method for detecting database corruption or incompatibility (`locus:analyze/1`)
 - new command line tool for checking for database corruption or incompatibility
-- ability of waiting asynchronously for the result of database loader first attempts
 - three new dependencies:
     - certifi 2.4.2
     - ssl_verify_fun 1.1.4

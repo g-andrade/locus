@@ -71,8 +71,12 @@
 
 -type opt() ::
     {event_subscriber, module() | pid()} |
-    {async_waiter, {pid(),reference()}}.
+    internal_opt().
 -export_type([opt/0]).
+
+-opaque internal_opt() ::
+    {async_waiter, {pid(),reference()}}.
+-export_type([internal_opt/0]).
 
 -record(state, {
           id :: atom(),
