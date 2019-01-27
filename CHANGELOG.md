@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - documentation was mildly improved
 ### Fixed
 - misguided rejection of non-printable (but valid) codepoints in UTF-8 strings
+- unnecessarily strict refusal to load 2.x database formats above 2.0
 
 ## [1.5.1] - 2019-01-19
 ### Fixed

@@ -275,7 +275,7 @@ decode_database_parts(BinDatabase, Source) ->
     BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
     FmtMajorVersion = maps:get(<<"binary_format_major_version">>, Metadata),
     FmtMinorVersion = maps:get(<<"binary_format_minor_version">>, Metadata),
-    ?assert(is_known_database_format(FmtMajorVersion, FmtMinorVersion),
+    ?assert(is_known_database_format(FmtMajorVersion),
             {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
     TreeSize = ((RecordSize * 2) div 8) * NodeCount,
     <<Tree:TreeSize/bytes, 0:128, DataSection/bytes>> = TreeAndDataSection,
@@ -291,9 +291,8 @@ decode_metadata(BinMetadata) ->
     {Metadata, _FinalChunk} = consume_data_section_on_index(BinMetadata, 0),
     Metadata.
 
-is_known_database_format(FmtMajorVersion, FmtMinorVersion) ->
-    lists:member({FmtMajorVersion, FmtMinorVersion},
-                 [{2,0}]).
+is_known_database_format(FmtMajorVersion) ->
+    FmtMajorVersion =:= 2.
 
 -spec epoch_to_datetime(integer()) -> calendar:datetime().
 epoch_to_datetime(Epoch) ->
