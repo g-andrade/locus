@@ -6,25 +6,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## UNRELEASED
 ### Added
-- new API method for detecting database corruption or incompatibility (`locus:analyze/1`)
-- new command line tool for checking for database corruption or incompatibility
-- three new dependencies:
+- new API method for validating the database (`locus:analyze/1`)
+- new command line tool supporting database validation
+- new dependencies:
     - certifi 2.4.2
     - ssl_verify_fun 1.1.4
     - stacktrace_transform 1.0.2
 ### Changed
-- when loading databases using HTTPS, the load attempt will now fail
-  under any of the following conditions:
-    - the server certificate has expired
-    - the server certificate does not pertain to the hostname in the URL
-    - the server certificate is self-signed
-    - the server certificate was signed by an unknown CA
-- test coverage using MaxMind`s own test data was greatly extended
+- safety of database HTTPS downloads was substantially improved
+  by rejecting expired certificates, mismatched certificate hostnames,
+  self-signed certificates or unknown certificate authorities
+- test coverage using MaxMind`s test data was greatly extended
 - database decoder was thoroughly optimized
 - documentation was mildly improved
 ### Fixed
 - misguided rejection of non-printable (but valid) codepoints in UTF-8 strings
-- unnecessarily strict refusal to load 2.x database formats above 2.0
+- unnecessarily strict refusal to load 2.x database formats succeeding 2.0
 
 ## [1.5.1] - 2019-01-19
 ### Fixed
