@@ -1,4 +1,4 @@
-%% Copyright (c) 2018 Guilherme Andrade
+%% Copyright (c) 2018-2019 Guilherme Andrade
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -20,6 +20,9 @@
 %%
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
+%%
+%% locus includes code extracted from OTP source code, by Ericsson AB,
+%% released under the Apache License 2.0.
 
 -module(main_mmdb_SUITE).
 -compile(export_all).
