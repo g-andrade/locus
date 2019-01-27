@@ -44,11 +44,11 @@ xref: $(REBAR3)
 
 test: $(REBAR3) cli
 	@$(REBAR3) ct
-	./locus analyze test/priv/GeoLite2-Country.tar.gz
+	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 travis_test: $(REBAR3) cli
 	@$(REBAR3) as travis_test ct
-	./locus analyze test/priv/GeoLite2-Country.tar.gz
+	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 cover: $(REBAR3) test
 	@$(REBAR3) cover
