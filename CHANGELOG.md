@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - new API method for detecting database corruption or incompatibility (`locus:analyze/1`)
 - new command line tool for checking for database corruption or incompatibility
 - ability of waiting asynchronously for the result of database loader first attempts
-- two new dependencies:
-    - certifi
-    - ssl_verify_fun
+- three new dependencies:
+    - certifi 2.4.2
+    - ssl_verify_fun 1.1.4
+    - stacktrace_transform 1.0.2
 ### Changed
 - when loading databases using HTTPS, the load attempt will now fail
   under any of the following conditions:
