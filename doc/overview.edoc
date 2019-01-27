@@ -203,7 +203,7 @@ Run `./locus analyze --help' for a description of supported options and argument
 <li>To tweak the log level in runtime, use `locus_logger:set_loglevel/1'</li>
 </ul>
 
-<h5 id="event-subscriptions">Event Subscription</h5>
+<h5 id="event-subscriptions">Event Subscriptions</h5>
 
 <ul>
 <li>Any number of event subscribers can be attached to a database loader by specifying the `{event_subscriber, Subscriber}'

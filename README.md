@@ -210,7 +210,7 @@ arguments.
     application's `env` config
   - To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
 
-##### Event Subscription
+##### Event Subscriptions
 
   - Any number of event subscribers can be attached to a database loader
     by specifying the `{event_subscriber, Subscriber}` option when
