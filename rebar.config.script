@@ -6,10 +6,15 @@ case erlang:function_exported(rebar3, main, 1) of
     false ->
         % rebar 2.x
         OverridenDeps =
-            [{certifi, ".*", {git, "https://github.com/certifi/erlang-certifi.git", {tag, "2.4.2"}}},
+            [{certifi, ".*", {git, "https://github.com/certifi/erlang-certifi.git",
+                              {tag, "2.4.2"}}},
              %% XXX we don't actually need parse_trans, but certifi imports it
              %% from hex.pm, which would make it impossible to build it on rebar 2.
-             {parse_trans, ".*", {git, "https://github.com/uwiger/parse_trans.git", {tag, "3.3.0"}}},
-             {ssl_verify_fun, ".*", {git, "https://github.com/deadtrickster/ssl_verify_fun.erl.git", {tag, "1.1.4"}}}],
+             {parse_trans, ".*", {git, "https://github.com/uwiger/parse_trans.git",
+                                  {tag, "3.3.0"}}},
+             {ssl_verify_fun, ".*", {git, "https://github.com/deadtrickster/ssl_verify_fun.erl.git",
+                                     {tag, "1.1.4"}}},
+             {stacktrace_compat, ".*", {git, "https://github.com/g-andrade/stacktrace_compat.git",
+                                        {tag, "1.0.2"}}}],
         lists:keystore(deps, 1, CONFIG)
 end.
