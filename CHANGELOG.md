@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     - stacktrace_transform 1.0.2
 ### Changed
 - safety of database HTTPS downloads was substantially improved
-  by rejecting expired certificates, mismatched certificate hostnames,
+  by now rejecting expired certificates, mismatched certificate hostnames,
   self-signed certificates or unknown certificate authorities
 - test coverage using MaxMind`s test data was greatly extended
 - database decoder was thoroughly optimized
