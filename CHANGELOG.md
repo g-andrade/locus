@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - misguided rejection of UTF-8 strings with non-printable (but valid) codepoints
 - unnecessarily strict refusal to load 2.x database formats succeeding 2.0
 ### Security
-- safety of database HTTPS downloads was substantially increased by now
+- safety of database HTTPS downloads was substantially improved by now
   rejecting expired certificates, mismatched hostnames, self-signed
   certificates or unknown certificate authorities
 - infinite recursion in maliciously crafted databases due to
