@@ -322,7 +322,7 @@ get_info(DatabaseId, Property) ->
 %% <ul>
 %% <li>`ok' if the database is wholesome</li>
 %% <li>`{error, {flawed, [Flaw, ...]]}}' in case of corruption or incompatibility
-%%    (check the @link{locus_mmdb:analysis_flaw/0.definition of Flaw} for specifics.)
+%%    (see the definition of {@link locus_mmdb:analysis_flaw/0})
 %% </li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
 %% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>

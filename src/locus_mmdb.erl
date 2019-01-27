@@ -24,9 +24,7 @@
 %% locus includes code extracted from OTP source code, by Ericsson AB,
 %% released under the Apache License 2.0.
 
-%% @reference
-%%
-%% * [MaxMind DB File Format Specification](https://maxmind.github.io/MaxMind-DB/)
+%% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
 
 -module(locus_mmdb).
 
@@ -265,6 +263,7 @@ table_name(Id) ->
     list_to_atom("locus_mmdb_" ++ atom_to_list(Id)).
 
 -spec decode_database_parts(bin_database(), source()) -> {parts(), calendar:datetime()}.
+%% @private
 decode_database_parts(BinDatabase, Source) ->
     BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
     {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
@@ -496,6 +495,7 @@ ip_address_to_bitstring({A,B,C,D,E,F,G,H}, DatabaseParts) ->
         6 -> {ok, <<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>>, 0}
     end.
 
+%% @private
 lookup_(false, _Address) ->
     {error, database_unknown};
 lookup_([] = _DatabaseLookup, _Address) ->
@@ -574,6 +574,7 @@ ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 128 ->
 %% Internal Function Definitions - Analysis
 %% ------------------------------------------------------------------
 
+%% @private
 analyze_(false) ->
     {error, database_unknown};
 analyze_([]) ->

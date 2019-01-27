@@ -89,22 +89,31 @@ ok = locus:start_loader(country, URL).
 
 #### Documentation
 
-1.  [On Databases](#on-databases)
-2.  [On Formats](#on-formats)
-3.  [On HTTP URLS: Downloading and
-    Updating](#on-http-urls-downloading-and-updating)
-4.  [On HTTP URLs: Caching](#on-http-urls-caching)
-5.  [On Filesystem URLs: Loading and
-    Updating](#on-filesystem-urls-loading-and-updating)
-6.  [Logging](#logging)
-7.  [Event Subscriptions](#event-subscriptions)
-8.  [API Reference](#api-reference)
-9.  [Tested Setup](#tested-setup)
-10. [License](#license)
-11. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
-12. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
+1.  [File Formats](#file-formats)
+2.  [Database Types and Loading](#database-types-and-loading)
+3.  [Database Validation](#database-validation)
+4.  [HTTP URLS: Downloading and
+    Updating](#http-urls-downloading-and-updating)
+5.  [HTTP URLs: Caching](#http-urls-caching)
+6.  [Filesystem URLs: Loading and
+    Updating](#filesystem-urls-loading-and-updating)
+7.  [Logging](#logging)
+8.  [Event Subscriptions](#event-subscriptions)
+9.  [API Reference](#api-reference)
+10. [Tested Setup](#tested-setup)
+11. [License](#license)
+12. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
+13. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
 
-##### On Databases
+##### File Formats
+
+  - Only gzip-compressed tarballs are supported as of this moment
+  - The first file to be found, within the tarball, with an .mmdb
+    extension, is the one that's chosen for loading
+  - The implementation of [MaxMind DB
+    format](https://maxmind.github.io/MaxMind-DB/) is complete
+
+##### Database Types and Loading
 
   - The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
@@ -119,19 +128,38 @@ ok = locus:start_loader(country, URL).
     addresses. The data for each entry is decoded on the fly upon
     successful lookups.
 
-##### On Formats
+##### Database Validation
 
-  - Only gzip-compressed tarballs are supported at this moment
-  - The first file to be found, within the tarball, with an .mmdb
-    extension, is the one that's chosen for loading
-  - The implementation of [MaxMind DB
-    format](https://maxmind.github.io/MaxMind-DB/) is mostly complete
+Databases, local or remote, can have their compatibility validated
+through the `locus:analyze/1` function after they've been loaded (see
+[function reference](#api-reference).)
 
-##### On HTTP URLs: Downloading and Updating
+Alternatively, they can also be checked from the command line by use of
+the `locus` CLI utility:
+
+1.  Run `make cli` to build the script, named `locus`, which will be
+    deployed to the current directory.
+
+2.  Run analysis:  
+    
+    ``` 
+    
+    ./locus analyze https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz
+    # Loading database from "https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz"...
+    # Database version {{2019,1,22},{11,42,28}} successfully loaded
+    # Analyzing database for flaws...
+    # Database is wholesome.
+    ```
+
+The script will exit with code 1 in case of failure, and 0 otherwise.
+Run `./locus analyze --help` for a description of supported options and
+arguments.
+
+##### HTTP URLs: Downloading and Updating
 
   - The downloaded tarballs are uncompressed in memory
-  - The 'last-modified' response header, if present, is used to
-    condition subsequent download attempts (using 'if-modified-since'
+  - The `last-modified` response header, if present, is used to
+    condition subsequent download attempts (using `if-modified-since`
     request headers) in order to save bandwidth
   - The downloaded tarballs are cached on the filesystem in order to
     more quickly achieve readiness on future launches of the database
@@ -139,8 +167,8 @@ ok = locus:start_loader(country, URL).
   - Until a HTTP database loader achieves readiness, download attempts
     are made every minute; once readiness is achieved (either from cache
     or network), this interval increases to every 6 hours. These can be
-    tweaked using the 'pre\_readiness\_update\_period' and
-    'post\_readiness\_update\_period' loader settings (in milliseconds.)
+    tweaked using the `pre_readiness_update_period` and
+    `post_readiness_update_period` loader settings (in milliseconds.)
   - When downloading from a HTTPS URL, the remote certificate will be
     authenticated against a [list of known
     CAs](https://github.com/certifi/erlang-certifi) and connection
@@ -148,21 +176,21 @@ ok = locus:start_loader(country, URL).
     hosts, and so on. These checks can be disabled using the `insecure`
     loader option.
 
-##### On HTTP URLs: Caching
+##### HTTP URLs: Caching
 
   - Caching is a best-effort; the system falls back to relying
     exclusively on the network if needed
-  - A caching directory named 'locus\_erlang' is created under the
+  - A caching directory named `locus_erlang` is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
   - Cached tarballs are named after the SHA256 hash of their source URL
-  - Modification time of the tarballs is extracted from 'last-modified'
+  - Modification time of the tarballs is extracted from `last-modified`
     response header (when present) and used to condition downloads on
     subsequent boots and save bandwidth
   - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
 
-##### On Filesystem URLs: Loading and Updating
+##### Filesystem URLs: Loading and Updating
 
   - The loaded tarballs are uncompressed in memory
   - Until a filesystem database loader achieves readiness, load attempts

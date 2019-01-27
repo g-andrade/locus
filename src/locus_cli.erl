@@ -131,7 +131,7 @@ fall_from_grace(MsgFmt) ->
 
 fall_from_grace(MsgFmt, MsgArgs) ->
     _ = MsgFmt =/= "" andalso stderr_println("[ERROR] " ++ MsgFmt, MsgArgs),
-    erlang:halt(255, [{flush,true}]).
+    erlang:halt(1, [{flush,true}]).
 
 stderr_println(Fmt) ->
     stderr_println(Fmt, []).
