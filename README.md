@@ -170,10 +170,11 @@ arguments.
     tweaked using the `pre_readiness_update_period` and
     `post_readiness_update_period` loader settings (in milliseconds.)
   - When downloading from a HTTPS URL, the remote certificate will be
-    authenticated against a [list of known
-    CAs](https://github.com/certifi/erlang-certifi) and connection
-    negotiation will fail in case of expired certificates, mismatched
-    hosts, and so on. These checks can be disabled using the `insecure`
+    authenticated against a [list of known Certificate
+    Authorities](https://github.com/certifi/erlang-certifi) and
+    connection negotiation will fail in case of an expired certificate,
+    mismatched hostname, self-signed certificate or unknown certificate
+    authority. These checks can be disabled by specifying the `insecure`
     loader option.
 
 ##### HTTP URLs: Caching
