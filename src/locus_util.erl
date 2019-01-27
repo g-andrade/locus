@@ -44,20 +44,8 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
--define(is_ip_address(V), (?is_ip4_address((V)) orelse ?is_ip6_address((V)))).
-
--define(is_ip4_address(V), (is_tuple((V)) andalso tuple_size((V)) =:= 4 andalso
-                            ?is_uint8(element(1, ((V)))) andalso ?is_uint8(element(2, (V))) andalso
-                            ?is_uint8(element(3, ((V)))) andalso ?is_uint8(element(4, (V))))).
-
--define(is_ip6_address(V), (is_tuple((V)) andalso tuple_size((V)) =:= 8 andalso
-                            ?is_uint16(element(1, ((V)))) andalso ?is_uint16(element(2, (V))) andalso
-                            ?is_uint16(element(3, ((V)))) andalso ?is_uint16(element(4, (V))) andalso
-                            ?is_uint16(element(5, ((V)))) andalso ?is_uint16(element(7, (V))) andalso
-                            ?is_uint16(element(6, ((V)))) andalso ?is_uint16(element(8, (V))))).
-
--define(is_uint8(V), (is_integer((V)) andalso ((V) band 16#FF =:= (V)))).
--define(is_uint16(V), (is_integer((V)) andalso ((V) band 16#FFFF =:= (V)))).
+-define(is_uint8(V), ((V) band 16#FF =:= (V))).
+-define(is_uint16(V), ((V) band 16#FFFF =:= (V))).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -105,7 +93,12 @@ load_database_from_tarball(Id, Tarball, Source) ->
 
 -spec parse_ip_address(binary() | string() | inet:ip_address())
         -> {ok, inet:ip_address()} | {error, einval}.
-parse_ip_address(Address) when ?is_ip_address(Address) ->
+parse_ip_address({A,B,C,D} = Address)
+  when ?is_uint8(A), ?is_uint8(B), ?is_uint8(C), ?is_uint8(D) ->
+    {ok, Address};
+parse_ip_address({A,B,C,D,E,F,G,H} = Address)
+  when ?is_uint16(A), ?is_uint16(B), ?is_uint16(C), ?is_uint16(D),
+       ?is_uint16(E), ?is_uint16(F), ?is_uint16(G), ?is_uint16(H) ->
     {ok, Address};
 parse_ip_address(Binary) when is_binary(Binary) ->
     String = binary_to_list(Binary),
