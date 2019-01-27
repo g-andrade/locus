@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - misguided rejection of non-printable (but valid) codepoints in UTF-8 strings
 - unnecessarily strict refusal to load 2.x database formats succeeding 2.0
+- chance of infinite recursion in databases maliciously crafted with circular paths
 
 ## [1.5.1] - 2019-01-19
 ### Fixed

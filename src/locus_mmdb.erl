@@ -300,22 +300,30 @@ epoch_to_datetime(Epoch) ->
     calendar:gregorian_seconds_to_datetime(GregorianEpoch + Epoch).
 
 consume_data_section_on_index(DataSection, Index) ->
-    Chunk = binary:part(DataSection, {Index, byte_size(DataSection) - Index}),
-    consume_data_section_chunk(DataSection, Chunk).
+    consume_data_section_on_index(DataSection, [], Index).
 
-consume_data_section_chunk(DataSection, Chunk) ->
+consume_data_section_on_index(DataSection, Path, Index) ->
+    Chunk = binary:part(DataSection, {Index, byte_size(DataSection) - Index}),
+    UpdatedPath = [Index | Path],
+    case lists:member(Index, Path) of
+        true -> error({circular_path, UpdatedPath});
+        _ ->
+            consume_data_section_chunk(DataSection, UpdatedPath, Chunk)
+    end.
+
+consume_data_section_chunk(DataSection, Path, Chunk) ->
     case Chunk of
         <<?pointer:3, 0:2, Pointer:11, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, Pointer),
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer),
             {Value, Remaining};
         <<?pointer:3, 1:2, Pointer:19, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, Pointer + 2048),
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer + 2048),
             {Value, Remaining};
         <<?pointer:3, 2:2, Pointer:27, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, Pointer + 526336),
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer + 526336),
             {Value, Remaining};
         <<?pointer:3, _:5, Pointer:32, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, Pointer),
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer),
             {Value, Remaining};
         %
         <<?utf8_string:3, Size:5, Remaining/bytes>> when Size < 29 ->
@@ -347,13 +355,13 @@ consume_data_section_chunk(DataSection, Chunk) ->
             {Integer, Remaining};
         %
         <<?map:3, Size:5, Remaining/bytes>> when Size < 29 ->
-            consume_map(DataSection, Size, Remaining);
+            consume_map(DataSection, Path, Size, Remaining);
         <<?map:3, 29:5, BaseSize, Remaining/bytes>> ->
-            consume_map(DataSection, 29 + BaseSize, Remaining);
+            consume_map(DataSection, Path, 29 + BaseSize, Remaining);
         <<?map:3, 30:5, BaseSize:16, Remaining/bytes>> ->
-            consume_map(DataSection, 285 + BaseSize, Remaining);
+            consume_map(DataSection, Path, 285 + BaseSize, Remaining);
         <<?map:3, _:5, BaseSize:24, Remaining/bytes>> ->
-            consume_map(DataSection, 65821 + BaseSize, Remaining);
+            consume_map(DataSection, Path, 65821 + BaseSize, Remaining);
         %
         <<0:3, Size:5, ?extended_int32, Integer:Size/signed-integer-unit:8, Remaining/bytes>>
           when Size =< 4 ->
@@ -366,13 +374,13 @@ consume_data_section_chunk(DataSection, Chunk) ->
             {Integer, Remaining};
         %
         <<0:3, Size:5, ?extended_array, Remaining/bytes>> when Size < 29 ->
-            consume_array(DataSection, Size, Remaining);
+            consume_array(DataSection, Path, Size, Remaining);
         <<0:3, 29:5, ?extended_array, BaseSize, Remaining/bytes>> ->
-            consume_array(DataSection, 29 + BaseSize, Remaining);
+            consume_array(DataSection, Path, 29 + BaseSize, Remaining);
         <<0:3, 30:5, ?extended_array, BaseSize:16, Remaining/bytes>> ->
-            consume_array(DataSection, 285 + BaseSize, Remaining);
+            consume_array(DataSection, Path, 285 + BaseSize, Remaining);
         <<0:3, _:5, ?extended_array, BaseSize:24, Remaining/bytes>> ->
-            consume_array(DataSection, 65821 + BaseSize, Remaining);
+            consume_array(DataSection, Path, 65821 + BaseSize, Remaining);
         %
         <<0:3, 0:5, ?extended_data_cache_container, _/bytes>> ->
             error({unexpected_marker, data_cache_container});
@@ -402,34 +410,37 @@ consume_bytes(Size, Chunk) ->
     CopiedBytes = binary:copy(Bytes),
     {CopiedBytes, Remaining}.
 
-consume_map(DataSection, Size, Chunk) ->
-    consume_map_recur(DataSection, Size, Chunk, []).
+consume_map(DataSection, Path, Size, Chunk) ->
+    consume_map_recur(DataSection, Path, Size, Chunk, []).
 
-consume_map_recur(_DataSection, 0, Remaining, KvAcc) ->
+consume_map_recur(_DataSection, _Path, 0, Remaining, KvAcc) ->
     case lists:ukeysort(1, KvAcc) of
         SortedKvAcc when length(SortedKvAcc) =:= length(KvAcc) ->
             Map = maps:from_list(SortedKvAcc),
             {Map, Remaining}
     end;
-consume_map_recur(DataSection, Size, Chunk, KvAcc) ->
+consume_map_recur(DataSection, Path, Size, Chunk, KvAcc) ->
     {Key, Chunk2} = consume_map_key(DataSection, Chunk),
-    {Value, Chunk3} = consume_data_section_chunk(DataSection, Chunk2),
+    {Value, Chunk3} = consume_data_section_chunk(DataSection, Path, Chunk2),
     UpdatedKvAcc = [{Key,Value} | KvAcc],
-    consume_map_recur(DataSection, Size - 1, Chunk3, UpdatedKvAcc).
+    consume_map_recur(DataSection, Path, Size - 1, Chunk3, UpdatedKvAcc).
 
 consume_map_key(DataSection, Chunk) ->
+    consume_map_key(DataSection, [], Chunk).
+
+consume_map_key(DataSection, Path, Chunk) ->
     case Chunk of
         <<?pointer:3, 0:2, Pointer:11, Remaining/bytes>> ->
-            {Value, _} = consume_map_key_on_index(DataSection, Pointer),
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer),
             {Value, Remaining};
         <<?pointer:3, 1:2, Pointer:19, Remaining/bytes>> ->
-            {Value, _} = consume_map_key_on_index(DataSection, Pointer + 2048),
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer + 2048),
             {Value, Remaining};
         <<?pointer:3, 2:2, Pointer:27, Remaining/bytes>> ->
-            {Value, _} = consume_map_key_on_index(DataSection, Pointer + 526336),
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer + 526336),
             {Value, Remaining};
         <<?pointer:3, _:5, Pointer:32, Remaining/bytes>> ->
-            {Value, _} = consume_map_key_on_index(DataSection, Pointer),
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer),
             {Value, Remaining};
         %
         <<?utf8_string:3, Size:5, Remaining/bytes>> when Size < 29 ->
@@ -442,20 +453,25 @@ consume_map_key(DataSection, Chunk) ->
             consume_utf8_string(65821 + BaseSize, Remaining)
     end.
 
-consume_map_key_on_index(DataSection, Index) ->
-    <<_:Index/bytes, Chunk/bytes>> = DataSection,
-    consume_map_key(DataSection, Chunk).
+consume_map_key_on_index(DataSection, Path, Index) ->
+    UpdatedPath = [Index | Path],
+    case lists:member(Index, Path) of
+        true -> error({circular_path, UpdatedPath});
+        _ ->
+            <<_:Index/bytes, Chunk/bytes>> = DataSection,
+            consume_map_key(DataSection, UpdatedPath, Chunk)
+    end.
 
-consume_array(DataSection, Size, Chunk) ->
-    consume_array_recur(DataSection, Size, Chunk, []).
+consume_array(DataSection, Path, Size, Chunk) ->
+    consume_array_recur(DataSection, Path, Size, Chunk, []).
 
-consume_array_recur(_DataSection, 0, Remaining, RevAcc) ->
+consume_array_recur(_DataSection, _Path, 0, Remaining, RevAcc) ->
     List = lists:reverse(RevAcc),
     {List, Remaining};
-consume_array_recur(DataSection, Size, Chunk, RevAcc) ->
-    {Value, Remaining} = consume_data_section_chunk(DataSection, Chunk),
+consume_array_recur(DataSection, Path, Size, Chunk, RevAcc) ->
+    {Value, Remaining} = consume_data_section_chunk(DataSection, Path, Chunk),
     UpdatedRevAcc = [Value | RevAcc],
-    consume_array_recur(DataSection, Size - 1, Remaining, UpdatedRevAcc).
+    consume_array_recur(DataSection, Path, Size - 1, Remaining, UpdatedRevAcc).
 
 find_ipv4_root_index(_Tree, #{ <<"ip_version">> := 4 } = _Metadata) ->
     0;
