@@ -123,13 +123,23 @@
         data_record_decoding_failed().
 -export_type([analysis_flaw/0]).
 
+-ifdef(POST_OTP_18).
 -type max_depth_exceeded() ::
         {max_depth_exceeded, #{ tree_prefix := {inet:ip_address(), 0..128},
                                 node_index := non_neg_integer(),
                                 depth := 33 | 129
                               }}.
 -export_type([max_depth_exceeded/0]).
+-else.
+-type max_depth_exceeded() ::
+        {max_depth_exceeded, #{ tree_prefix => {inet:ip_address(), 0..128},
+                                node_index => non_neg_integer(),
+                                depth => 33 | 129
+                              }}.
+-export_type([max_depth_exceeded/0]).
+-endif.
 
+-ifdef(POST_OTP_18).
 -type node_dereference_failed() ::
         {node_dereference_failed, #{ tree_prefix := {inet:ip_address(), 0..128},
                                      node_index := non_neg_integer(),
@@ -137,14 +147,33 @@
                                      reason := term()
                                    }}.
 -export_type([node_dereference_failed/0]).
+-else.
+-type node_dereference_failed() ::
+        {node_dereference_failed, #{ tree_prefix => {inet:ip_address(), 0..128},
+                                     node_index => non_neg_integer(),
+                                     class => error | throw | exit,
+                                     reason => term()
+                                   }}.
+-export_type([node_dereference_failed/0]).
+-endif.
 
+-ifdef(POST_OTP_18).
 -type bad_record_data_type() ::
          {bad_record_data_type, #{ data_index := non_neg_integer(),
                                    data_record := term(),
                                    tree_prefixes := [{inet:ip_address(), 0..128}, ...]
                                  }}.
 -export_type([bad_record_data_type/0]).
+-else.
+-type bad_record_data_type() ::
+         {bad_record_data_type, #{ data_index => non_neg_integer(),
+                                   data_record => term(),
+                                   tree_prefixes => [{inet:ip_address(), 0..128}, ...]
+                                 }}.
+-export_type([bad_record_data_type/0]).
+-endif.
 
+-ifdef(POST_OTP_18).
 -type data_record_decoding_failed() ::
         {data_record_decoding_failed, #{ data_index := non_neg_integer(),
                                          class := error | throw | exit,
@@ -152,6 +181,15 @@
                                          tree_prefixes := [{inet:ip_address(), 0..128}, ...]
                                        }}.
 -export_type([data_record_decoding_failed/0]).
+-else.
+-type data_record_decoding_failed() ::
+        {data_record_decoding_failed, #{ data_index => non_neg_integer(),
+                                         class => error | throw | exit,
+                                         reason => term(),
+                                         tree_prefixes => [{inet:ip_address(), 0..128}, ...]
+                                       }}.
+-export_type([data_record_decoding_failed/0]).
+-endif.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
