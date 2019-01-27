@@ -354,7 +354,7 @@ parse_url(DatabaseURL) ->
             parse_filesystem_url(DatabaseURL)
     end.
 
-parse_http_url(<<Binary/binary>>) ->
+parse_http_url(Binary) when is_binary(Binary) ->
     String = binary_to_list(Binary),
     parse_http_url(String);
 parse_http_url(String) ->

@@ -26,7 +26,6 @@
 %% * [MaxMind DB File Format Specification](https://maxmind.github.io/MaxMind-DB/)
 
 -module(locus_mmdb).
--compile([inline_list_funcs]).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -55,15 +54,16 @@
 -define(bytes, 4).
 -define(uint16, 5).
 -define(uint32, 6).
--define(int32, 8).
--define(uint64, 9).
--define(uint128, 10).
 -define(map, 7).
--define(array, 11).
--define(data_cache_container, 12).
--define(end_marker, 13).
--define(boolean, 14).
--define(float, 15).
+
+-define(extended_int32, 1).
+-define(extended_uint64, 2).
+-define(extended_uint128, 3).
+-define(extended_array, 4).
+-define(extended_data_cache_container, 5).
+-define(extended_end_marker, 6).
+-define(extended_boolean, 7).
+-define(extended_float, 8).
 
 -define(assert(Cond, Error), ((Cond) orelse error((Error)))).
 
@@ -212,7 +212,7 @@ analyze(Id) ->
     analyze_(DatabaseLookup).
 
 %% ------------------------------------------------------------------
-%% Internal Function Definitions - Initialization
+%% Internal Function Definitions - Initialization and Data Decoding
 %% ------------------------------------------------------------------
 
 -spec table_name(atom()) -> atom().
@@ -223,7 +223,7 @@ table_name(Id) ->
 decode_database_parts(BinDatabase, Source) ->
     BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
     {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
-    <<TreeAndDataSection:BinMetadataStart/binary, ?METADATA_MARKER, BinMetadata/binary>>
+    <<TreeAndDataSection:BinMetadataStart/bytes, ?METADATA_MARKER, BinMetadata/bytes>>
         = BinDatabase,
     Metadata = decode_metadata(BinMetadata),
     RecordSize = maps:get(<<"record_size">>, Metadata),
@@ -234,7 +234,7 @@ decode_database_parts(BinDatabase, Source) ->
     ?assert(is_known_database_format(FmtMajorVersion, FmtMinorVersion),
             {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
     TreeSize = ((RecordSize * 2) div 8) * NodeCount,
-    <<Tree:TreeSize/binary, 0:128, DataSection/binary>> = TreeAndDataSection,
+    <<Tree:TreeSize/bytes, 0:128, DataSection/bytes>> = TreeAndDataSection,
     IPv4RootIndex = find_ipv4_root_index(Tree, Metadata),
     Version = epoch_to_datetime(BuildEpoch),
     DatabaseParts = #{ tree => Tree, data_section => DataSection,
@@ -244,7 +244,7 @@ decode_database_parts(BinDatabase, Source) ->
 
 -spec decode_metadata(binary()) -> metadata().
 decode_metadata(BinMetadata) ->
-    {Metadata, _FinalIndex} = decode_data(BinMetadata, 0),
+    {Metadata, _FinalChunk} = consume_data_section_on_index(BinMetadata, 0),
     Metadata.
 
 is_known_database_format(FmtMajorVersion, FmtMinorVersion) ->
@@ -256,113 +256,163 @@ epoch_to_datetime(Epoch) ->
     GregorianEpoch = calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
     calendar:gregorian_seconds_to_datetime(GregorianEpoch + Epoch).
 
-decode_data(Data, Index) ->
-    case binary:part(Data, {Index,1}) of
-        <<0:3, SizeTag:5>> ->
-            ExtendedType = binary:at(Data, Index + 1),
-            Type = 7 + ExtendedType,
-            NewIndex = Index + 2,
-            decode_data_payload_size(Type, SizeTag, Data, NewIndex);
-        <<Type:3, SizeTag:5>> ->
-            NewIndex = Index + 1,
-            decode_data_payload_size(Type, SizeTag, Data, NewIndex)
+consume_data_section_on_index(DataSection, Index) ->
+    Chunk = binary:part(DataSection, {Index, byte_size(DataSection) - Index}),
+    consume_data_section_chunk(DataSection, Chunk).
+
+consume_data_section_chunk(DataSection, Chunk) ->
+    case Chunk of
+        <<?pointer:3, 0:2, Pointer:11, Remaining/bytes>> ->
+            {Value, _} = consume_data_section_on_index(DataSection, Pointer),
+            {Value, Remaining};
+        <<?pointer:3, 1:2, Pointer:19, Remaining/bytes>> ->
+            {Value, _} = consume_data_section_on_index(DataSection, Pointer + 2048),
+            {Value, Remaining};
+        <<?pointer:3, 2:2, Pointer:27, Remaining/bytes>> ->
+            {Value, _} = consume_data_section_on_index(DataSection, Pointer + 526336),
+            {Value, Remaining};
+        <<?pointer:3, _:5, Pointer:32, Remaining/bytes>> ->
+            {Value, _} = consume_data_section_on_index(DataSection, Pointer),
+            {Value, Remaining};
+        %
+        <<?utf8_string:3, Size:5, Remaining/bytes>> when Size < 29 ->
+            consume_utf8_string(Size, Remaining);
+        <<?utf8_string:3, 29:5, BaseSize, Remaining/bytes>> ->
+            consume_utf8_string(29 + BaseSize, Remaining);
+        <<?utf8_string:3, 30:5, BaseSize:16, Remaining/bytes>> ->
+            consume_utf8_string(285 + BaseSize, Remaining);
+        <<?utf8_string:3, _:5, BaseSize:24, Remaining/bytes>> ->
+            consume_utf8_string(65821 + BaseSize, Remaining);
+        %
+        <<?double:3, 8:5, Double:64/float, Remaining/bytes>> ->
+            {Double, Remaining};
+        %
+        <<?bytes:3, Size:5, Remaining/bytes>> when Size < 29 ->
+            consume_bytes(Size, Remaining);
+        <<?bytes:3, 29:5, BaseSize, Remaining/bytes>> ->
+            consume_bytes(29 + BaseSize, Remaining);
+        <<?bytes:3, 30:5, BaseSize:16, Remaining/bytes>> ->
+            consume_bytes(285 + BaseSize, Remaining);
+        <<?bytes:3, _:5, BaseSize:24, Remaining/bytes>> ->
+            consume_bytes(65821 + BaseSize, Remaining);
+        %
+        <<?uint16:3, Size:5, Integer:Size/integer-unit:8, Remaining/bytes>>
+          when Size =< 2 ->
+            {Integer, Remaining};
+        <<?uint32:3, Size:5, Integer:Size/integer-unit:8, Remaining/bytes>>
+          when Size =< 4 ->
+            {Integer, Remaining};
+        %
+        <<?map:3, Size:5, Remaining/bytes>> when Size < 29 ->
+            consume_map(DataSection, Size, Remaining);
+        <<?map:3, 29:5, BaseSize, Remaining/bytes>> ->
+            consume_map(DataSection, 29 + BaseSize, Remaining);
+        <<?map:3, 30:5, BaseSize:16, Remaining/bytes>> ->
+            consume_map(DataSection, 285 + BaseSize, Remaining);
+        <<?map:3, _:5, BaseSize:24, Remaining/bytes>> ->
+            consume_map(DataSection, 65821 + BaseSize, Remaining);
+        %
+        <<0:3, Size:5, ?extended_int32, Integer:Size/signed-integer-unit:8, Remaining/bytes>>
+          when Size =< 4 ->
+            {Integer, Remaining};
+        <<0:3, Size:5, ?extended_uint64, Integer:Size/integer-unit:8, Remaining/bytes>>
+          when Size =< 8 ->
+            {Integer, Remaining};
+        <<0:3, Size:5, ?extended_uint128, Integer:Size/integer-unit:8, Remaining/bytes>>
+          when Size =< 16 ->
+            {Integer, Remaining};
+        %
+        <<0:3, Size:5, ?extended_array, Remaining/bytes>> when Size < 29 ->
+            consume_array(DataSection, Size, Remaining);
+        <<0:3, 29:5, ?extended_array, BaseSize, Remaining/bytes>> ->
+            consume_array(DataSection, 29 + BaseSize, Remaining);
+        <<0:3, 30:5, ?extended_array, BaseSize:16, Remaining/bytes>> ->
+            consume_array(DataSection, 285 + BaseSize, Remaining);
+        <<0:3, _:5, ?extended_array, BaseSize:24, Remaining/bytes>> ->
+            consume_array(DataSection, 65821 + BaseSize, Remaining);
+        %
+        <<0:3, 0:5, ?extended_data_cache_container, _/bytes>> ->
+            error({unexpected_marker, data_cache_container});
+        <<0:3, 0:5, ?extended_end_marker, _/bytes>> ->
+            error({unexpected_marker, 'end'});
+        %
+        <<0:3, 0:5, ?extended_boolean, Remaining/bytes>> ->
+            {false, Remaining};
+        <<0:3, 1:5, ?extended_boolean, Remaining/bytes>> ->
+            {true, Remaining};
+        %
+        <<0:3, 4:5, ?extended_float, Float:32/float, Remaining/bytes>> ->
+            {Float, Remaining}
     end.
 
-decode_data_payload_size(Type, SizeTag, Data, Index) when SizeTag < 29 ->
-    PayloadSize = SizeTag,
-    decode_data_payload(Type, PayloadSize, Data, Index);
-decode_data_payload_size(Type, SizeTag, Data, Index) when SizeTag =:= 29 ->
-    <<ExtendedSize>> = binary:part(Data, {Index,1}),
-    PayloadSize = 29 + ExtendedSize,
-    NewIndex = Index + 1,
-    decode_data_payload(Type, PayloadSize, Data, NewIndex);
-decode_data_payload_size(Type, SizeTag, Data, Index) when SizeTag =:= 30 ->
-    <<ExtendedSize:16>> = binary:part(Data, {Index,2}),
-    PayloadSize = 285 + ExtendedSize,
-    NewIndex = Index + 2,
-    decode_data_payload(Type, PayloadSize, Data, NewIndex);
-decode_data_payload_size(Type, SizeTag, Data, Index) when SizeTag =:= 31 ->
-    <<ExtendedSize:24>> = binary:part(Data, {Index,3}),
-    PayloadSize = 65821 + ExtendedSize,
-    NewIndex = Index + 3,
-    decode_data_payload(Type, PayloadSize, Data, NewIndex).
+consume_utf8_string(Size, Chunk) ->
+    {Text, Remaining} = consume_bytes(Size, Chunk),
+    case unicode:characters_to_binary(Text, utf8) of
+        <<ValidatedText/bytes>> ->
+            {ValidatedText, Remaining};
+        Failure ->
+            error({not_utf8_text, Failure})
+    end.
 
-decode_data_payload(Type, Size, Data, Index)
-  when Type =:= ?pointer ->
-    <<SS:2, VV:3>> = <<Size:5>>,
-    {DataIndex, NewIndex} = decode_pointer_index(SS, VV, Data, Index),
-    {Value, _DiscardedIndex} = decode_data(Data, DataIndex),
-    {Value, NewIndex};
-decode_data_payload(Type, Size, Data, Index)
-  when Type =:= ?utf8_string ->
-    Text = binary:part(Data, {Index, Size}),
-    CopiedText = binary:copy(Text),
-    ?assert(is_utf8_text(CopiedText), {not_utf8_printable_text, CopiedText}),
-    {CopiedText, Index + Size};
-decode_data_payload(Type, Size, Data, Index)
-  when (Type =:= ?double andalso Size =:= 8);
-       (Type =:= ?float andalso Size =:= 4) ->
-    BitSize = Size * 8,
-    <<Float:BitSize/float>> = binary:part(Data, {Index, Size}),
-    {Float, Index + Size};
-decode_data_payload(Type, Size, Data, Index) when Type =:= ?bytes ->
-    Bytes = binary:part(Data, {Index, Size}),
+consume_bytes(Size, Chunk) ->
+    <<Bytes:Size/bytes, Remaining/bytes>> = Chunk,
     CopiedBytes = binary:copy(Bytes),
-    {CopiedBytes, Index + Size};
-decode_data_payload(Type, Size, Data, Index)
-  when (Type =:= ?uint16 andalso Size =< 2);
-       (Type =:= ?uint32 andalso Size =< 4);
-       (Type =:= ?uint64 andalso Size =< 8);
-       (Type =:= ?uint128 andalso Size =< 16) ->
-    <<Integer:Size/integer-unit:8>> = binary:part(Data, {Index, Size}),
-    {Integer, Index + Size};
-decode_data_payload(Type, Size, Data, Index)
-  when Type =:= ?int32, Size =< 4 ->
-    <<Integer:Size/signed-integer-unit:8>> = binary:part(Data, {Index, Size}),
-    {Integer, Index + Size};
-decode_data_payload(Type, Size, Data, Index)
-  when Type =:= ?map ->
-    lists:foldl(
-      fun (_Counter, {MapAcc1, IndexAcc1}) ->
-              {Key, IndexAcc2} = decode_data(Data, IndexAcc1),
-              ?assert(is_utf8_text(Key), {invalid_map_key, Key}),
-              ?assert(not maps:is_key(Key, MapAcc1), {repeated_map_key, Key}),
-              {Value, IndexAcc3} = decode_data(Data, IndexAcc2),
-              MapAcc2 = maps:put(Key, Value, MapAcc1),
-              {MapAcc2, IndexAcc3}
-      end,
-      {#{}, Index},
-      lists:seq(1, Size));
-decode_data_payload(Type, Size, Data, Index) when Type =:= ?array ->
-    lists:mapfoldl(
-      fun (_Counter, IndexAcc) ->
-              decode_data(Data, IndexAcc)
-      end,
-      Index, lists:seq(1, Size));
-decode_data_payload(Type, _Size, _Data, _Index) when Type =:= ?data_cache_container ->
-    error({unsupported_data_type, data_cache_container});
-decode_data_payload(Type, Size, Data, _Index) when Type =:= ?end_marker, Size =:= 0, Data =:= <<>> ->
-    error({unsupported_data_type, end_marker});
-decode_data_payload(Type, Size, _Data, Index) when Type =:= ?boolean, Size =:= 0 ->
-    {false, Index};
-decode_data_payload(Type, Size, _Data, Index) when Type =:= ?boolean, Size =:= 1 ->
-    {true, Index}.
+    {CopiedBytes, Remaining}.
 
-decode_pointer_index(SS, VV, Data, Index) when SS =:= 0 ->
-    <<ExtendedVV>> = binary:part(Data, {Index,1}),
-    <<Offset:11>> = <<VV:3, ExtendedVV:8>>,
-    {Offset, Index + 1};
-decode_pointer_index(SS, VV, Data, Index) when SS =:= 1 ->
-    <<ExtendedVV:16>> = binary:part(Data, {Index,2}),
-    <<BaseOffset:19>> = <<VV:3, ExtendedVV:16>>,
-    {BaseOffset + 2048, Index + 2};
-decode_pointer_index(SS, VV, Data, Index) when SS =:= 2 ->
-    <<ExtendedVV:24>> = binary:part(Data, {Index,3}),
-    <<BaseOffset:27>> = <<VV:3, ExtendedVV:24>>,
-    {BaseOffset + 526336, Index + 3};
-decode_pointer_index(SS, _VV, Data, Index) when SS =:= 3 ->
-    <<Offset:32>> = binary:part(Data, {Index,4}),
-    {Offset, Index + 4}.
+consume_map(DataSection, Size, Chunk) ->
+    consume_map_recur(DataSection, Size, Chunk, []).
+
+consume_map_recur(_DataSection, 0, Remaining, KvAcc) ->
+    case lists:ukeysort(1, KvAcc) of
+        SortedKvAcc when length(SortedKvAcc) =:= length(KvAcc) ->
+            Map = maps:from_list(SortedKvAcc),
+            {Map, Remaining}
+    end;
+consume_map_recur(DataSection, Size, Chunk, KvAcc) ->
+    {Key, Chunk2} = consume_map_key(DataSection, Chunk),
+    {Value, Chunk3} = consume_data_section_chunk(DataSection, Chunk2),
+    UpdatedKvAcc = [{Key,Value} | KvAcc],
+    consume_map_recur(DataSection, Size - 1, Chunk3, UpdatedKvAcc).
+
+consume_map_key(DataSection, Chunk) ->
+    case Chunk of
+        <<?pointer:3, 0:2, Pointer:11, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Pointer),
+            {Value, Remaining};
+        <<?pointer:3, 1:2, Pointer:19, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Pointer + 2048),
+            {Value, Remaining};
+        <<?pointer:3, 2:2, Pointer:27, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Pointer + 526336),
+            {Value, Remaining};
+        <<?pointer:3, _:5, Pointer:32, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Pointer),
+            {Value, Remaining};
+        %
+        <<?utf8_string:3, Size:5, Remaining/bytes>> when Size < 29 ->
+            consume_utf8_string(Size, Remaining);
+        <<?utf8_string:3, 29:5, BaseSize, Remaining/bytes>> ->
+            consume_utf8_string(29 + BaseSize, Remaining);
+        <<?utf8_string:3, 30:5, BaseSize:16, Remaining/bytes>> ->
+            consume_utf8_string(285 + BaseSize, Remaining);
+        <<?utf8_string:3, _:5, BaseSize:24, Remaining/bytes>> ->
+            consume_utf8_string(65821 + BaseSize, Remaining)
+    end.
+
+consume_map_key_on_index(DataSection, Index) ->
+    <<_:Index/bytes, Chunk/bytes>> = DataSection,
+    consume_map_key(DataSection, Chunk).
+
+consume_array(DataSection, Size, Chunk) ->
+    consume_array_recur(DataSection, Size, Chunk, []).
+
+consume_array_recur(_DataSection, 0, Remaining, RevAcc) ->
+    List = lists:reverse(RevAcc),
+    {List, Remaining};
+consume_array_recur(DataSection, Size, Chunk, RevAcc) ->
+    {Value, Remaining} = consume_data_section_chunk(DataSection, Chunk),
+    UpdatedRevAcc = [Value | RevAcc],
+    consume_array_recur(DataSection, Size - 1, Remaining, UpdatedRevAcc).
 
 find_ipv4_root_index(_Tree, #{ <<"ip_version">> := 4 } = _Metadata) ->
     0;
@@ -431,15 +481,17 @@ lookup_recur(<<Bit:1,NextBits/bits>>, Tree, DataSection, NodeSize, RecordSize,
 lookup_recur(_BitAddress, _Tree, _DataSection, _NodeSize, _RecordSize,
              NodeIndex, NodeCount)
   when NodeIndex =:= NodeCount ->
-    % end of the line
+    % leaf node
     {error, not_found};
 lookup_recur(BitAddress, _Tree, DataSection, _NodeSize, _RecordSize,
              NodeIndex, NodeCount) ->
     % pointer to the data section
     DataIndex = (NodeIndex - NodeCount) - 16,
-    {#{} = DecodedData, _NewDataIndex} = decode_data(DataSection, DataIndex),
-    SuffixSize = bit_size(BitAddress),
-    {ok, DecodedData, SuffixSize}.
+    case consume_data_section_on_index(DataSection, DataIndex) of
+        {#{} = DataRecord, _FinalChunk} ->
+            SuffixSize = bit_size(BitAddress),
+            {ok, DataRecord, SuffixSize}
+    end.
 
 extract_node_record(0 = _Bit, Node, RecordSize) when byte_size(Node) band 1 =:= 0 ->
     <<Left:RecordSize, _/bits>> = Node,
@@ -452,16 +504,6 @@ extract_node_record(0 = _Bit, Node, RecordSize) ->
 extract_node_record(1 = _Bit, Node, RecordSize) ->
     <<_:RecordSize, Right:RecordSize>> = Node,
     Right.
-
-is_utf8_text(<<Binary/binary>>) ->
-    case unicode:characters_to_list(Binary, utf8) of
-        String when is_list(String) ->
-            io_lib:printable_unicode_list(String);
-        _Failure ->
-            false
-    end;
-is_utf8_text(_Value) ->
-    false.
 
 handle_recursive_lookup_result({ok, Entry, SuffixSize}, BitAddress) ->
     Prefix = ip_address_prefix(BitAddress, SuffixSize),
@@ -559,17 +601,17 @@ analyze_recur(#{node_count := NodeCount, data_section := DataSection} = Params,
     % pointer to the data section
     DataIndex = (NodeIndex - NodeCount) - 16,
     try gb_sets:is_element(DataIndex, VisitedDataRecordsAcc) orelse
-        {first_visit, decode_data(DataSection, DataIndex)}
+        {first_visit, consume_data_section_on_index(DataSection, DataIndex)}
     of
         true ->
             % we've already visited the data record referenced by DataIndex
             {FlawsAcc, VisitedDataRecordsAcc};
-        {first_visit, {#{} = _DecodedData, _NewDataIndex}} ->
+        {first_visit, {#{} = _DataRecord, _NewDataIndex}} ->
             {FlawsAcc, VisitedDataRecordsAcc};
-        {first_visit, {DecodedDataOfWrongType, _NewDataIndex}} ->
+        {first_visit, {DataRecordOfWrongType, _NewDataIndex}} ->
             {[{bad_data_record_type, #{ tree_prefix => analysis_flaw_prefix(Params, Depth, Prefix),
                                         data_index => DataIndex,
-                                        data_record => DecodedDataOfWrongType }}
+                                        data_record => DataRecordOfWrongType }}
               | FlawsAcc],
              gb_sets:add(DataIndex, VisitedDataRecordsAcc)}
     catch

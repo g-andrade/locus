@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     - the server certificate is self-signed
     - the server certificate was signed by an unknown CA
 - test coverage using MaxMind`s own test data was greatly extended
+- decoder code was optimized
+### Fixed
+- misguided rejection of non-printable (but valid) codepoints in UTF-8 strings
 
 ## [1.5.1] - 2019-01-19
 ### Fixed
