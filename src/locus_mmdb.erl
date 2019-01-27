@@ -119,34 +119,38 @@
 -type analysis_flaw() ::
         max_depth_exceeded() |
         node_dereference_failed() |
-        bad_data_record_type() |
+        bad_record_data_type() |
         data_record_decoding_failed().
 -export_type([analysis_flaw/0]).
 
 -type max_depth_exceeded() ::
         {max_depth_exceeded, #{ tree_prefix := {inet:ip_address(), 0..128},
                                 node_index := non_neg_integer(),
-                                depth := 33 | 129 }}.
+                                depth := 33 | 129
+                              }}.
 -export_type([max_depth_exceeded/0]).
 
 -type node_dereference_failed() ::
         {node_dereference_failed, #{ tree_prefix := {inet:ip_address(), 0..128},
                                      node_index := non_neg_integer(),
                                      class := error | throw | exit,
-                                     reason := term() }}.
+                                     reason := term()
+                                   }}.
 -export_type([node_dereference_failed/0]).
 
--type bad_data_record_type() ::
-         {bad_data_record_type, #{ tree_prefix := {inet:ip_address(), 0..128},
-                                   data_index := non_neg_integer(),
-                                   data_record := term() }}.
--export_type([bad_data_record_type/0]).
+-type bad_record_data_type() ::
+         {bad_record_data_type, #{ data_index := non_neg_integer(),
+                                   data_record := term(),
+                                   tree_prefixes := [{inet:ip_address(), 0..128}, ...]
+                                 }}.
+-export_type([bad_record_data_type/0]).
 
 -type data_record_decoding_failed() ::
-        {data_record_decoding_failed, #{ tree_prefix := {inet:ip_address(), 0..128},
-                                         data_index := non_neg_integer(),
+        {data_record_decoding_failed, #{ data_index := non_neg_integer(),
                                          class := error | throw | exit,
-                                         reason := term() }}.
+                                         reason := term(),
+                                         tree_prefixes := [{inet:ip_address(), 0..128}, ...]
+                                       }}.
 -export_type([data_record_decoding_failed/0]).
 
 %% ------------------------------------------------------------------
@@ -525,9 +529,8 @@ ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 128 ->
     <<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>> = BitBaseAddress,
     {{A,B,C,D,E,F,G,H}, PrefixSize}.
 
-
 %% ------------------------------------------------------------------
-%% Internal Function Definitions - Walking
+%% Internal Function Definitions - Analysis
 %% ------------------------------------------------------------------
 
 analyze_(false) ->
@@ -535,6 +538,36 @@ analyze_(false) ->
 analyze_([]) ->
     {error, database_not_loaded};
 analyze_([{database, DatabaseParts}]) ->
+    ParentPid = self(),
+    PrevTrapExit = process_flag(trap_exit, true),
+    CoordinatorSpawnOpts = [link, {priority,low}],
+    try
+        CoordinatorPid =
+            spawn_opt(
+              fun () -> run_analysis_coordinator(ParentPid, DatabaseParts) end,
+              CoordinatorSpawnOpts),
+
+        receive
+            {CoordinatorPid, {analysis_result, TreeFlaws, DataRecordFlaws}} ->
+                process_flag(trap_exit, PrevTrapExit),
+                receive {'EXIT', CoordinatorPid, _} -> ok after 0 -> ok end,
+                case {TreeFlaws,DataRecordFlaws} of
+                    {[],[]} ->
+                        ok;
+                    _ ->
+                        {error, {flawed, TreeFlaws ++ DataRecordFlaws}}
+                end;
+            {'EXIT', CoordinatorPid, Reason} ->
+                process_flag(trap_exit, PrevTrapExit),
+                {error, {coordinator_stopped, CoordinatorPid, Reason}}
+        end
+    catch
+        ExcClass:ExcReason ->
+            true = process_flag(trap_exit, PrevTrapExit),
+            erlang:raise(ExcClass, ExcReason, erlang:get_stacktrace())
+    end.
+
+run_analysis_coordinator(ParentPid, DatabaseParts) ->
     #{ tree := Tree, data_section := DataSection } = DatabaseParts,
     NodeCount = metadata_get(<<"node_count">>, DatabaseParts),
     RecordSize = metadata_get(<<"record_size">>, DatabaseParts),
@@ -544,85 +577,97 @@ analyze_([{database, DatabaseParts}]) ->
             4 -> 32;
             6 -> 128
         end,
+
+    CoordinatorPid = self(),
+    DataAnalyzerSpawnOpts = [link, {priority,normal}],
+    DataAnalysisConcurrency = erlang:system_info(schedulers_online),
+    DataAnalyzers =
+        lists:foldl(
+          fun (DataAnalyzerNr, Acc) ->
+                  Pid = spawn_opt(
+                          fun () -> run_data_analyzer(CoordinatorPid, DataSection) end,
+                          DataAnalyzerSpawnOpts),
+                  maps:put(DataAnalyzerNr - 1, Pid, Acc)
+          end,
+          #{}, lists:seq(1, DataAnalysisConcurrency)),
+
     Params =
         #{ tree => Tree,
-           data_section => DataSection,
            node_size => NodeSize,
-           record_size => RecordSize ,
+           record_size => RecordSize,
            node_count => NodeCount,
-           max_depth => MaxDepth
+           max_depth => MaxDepth,
+           data_analyzers => DataAnalyzers
          },
+    RevTreeFlaws = analyze_tree_recur(Params, 0, 0, 0, []),
+    TreeFlaws = lists:reverse(RevTreeFlaws),
 
-    case analyze_recur(Params, 0, 0, 0, [], gb_sets:empty()) of
-        {[], _} ->
-            ok;
-        {RevFlaws, _} ->
-            Flaws = lists:reverse(RevFlaws),
-            {error, {flawed, Flaws}}
-    end.
+    BadDataRecordResults =
+        maps:fold(
+          fun (_, DataAnalyzerPid, Acc) ->
+                  _ = DataAnalyzerPid ! {self(), collect_bad_results},
+                  receive
+                      {DataAnalyzerPid, {bad_results, Bad}} ->
+                          maps:merge(Acc, Bad)
+                  end
+          end,
+          #{}, DataAnalyzers),
 
-analyze_recur(#{max_depth := MaxDepth} = Params, NodeIndex, Depth, Prefix,
-              FlawsAcc, VisitedDataRecordsAcc)
+    DataRecordFlaws =
+        maps:fold(
+          fun (DataIndex, {{bad_record_data_type,NotAMap}, TreeRefs}, Acc) ->
+                  [{bad_record_data_type,
+                    #{ data_index => DataIndex,
+                       data_record => NotAMap,
+                       tree_prefixes => data_analysis_bad_tree_prefixes(MaxDepth, TreeRefs)
+                     }} | Acc];
+              (DataIndex, {{data_record_decoding_failed,Class,Reason}, TreeRefs}, Acc) ->
+                  [{data_record_decoding_failed,
+                    #{ data_index => DataIndex,
+                       class => Class,
+                       reason => Reason,
+                       tree_prefixes => data_analysis_bad_tree_prefixes(MaxDepth, TreeRefs)
+                     }} | Acc]
+          end,
+          [], BadDataRecordResults),
+
+    _ = ParentPid ! {self(), {analysis_result, TreeFlaws, DataRecordFlaws}},
+    ok.
+
+analyze_tree_recur(#{max_depth := MaxDepth}, NodeIndex, Depth, Prefix, FlawsAcc)
   when Depth > MaxDepth ->
-    {[{max_depth_exceeded, #{ tree_prefix => analysis_flaw_prefix(Params, Depth, Prefix),
-                              node_index => NodeIndex }}
-      | FlawsAcc],
-     VisitedDataRecordsAcc};
-analyze_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Prefix,
-              FlawsAcc, VisitedDataRecordsAcc)
+    [{max_depth_exceeded, #{ tree_prefix => analysis_flaw_prefix(MaxDepth, Depth, Prefix),
+                             node_index => NodeIndex }}
+     | FlawsAcc];
+analyze_tree_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Prefix, FlawsAcc)
   when NodeIndex < NodeCount ->
     % regular node
-    #{tree := Tree, node_size := NodeSize, record_size := RecordSize} = Params,
+    #{tree := Tree, node_size := NodeSize, record_size := RecordSize, max_depth := MaxDepth} = Params,
     try binary:part(Tree, {NodeIndex * NodeSize, NodeSize}) of
         Node ->
             {LeftNodeIndex, RightNodeIndex} = extrace_node_records(Node, RecordSize),
-            {FlawsAcc2, VisitedDataRecordsAcc2} =
-                analyze_recur(Params, LeftNodeIndex, Depth + 1, Prefix bsl 1,
-                              FlawsAcc, VisitedDataRecordsAcc),
-            analyze_recur(Params, RightNodeIndex, Depth + 1, (Prefix bsl 1) bor 1,
-                          FlawsAcc2, VisitedDataRecordsAcc2)
+            FlawsAcc2 = analyze_tree_recur(Params, LeftNodeIndex, Depth + 1, Prefix bsl 1, FlawsAcc),
+            analyze_tree_recur(Params, RightNodeIndex, Depth + 1, (Prefix bsl 1) bor 1, FlawsAcc2)
     catch
         Class:Reason ->
-            {[{node_dereference_failed, #{ tree_prefix => analysis_flaw_prefix(Params, Depth, Prefix),
-                                           node_index => NodeIndex,
-                                           class => Class,
-                                           reason => Reason }}
-              | FlawsAcc],
-             VisitedDataRecordsAcc}
+            [{node_dereference_failed, #{ tree_prefix => analysis_flaw_prefix(MaxDepth, Depth, Prefix),
+                                          node_index => NodeIndex,
+                                          class => Class,
+                                          reason => Reason }}
+             | FlawsAcc]
     end;
-analyze_recur(#{node_count := NodeCount}, NodeIndex, _Depth, _Prefix,
-              FlawsAcc, VisitedDataRecordsAcc)
+analyze_tree_recur(#{node_count := NodeCount}, NodeIndex, _Depth, _Prefix, FlawsAcc)
   when NodeIndex =:= NodeCount ->
     % leaf node
-    {FlawsAcc, VisitedDataRecordsAcc};
-analyze_recur(#{node_count := NodeCount, data_section := DataSection} = Params,
-              NodeIndex, Depth, Prefix,
-              FlawsAcc, VisitedDataRecordsAcc) ->
+    FlawsAcc;
+analyze_tree_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Prefix, FlawsAcc) ->
     % pointer to the data section
+    #{data_analyzers := DataAnalyzers} = Params,
     DataIndex = (NodeIndex - NodeCount) - 16,
-    try gb_sets:is_element(DataIndex, VisitedDataRecordsAcc) orelse
-        {first_visit, consume_data_section_on_index(DataSection, DataIndex)}
-    of
-        true ->
-            % we've already visited the data record referenced by DataIndex
-            {FlawsAcc, VisitedDataRecordsAcc};
-        {first_visit, {#{} = _DataRecord, _NewDataIndex}} ->
-            {FlawsAcc, VisitedDataRecordsAcc};
-        {first_visit, {DataRecordOfWrongType, _NewDataIndex}} ->
-            {[{bad_data_record_type, #{ tree_prefix => analysis_flaw_prefix(Params, Depth, Prefix),
-                                        data_index => DataIndex,
-                                        data_record => DataRecordOfWrongType }}
-              | FlawsAcc],
-             gb_sets:add(DataIndex, VisitedDataRecordsAcc)}
-    catch
-        Class:Reason ->
-            {[{data_record_decoding_failed, #{ tree_prefix => analysis_flaw_prefix(Params, Depth, Prefix),
-                                               data_index => DataIndex,
-                                               class => Class,
-                                               reason => Reason }}
-              | FlawsAcc],
-             gb_sets:add(DataIndex, VisitedDataRecordsAcc)}
-    end.
+    DataAnalyzerNr = erlang:phash2(DataIndex, map_size(DataAnalyzers)),
+    DataAnalyzerPid = maps:get(DataAnalyzerNr, DataAnalyzers),
+    _ = DataAnalyzerPid ! {self(), {analyze, DataIndex, Depth, Prefix}},
+    FlawsAcc.
 
 extrace_node_records(Node, RecordSize) when byte_size(Node) band 1 =:= 0 ->
     <<Left:RecordSize, Right:RecordSize>> = Node,
@@ -634,8 +679,77 @@ extrace_node_records(Node, RecordSize) ->
     Left = (LeftHigh bsl LeftWholeSz) bor LeftLow,
     {Left, Right}.
 
-analysis_flaw_prefix(#{max_depth := MaxDepth}, Depth, Prefix) ->
+analysis_flaw_prefix(MaxDepth, Depth, Prefix) ->
     ShiftAmount = MaxDepth - Depth,
     ShiftedPrefix = Prefix bsl ShiftAmount,
     BitAddress = <<ShiftedPrefix:MaxDepth>>,
     ip_address_prefix(BitAddress, ShiftAmount).
+
+run_data_analyzer(CoordinatorPid, DataSection) ->
+    State = #{ coordinator_pid => CoordinatorPid,
+               data_section => DataSection,
+               good => gb_sets:empty(),
+               bad => #{}
+             },
+    run_data_analyzer_loop(State).
+
+run_data_analyzer_loop(State) ->
+    receive
+        Msg ->
+            UpdatedState = handle_data_analyzer_msg(Msg, State),
+            run_data_analyzer_loop(UpdatedState)
+    end.
+
+handle_data_analyzer_msg({CoordinatorPid, {analyze, DataIndex, Depth, Prefix}},
+                         #{coordinator_pid := CoordinatorPid} = State) ->
+    #{good := Good} = State,
+    case gb_sets:is_element(DataIndex, Good) of
+        true ->
+            % already analyzed and classified as good data record
+            run_data_analyzer_loop(State);
+        false ->
+            #{bad := Bad} = State,
+            case maps:find(DataIndex, Bad) of
+                {ok, {FlawInfo, BadReferences}} ->
+                    % already analyzed and classified as flawed data record
+                    UpdatedBadRefereces = [{Depth,Prefix} | BadReferences],
+                    UpdatedBad = maps:update(DataIndex, {FlawInfo, UpdatedBadRefereces}, Bad),
+                    UpdatedState = maps:update(bad, UpdatedBad, State),
+                    run_data_analyzer_loop(UpdatedState);
+                error ->
+                    % analyzing for the first time
+                    handle_data_record_analysis(DataIndex, Depth, Prefix, State)
+            end
+    end;
+handle_data_analyzer_msg({CoordinatorPid, collect_bad_results},
+                         #{coordinator_pid := CoordinatorPid} = State) ->
+    #{bad := Bad} = State,
+    _ = CoordinatorPid ! {self(), {bad_results,Bad}},
+    State.
+
+handle_data_record_analysis(DataIndex, Depth, Prefix, State) ->
+    #{data_section := DataSection} = State,
+    try consume_data_section_on_index(DataSection, DataIndex) of
+        {#{}, _} ->
+            #{good := Good} = State,
+            UpdatedGood = gb_sets:insert(DataIndex, Good),
+            maps:update(good, UpdatedGood, State);
+        {NotAMap, _} ->
+            #{bad := Bad} = State,
+            FlawInfo = {bad_record_data_type, NotAMap},
+            UpdatedBad = maps:put(DataIndex, {FlawInfo,[{Depth,Prefix}]}, Bad),
+            maps:update(bad, UpdatedBad, State)
+    catch
+        Class:Reason ->
+            #{bad := Bad} = State,
+            FlawInfo = {data_record_decoding_failed, Class, Reason},
+            UpdatedBad = maps:put(DataIndex, {FlawInfo,[{Depth,Prefix}]}, Bad),
+            maps:update(bad, UpdatedBad, State)
+    end.
+
+data_analysis_bad_tree_prefixes(MaxDepth, BadReferences) ->
+    lists:map(
+      fun ({Depth, Prefix}) ->
+              analysis_flaw_prefix(MaxDepth, Depth, Prefix)
+      end,
+      BadReferences).
