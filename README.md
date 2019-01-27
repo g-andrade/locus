@@ -32,12 +32,7 @@ ok = locus:start_loader(country, URL).
 ##### 2\. Wait for the database to load (optional)
 
 ``` erlang
-% Either block indefinitely
-{ok, _DatabaseVersion} = locus:wait_for_loader(country).
-```
-
-``` erlang
-% ... or give-up after 30 seconds
+% Give up after 30 seconds
 {ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 ```
 
@@ -122,7 +117,7 @@ ok = locus:start_loader(country, URL).
     [commercial
     databases](https://dev.maxmind.com/geoip/geoip2/downloadable/) have
     yet been tested
-  - The databases are loaded into memory (mostly) as-is; reference
+  - The databases are loaded into memory (mostly) as is; reference
     counted binaries are shared with the application callers using ETS
     tables, and the original binary search tree is used to lookup
     addresses. The data for each entry is decoded on the fly upon
@@ -179,7 +174,7 @@ arguments.
 
 ##### HTTP URLs: Caching
 
-  - Caching is a best-effort; the system falls back to relying
+  - Caching is a best effort; the system falls back to relying
     exclusively on the network if needed
   - A caching directory named `locus_erlang` is created under the
     ['user\_cache'

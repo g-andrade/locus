@@ -31,12 +31,7 @@ ok = locus:start_loader(country, URL).
 <h5>2. Wait for the database to load (optional)</h5>
 
 <pre lang="erlang" class="erlang">
-% Either block indefinitely
-{ok, _DatabaseVersion} = locus:wait_for_loader(country).
-</pre>
-
-<pre lang="erlang" class="erlang">
-% ... or give-up after 30 seconds
+% Give up after 30 seconds
 {ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 </pre>
 
@@ -122,7 +117,7 @@ is mostly complete</li>
   IP address prefixes to arbitrary data, but no <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/downloadable/">
   commercial databases</a> have yet been tested
   </li>
-<li>The databases are loaded into memory (mostly) as-is; reference counted binaries are shared with the
+<li>The databases are loaded into memory (mostly) as is; reference counted binaries are shared with the
   application callers using ETS tables, and the original binary search tree is used to lookup addresses.
   The data for each entry is decoded on the fly upon successful lookups.
   </li>
@@ -175,7 +170,7 @@ Run `./locus analyze --help' for a description of supported options and argument
 <h5 id="http-urls-caching">HTTP URLs: Caching</h5>
 
 <ul>
-<li>Caching is a best-effort; the system falls back to relying exclusively on the network if needed</li>
+<li>Caching is a best effort; the system falls back to relying exclusively on the network if needed</li>
 <li>A caching directory named `locus_erlang' is created under the <a target="_parent" href="http://erlang.org/doc/man/filename.html#basedir-3">'user_cache' basedir</a></li>
 <li>Cached tarballs are named after the SHA256 hash of their source URL</li>
 <li>Modification time of the tarballs is extracted from `last-modified' response header (when present)
