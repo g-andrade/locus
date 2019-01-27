@@ -4,25 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## UNRELEASED
+## [1.6.0] - 2019-01-27
 ### Added
-- new API method for validating the database (`locus:analyze/1`)
+- new API method for validating loaded databases (`locus:analyze/1`)
 - new command line tool supporting database validation
 - new dependencies:
     - `certifi` 2.4.2
     - `ssl_verify_fun` 1.1.4
     - `stacktrace_transform` 1.0.2
 ### Changed
-- safety of database HTTPS downloads was substantially improved
-  by now rejecting expired certificates, mismatched certificate hostnames,
-  self-signed certificates or unknown certificate authorities
 - test coverage using MaxMind`s test data was greatly extended
 - database decoder was thoroughly optimized
 - documentation was mildly improved
 ### Fixed
-- misguided rejection of non-printable (but valid) codepoints in UTF-8 strings
+- misguided rejection of UTF-8 strings with non-printable (but valid) codepoints
 - unnecessarily strict refusal to load 2.x database formats succeeding 2.0
-- chance of infinite recursion in databases maliciously crafted with circular paths
+### Security
+- safety of database HTTPS downloads was substantially increased by now
+  rejecting expired certificates, mismatched hostnames, self-signed
+  certificates or unknown certificate authorities
+- infinite recursion in maliciously crafted databases due to
+  circular paths is now prevented
 
 ## [1.5.1] - 2019-01-19
 ### Fixed
