@@ -301,10 +301,15 @@ ready(internal, update_database, StateData) ->
     ConnectTimeout = maps:get(connect_timeout, StateData),
     BaseHTTPOptions = [{connect_timeout, ConnectTimeout}],
     ExtraHTTPOptions =
-        case maps:is_key(insecure, StateData) orelse URL of
-            true -> [];
-            "http://" ++ _ -> [];
-            "https://" ++ _ -> [{ssl,locus_https_requests:ssl_opts_for_ca_authentication(URL)}]
+        case maps:is_key(insecure, StateData) orelse
+             http_uri:parse(URL)
+        of
+            true ->
+                [];
+            {ok, ParsedURL} when element(1, ParsedURL) =:= http ->
+                [];
+            {ok, ParsedURL} when element(1, ParsedURL) =:= https ->
+                [{ssl,locus_https_requests:ssl_opts_for_ca_authentication(URL)}]
         end,
     HTTPOptions = BaseHTTPOptions  ++ ExtraHTTPOptions,
     Options = [{sync, false}, {stream, self}],
