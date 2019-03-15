@@ -33,6 +33,8 @@
         ((fun () -> receive Msg -> ?assertMatch((Pattern), Msg)
                     after 30000 -> error(timeout) end end)())).
 
+-define(OTP_21_3__INITIAL_SSL_VERSION, [9,2]).
+
 %% ------------------------------------------------------------------
 %% Setup
 %% ------------------------------------------------------------------
@@ -62,24 +64,65 @@ end_per_group(_GroupName, Config) ->
 %% ------------------------------------------------------------------
 
 expired_https_test(Config) ->
-    do_https_test(expired_https_test, "expired.badssl.com", "certificate expired",
-                  Config).
+    case ssl_app_version() of
+        SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
+            do_https_test(expired_https_test, "expired.badssl.com",
+                          "certificate expired",
+                          Config);
+        _SslVersion ->
+            do_https_test(expired_https_test, "expired.badssl.com",
+                          {certificate_expired, "received CLIENT ALERT: Fatal - Certificate Expired"},
+                          Config)
+    end.
 
 wronghost_https_test(Config) ->
-    do_https_test(wronghost_https_test, "wrong.host.badssl.com", "handshake failure",
-                  Config).
+    case ssl_app_version() of
+        SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
+            do_https_test(wronghost_https_test, "wrong.host.badssl.com",
+                          "handshake failure",
+                          Config);
+        _SslVersion ->
+            do_https_test(wronghost_https_test, "wrong.host.badssl.com",
+                          {handshake_failure,
+                           "received CLIENT ALERT: Fatal - Handshake Failure"
+                           " - {bad_cert,unable_to_match_altnames}"},
+                          Config)
+    end.
 
 selfsigned_https_test(Config) ->
-    do_https_test(selfsigned_https_test, "self-signed.badssl.com", "bad certificate",
-                  Config).
+    case ssl_app_version() of
+        SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
+            do_https_test(selfsigned_https_test, "self-signed.badssl.com",
+                          "bad certificate",
+                          Config);
+        _SslVersion ->
+            do_https_test(selfsigned_https_test, "self-signed.badssl.com",
+                          {bad_certificate,"received CLIENT ALERT: Fatal - Bad Certificate"},
+                          Config)
+    end.
 
 untrusted_https_test(Config) ->
-    do_https_test(untrusted_https_test, "untrusted-root.badssl.com", "unknown ca",
-                  Config).
+    case ssl_app_version() of
+        SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
+            do_https_test(untrusted_https_test, "untrusted-root.badssl.com",
+                          "unknown ca",
+                          Config);
+        _SslVersion ->
+            do_https_test(untrusted_https_test, "untrusted-root.badssl.com",
+                          {unknown_ca, "received CLIENT ALERT: Fatal - Unknown CA"},
+                          Config)
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal
 %% ------------------------------------------------------------------
+
+ssl_app_version() ->
+    {ok, _} = application:ensure_all_started(ssl),
+    {ssl, _, VersionStr} = lists:keyfind(ssl, 1, application:which_applications()),
+    VersionBin = list_to_binary(VersionStr),
+    Parts = binary:split(VersionBin, <<".">>, [global]),
+    lists:map(fun binary_to_integer/1, Parts).
 
 do_https_test(Loader, Host, ExpectedTlsAlert, Config) ->
     Noise = crypto:strong_rand_bytes(32),
