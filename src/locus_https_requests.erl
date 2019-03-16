@@ -46,10 +46,21 @@
    ]).
 
 %% ------------------------------------------------------------------
+%% Record and Type Definitions
+%% ------------------------------------------------------------------
+
+-ifdef(SSL_OLD_CLIENT_OPTIONS).
+-type ssl_option() :: ssl:connect_option().
+-else.
+-type ssl_option() :: ssl:tls_client_option().
+-endif.
+-export_type([ssl_option/0]).
+
+%% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec ssl_opts_for_ca_authentication(string()) -> [ssl:connect_option(), ...].
+-spec ssl_opts_for_ca_authentication(string()) -> [ssl_option(), ...].
 ssl_opts_for_ca_authentication(URL) ->
     case http_uri:parse(URL) of
         {ok, {_Scheme, _UserInfo, Host, _Port, _Path, _Query}} ->
