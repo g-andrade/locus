@@ -19,4 +19,5 @@ otp_release:
     - 21.1
     - 21.2
     - 21.3
+    - 22.0
 script: RUNNING_ON_TRAVIS=yes make travis_test
