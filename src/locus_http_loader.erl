@@ -95,45 +95,26 @@
     {async_waiter, {pid(),reference()}}.
 -export_type([internal_opt/0]).
 
--ifdef(POST_OTP_18).
--type state_data() ::
-    #{ id := atom(),
-       url := url(),
-       waiters := [from()],
-       event_subscribers := [module() | pid()],
-       connect_timeout := timeout(),
-       download_start_timeout := timeout(),
-       idle_download_timeout := timeout(),
-       pre_readiness_update_period := pos_integer(),
-       post_readiness_update_period := pos_integer(),
-       no_cache => true,
-       insecure => true,
+-record(state_data, {
+          id :: atom(),
+          url :: url(),
+          waiters :: [from()],
+          event_subscribers :: [module() | pid()],
+          connect_timeout :: timeout(),
+          download_start_timeout :: timeout(),
+          idle_download_timeout :: timeout(),
+          pre_readiness_update_period :: pos_integer(),
+          post_readiness_update_period :: pos_integer(),
+          no_cache :: boolean(),
+          insecure :: boolean(),
 
-       request_id => reference(),
-       last_response_headers => headers(),
-       last_response_body => binary(),
-       last_modified => calendar:datetime(),
-       last_version => calendar:datetime()
-     }.
--else.
--type state_data() ::
-    #{ id => atom(),
-       url => url(),
-       waiters => [from()],
-       event_subscribers => [module() | pid()],
-       connect_timeout => timeout(),
-       download_start_timeout => timeout(),
-       idle_download_timeout => timeout(),
-       no_cache => true,
-       insecure => true,
-
-       request_id => reference(),
-       last_response_headers => headers(),
-       last_response_body => binary(),
-       last_modified => calendar:datetime(),
-       last_version => calendar:datetime()
-     }.
--endif.
+          request_id :: reference() | undefined,
+          last_response_headers :: headers() | undefined,
+          last_response_body :: binary() | undefined,
+          last_modified :: calendar:datetime() | undefined,
+          last_version :: calendar:datetime() | undefined
+         }).
+-type state_data() :: #state_data{}.
 
 -type filename() :: string().
 -export_type([filename/0]).
@@ -241,7 +222,7 @@ whereis(Id) ->
 list_subscribers(Id) ->
     ServerName = server_name(Id),
     {_State, StateData} = sys:get_state(ServerName),
-    maps:get(event_subscribers, StateData).
+    StateData#state_data.event_subscribers.
 -endif.
 
 %% ------------------------------------------------------------------
@@ -268,7 +249,7 @@ init([Id, URL, Opts]) ->
 %% @private
 initializing(enter, _PrevState, _StateData) ->
     keep_state_and_data;
-initializing(info, maybe_load_from_cache, #{ no_cache := true } = StateData) ->
+initializing(info, maybe_load_from_cache, #state_data{no_cache = true} = StateData) ->
     {next_state, ready, StateData, {next_event, internal, update_database}};
 initializing(info, maybe_load_from_cache, StateData) ->
     CachedTarballName = cached_tarball_name(StateData),
@@ -295,13 +276,12 @@ ready({call,From}, wait, StateData) ->
 ready(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
     handle_monitored_process_death(Pid, StateData);
 ready(internal, update_database, StateData) ->
-    URL = maps:get(url, StateData),
+    #state_data{url = URL, connect_timeout = ConnectTimeout} = StateData,
     Headers = request_headers(StateData),
     Request = {URL, Headers},
-    ConnectTimeout = maps:get(connect_timeout, StateData),
     BaseHTTPOptions = [{connect_timeout, ConnectTimeout}],
     ExtraHTTPOptions =
-        case maps:is_key(insecure, StateData) orelse
+        case StateData#state_data.insecure orelse
              http_uri:parse(URL)
         of
             true ->
@@ -315,7 +295,7 @@ ready(internal, update_database, StateData) ->
     Options = [{sync, false}, {stream, self}],
     {ok, RequestId} = httpc:request(get, Request, HTTPOptions, Options),
     true = is_reference(RequestId),
-    UpdatedStateData = StateData#{ request_id => RequestId },
+    UpdatedStateData = StateData#state_data{ request_id = RequestId },
     report_event({request_sent, URL, Headers}, StateData),
     {next_state, waiting_stream_start, UpdatedStateData};
 ready(state_timeout, update_database, _StateData) ->
@@ -339,42 +319,45 @@ ready(state_timeout, update_database, _StateData) ->
                             -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
 waiting_stream_start(enter, _PrevState, StateData) ->
-    StreamStartTimeout = maps:get(download_start_timeout, StateData),
+    #state_data{download_start_timeout = StreamStartTimeout} = StateData,
     {keep_state_and_data, {state_timeout, StreamStartTimeout, timeout}};
 waiting_stream_start({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
 waiting_stream_start(info, {http, {RequestId, stream_start, Headers}},
-                     #{ request_id := RequestId } = StateData) ->
+                     #state_data{ request_id = RequestId } = StateData) ->
     report_event({download_started, Headers}, StateData),
-    UpdatedStateData = StateData#{ last_response_headers => Headers,
-                                   last_response_body => <<>> },
+    UpdatedStateData =
+        StateData#state_data{
+          last_response_headers = Headers,
+          last_response_body = <<>>
+         },
     {next_state, waiting_stream_end, UpdatedStateData};
 waiting_stream_start(info,
                      {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
-                     #{ request_id := RequestId } = StateData)
+                     #state_data{ request_id = RequestId } = StateData)
   when StatusCode =:= 304 ->
     report_event({download_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
-    UpdatedStateData = maps:remove(request_id, StateData),
+    UpdatedStateData = StateData#state_data{request_id = undefined},
     {next_state, ready, UpdatedStateData};
 waiting_stream_start(info,
                      {http, {RequestId, {{_HttpVersion, StatusCode, StatusDesc}, Headers, Body}}},
-                     #{ request_id := RequestId } = StateData) ->
+                     #state_data{ request_id = RequestId } = StateData) ->
     report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, StateData),
-    StateData2 = maps:remove(request_id, StateData),
+    StateData2 = StateData#state_data{request_id = undefined},
     {StateData3, Replies} = reply_to_waiters({error, {http, StatusCode, StatusDesc}}, StateData2),
     {next_state, ready, StateData3, Replies};
 waiting_stream_start(info, {http, {RequestId, {error, Reason}}},
-                     #{ request_id := RequestId } = StateData) ->
+                     #state_data{ request_id = RequestId } = StateData) ->
     report_event({download_failed_to_start, {error, Reason}}, StateData),
-    StateData2 = maps:remove(request_id, StateData),
+    StateData2 = StateData#state_data{request_id = undefined},
     {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
     {next_state, ready, StateData3, Replies};
 waiting_stream_start(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
     handle_monitored_process_death(Pid, StateData);
-waiting_stream_start(state_timeout, timeout, StateData) ->
+waiting_stream_start(state_timeout, timeout, #state_data{request_id = RequestId} = StateData) ->
     report_event({download_failed_to_start, timeout}, StateData),
-    {RequestId, StateData2} = ?maps_take(request_id, StateData),
+    StateData2 = StateData#state_data{request_id = undefined},
     {StateData3, Replies} = reply_to_waiters({error, {timeout, waiting_stream_start}}, StateData2),
     ok = httpc:cancel_request(RequestId),
     clear_inbox_of_late_http_messages(RequestId),
@@ -397,55 +380,64 @@ waiting_stream_start(state_timeout, timeout, StateData) ->
                         -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
 %% @private
 waiting_stream_end(enter, _PrevState, StateData) ->
-    IdleStreamTimeout = maps:get(idle_download_timeout, StateData),
+    #state_data{idle_download_timeout = IdleStreamTimeout} = StateData,
     {keep_state_and_data, {state_timeout, IdleStreamTimeout, timeout}};
 waiting_stream_end({call,From}, wait, StateData) ->
     {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
     {keep_state, StateData2, Actions};
 waiting_stream_end(info, {http, {RequestId, stream, BinBodyPart}},
-                   #{ request_id := RequestId } = StateData) ->
-    UpdatedStateData =
-        ?maps_update_with3(
-          last_response_body,
-          fun (Body) -> <<Body/binary, BinBodyPart/binary>> end,
-          StateData),
+                   #state_data{ request_id = RequestId } = StateData) ->
+    #state_data{idle_download_timeout = IdleStreamTimeout,
+                last_response_body = Acc} = StateData,
+    UpdatedAcc = <<Acc/binary, BinBodyPart/binary>>,
+    UpdatedStateData = StateData#state_data{last_response_body = UpdatedAcc},
     %?log_info("~p database download in progress - ~.3f MiB received so far",
-    %          [maps:get(id, StateData),
-    %           byte_size(maps:get(last_response_body, UpdatedStateData)) / (1 bsl 20)]),
-    IdleStreamTimeout = maps:get(idle_download_timeout, StateData),
+    %          [StateData#state_data.id,
+    %           byte_size(UpdatedAcc) / (1 bsl 20)]),
     {keep_state, UpdatedStateData, {state_timeout, IdleStreamTimeout, timeout}};
-waiting_stream_end(info, {http, {RequestId, stream_end, Headers}}, % no chunked encoding
-                   #{ request_id := RequestId } = StateData) ->
-    BodySize = byte_size(maps:get(last_response_body, StateData)),
-    report_event({download_finished, BodySize, {ok, Headers}}, StateData),
-    StateData2 =
-        ?maps_update_with4(
-          last_response_headers,
-          fun (PrevHeaders) -> lists:usort(PrevHeaders ++ Headers) end,
-          Headers, StateData),
-    StateData3 = maps:remove(request_id, StateData2),
-    {next_state, processing_update, StateData3,
+waiting_stream_end(info, {http, {RequestId, stream_end, TrailHeaders}}, % no chunked encoding
+                   #state_data{ request_id = RequestId } = StateData) ->
+    #state_data{last_response_headers = PrevHeaders,
+                last_response_body = LastResponseBody} = StateData,
+    BodySize = byte_size(LastResponseBody),
+    report_event({download_finished, BodySize, {ok, TrailHeaders}}, StateData),
+    UpdatedHeaders = lists:usort(PrevHeaders ++ TrailHeaders),
+    UpdatedStateData =
+        StateData#state_data{
+          request_id = undefined,
+          last_response_headers = UpdatedHeaders
+         },
+    {next_state, processing_update, UpdatedStateData,
      {next_event, internal, execute}};
 waiting_stream_end(info, {http, {RequestId, {error, Reason}}},
-                   #{ request_id := RequestId } = StateData) ->
-    BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
+                   #state_data{ request_id = RequestId } = StateData) ->
+    #state_data{last_response_body = LastResponseBody} = StateData,
+    BodySizeSoFar = byte_size(LastResponseBody),
     report_event({download_finished, BodySizeSoFar, {error, Reason}}, StateData),
     StateData2 =
-        maps:without([request_id, last_response_headers, last_response_body],
-                     StateData),
+        StateData#state_data{
+          request_id = undefined,
+          last_response_headers = undefined,
+          last_response_body = undefined
+         },
     {StateData3, Replies} = reply_to_waiters({error, {http, Reason}}, StateData2),
     {next_state, ready, {StateData3, Replies}};
 waiting_stream_end(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
     handle_monitored_process_death(Pid, StateData);
 waiting_stream_end(state_timeout, timeout, StateData) ->
-    BodySizeSoFar = byte_size(maps:get(last_response_body, StateData)),
+    #state_data{request_id = RequestId, last_response_body = LastResponseBody} = StateData,
+    BodySizeSoFar = byte_size(LastResponseBody),
     report_event({download_finished, BodySizeSoFar, {error, timeout}}, StateData),
-    {RequestId, StateData2} = ?maps_take(request_id, StateData),
-    StateData3 = maps:without([last_response_headers, last_response_body], StateData2),
-    {StateData4, Replies} = reply_to_waiters({error, {timeout, waiting_stream_end}}, StateData3),
+    StateData2 =
+        StateData#state_data{
+          request_id = undefined,
+          last_response_headers = undefined,
+          last_response_body = undefined
+         },
+    {StateData3, Replies} = reply_to_waiters({error, {timeout, waiting_stream_end}}, StateData2),
     ok = httpc:cancel_request(RequestId),
     clear_inbox_of_late_http_messages(RequestId),
-    {next_state, ready, StateData4, Replies}.
+    {next_state, ready, StateData3, Replies}.
 
 -spec processing_update(enter, atom(), state_data())
                         -> keep_state_and_data;
@@ -455,52 +447,78 @@ waiting_stream_end(state_timeout, timeout, StateData) ->
 processing_update(enter, _PrevState, _StateData) ->
     keep_state_and_data;
 processing_update(internal, execute, StateData) ->
-    Id = maps:get(id, StateData),
-    {Headers, StateData2} = ?maps_take(last_response_headers, StateData),
-    {Body, StateData3} = ?maps_take(last_response_body, StateData2),
-    URL = maps:get(url, StateData),
+    #state_data{id = Id, url = URL,
+                last_response_headers = Headers,
+                last_response_body = Body
+               } = StateData,
+    StateData2 =
+        StateData#state_data{
+          last_response_headers = undefined,
+          last_response_body = undefined
+         },
     Source = {remote, URL},
     case locus_util:load_database_from_tarball(Id, Body, Source) of
         {ok, Version} ->
-            report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
+            report_event({load_attempt_finished, Source, {ok, Version}}, StateData2),
             LastModified = extract_last_modified_datetime_from_response_headers(Headers),
-            StateData4 = StateData3#{ last_modified => LastModified,
-                                      last_version => Version },
-            maybe_try_saving_cached_tarball(Body, LastModified, StateData4),
-            {StateData5, Replies} = reply_to_waiters({ok, Version}, StateData4),
-            {next_state, ready, StateData5, Replies};
+            StateData3 = StateData2#state_data{ last_modified = LastModified,
+                                                last_version = Version },
+            maybe_try_saving_cached_tarball(Body, LastModified, StateData3),
+            {StateData4, Replies} = reply_to_waiters({ok, Version}, StateData3),
+            {next_state, ready, StateData4, Replies};
         {error, Error} ->
-            report_event({load_attempt_finished, Source, {error, Error}}, StateData),
-            {StateData4, Replies} = reply_to_waiters({error, Error}, StateData3),
-            {next_state, ready, StateData4, Replies}
+            report_event({load_attempt_finished, Source, {error, Error}}, StateData2),
+            {StateData3, Replies} = reply_to_waiters({error, Error}, StateData2),
+            {next_state, ready, StateData3, Replies}
     end.
 
 -spec code_change(term(), atom(), state_data(), term()) -> {ok, atom(), state_data()}.
 %% @private
-code_change(_OldVsn, OldState, OldStateData, _Extra) ->
-    case OldStateData of
-        #{ id := _, url := _, waiters := _, event_subscribers := _,
-           pre_readiness_update_period := _, post_readiness_update_period := _
-         } ->
-            {ok, OldState, OldStateData};
+code_change(_OldVsn, State, #state_data{} = StateData, _Extra) ->
+    % lib is at version 1.7 or higher
+    {ok, State, StateData};
+code_change(_OldVsn, State, #{} = OldStateData, _Extra) ->
+    % lib was at version 1.6 or older
+    UpdatedStateData =
+        #state_data{
+           id = maps:get(id, OldStateData),
+           url = maps:get(url, OldStateData),
+           waiters = maps:get(waiters, OldStateData),
+           event_subscribers =
+                maps:get(event_subscribers, OldStateData,
+                         [locus_logger]),
+           connect_timeout =
+                maps:get(connect_timeout, OldStateData,
+                         ?DEFAULT_HTTP_CONNECT_TIMEOUT),
+           download_start_timeout =
+                maps:get(download_start_timeout, OldStateData,
+                         ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT),
+           idle_download_timeout =
+                maps:get(idle_download_timeout, OldStateData,
+                         ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT),
+           pre_readiness_update_period =
+                maps:get(pre_readiness_update_period, OldStateData,
+                         ?DEFAULT_PRE_READINESS_UPDATE_PERIOD),
+           post_readiness_update_period =
+                maps:get(post_readiness_update_period, OldStateData,
+                         ?DEFAULT_POST_READINESS_UPDATE_PERIOD),
+           no_cache =
+                maps:get(no_cache, OldStateData, false),
+           insecure =
+                maps:get(insecure, OldStateData, false),
 
-        #{ id := _, url := _, waiters := _, event_subscribers := _
-         } ->
-            % lib was at a version between 1.1.x and 1.4.x
-            StateData = OldStateData#{ pre_readiness_update_period => ?DEFAULT_PRE_READINESS_UPDATE_PERIOD,
-                                       post_readiness_update_period => ?DEFAULT_POST_READINESS_UPDATE_PERIOD
-                                     },
-            {ok, OldState, StateData};
-
-        #{ id := _, url := _, waiters := _ } ->
-            % lib was at version 1.0.0; ensure everything works as before
-            EventSubscribers = [locus_logger],
-            StateData = OldStateData#{ event_subscribers => EventSubscribers,
-                                       connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
-                                       download_start_timeout => ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
-                                       idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT },
-            {ok, OldState, StateData}
-    end.
+           request_id =
+                maps:get(request_id, OldStateData, undefined),
+           last_response_headers =
+                maps:get(last_response_headers, OldStateData, undefined),
+           last_response_body =
+                maps:get(last_response_body, OldStateData, undefined),
+           last_modified =
+                maps:get(last_modified, OldStateData, undefined),
+           last_version =
+                maps:get(last_version, OldStateData, undefined)
+          },
+    {ok, State, UpdatedStateData}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -515,53 +533,52 @@ server_name(Id) ->
            {stop, {invalid_opt, term()}}.
 init(Id, URL, Opts) ->
     BaseStateData =
-        #{ id => Id,
-           url => URL,
-           waiters => [],
-           event_subscribers => [],
-           connect_timeout => ?DEFAULT_HTTP_CONNECT_TIMEOUT,
-           download_start_timeout => ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
-           idle_download_timeout => ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT,
-           pre_readiness_update_period => ?DEFAULT_PRE_READINESS_UPDATE_PERIOD,
-           post_readiness_update_period => ?DEFAULT_POST_READINESS_UPDATE_PERIOD
-         },
+        #state_data{
+           id = Id,
+           url = URL,
+           waiters = [],
+           event_subscribers = [],
+           connect_timeout = ?DEFAULT_HTTP_CONNECT_TIMEOUT,
+           download_start_timeout = ?DEFAULT_HTTP_DOWNLOAD_START_TIMEOUT,
+           idle_download_timeout = ?DEFAULT_HTTP_IDLE_DOWNLOAD_TIMEOUT,
+           pre_readiness_update_period = ?DEFAULT_PRE_READINESS_UPDATE_PERIOD,
+           post_readiness_update_period = ?DEFAULT_POST_READINESS_UPDATE_PERIOD,
+           no_cache = false,
+           insecure = false
+          },
     init_opts(Opts, BaseStateData).
 
 init_opts([{event_subscriber, Module} | Opts], StateData) when is_atom(Module), Module =/= undefined ->
-    NewStateData =
-        ?maps_update_with3(
-          event_subscribers,
-          fun (PrevSubscribers) -> [Module | PrevSubscribers] end,
-          StateData),
-    init_opts(Opts, NewStateData);
+    #state_data{ event_subscribers = Subscribers } = StateData,
+    UpdatedSubscribers = [Module | Subscribers],
+    UpdatedStateData = StateData#state_data{ event_subscribers = UpdatedSubscribers },
+    init_opts(Opts, UpdatedStateData);
 init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
     _ = monitor(process, Pid),
-    NewStateData =
-        ?maps_update_with3(
-          event_subscribers,
-          fun (PrevSubscribers) -> [Pid | PrevSubscribers] end,
-          StateData),
-    init_opts(Opts, NewStateData);
+    #state_data{ event_subscribers = Subscribers } = StateData,
+    UpdatedSubscribers = [Pid | Subscribers],
+    UpdatedStateData = StateData#state_data{ event_subscribers = UpdatedSubscribers },
+    init_opts(Opts, UpdatedStateData);
 init_opts([{connect_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
-    NewStateData = StateData#{ connect_timeout := Timeout },
+    NewStateData = StateData#state_data{ connect_timeout = Timeout },
     init_opts(Opts, NewStateData);
 init_opts([{download_start_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
-    NewStateData = StateData#{ download_start_timeout := Timeout },
+    NewStateData = StateData#state_data{ download_start_timeout = Timeout },
     init_opts(Opts, NewStateData);
 init_opts([{idle_download_timeout, Timeout} | Opts], StateData) when ?is_timeout(Timeout) ->
-    NewStateData = StateData#{ idle_download_timeout := Timeout },
+    NewStateData = StateData#state_data{ idle_download_timeout = Timeout },
     init_opts(Opts, NewStateData);
 init_opts([{pre_readiness_update_period, Interval} | Opts], StateData) when ?is_pos_integer(Interval) ->
-    NewStateData = StateData#{ pre_readiness_update_period := Interval },
+    NewStateData = StateData#state_data{ pre_readiness_update_period = Interval },
     init_opts(Opts, NewStateData);
 init_opts([{post_readiness_update_period, Interval} | Opts], StateData) when ?is_pos_integer(Interval) ->
-    NewStateData = StateData#{ post_readiness_update_period := Interval },
+    NewStateData = StateData#state_data{ post_readiness_update_period = Interval },
     init_opts(Opts, NewStateData);
 init_opts([no_cache | Opts], StateData) ->
-    NewStateData = StateData#{ no_cache => true },
+    NewStateData = StateData#state_data{ no_cache = true },
     init_opts(Opts, NewStateData);
 init_opts([insecure | Opts], StateData) ->
-    NewStateData = StateData#{ insecure => true },
+    NewStateData = StateData#state_data{ insecure = true },
     init_opts(Opts, NewStateData);
 init_opts([{internal, {async_waiter, {Pid,Ref}=From}} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
     {NewStateData, []} = enqueue_waiter(From, StateData),
@@ -574,7 +591,7 @@ init_opts([], StateData) ->
 
 -spec cached_tarball_name(state_data()) -> nonempty_string().
 cached_tarball_name(StateData) ->
-    #{ url := URL } = StateData,
+    #state_data{url = URL} = StateData,
     cached_tarball_name_for_url(URL).
 
 -spec cached_tarball_name_for_url(string()) -> nonempty_string().
@@ -591,14 +608,14 @@ cached_tarball_name_for_url(URL) ->
              when LookupResult :: ({ok, binary(), calendar:datetime()} |
                                    {error, term()}).
 handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, StateData) ->
-    Id = maps:get(id, StateData),
+    #state_data{ id = Id } = StateData,
     Source = {cache, CachedTarballName},
     case locus_util:load_database_from_tarball(Id, Content, Source) of
         {ok, Version} ->
             report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
-            {StateData2, Replies} = reply_to_waiters({ok, Version}, StateData),
-            {StateData2#{ last_modified => ModificationDate,
-                          last_version => Version },
+            {State2, Replies} = reply_to_waiters({ok, Version}, StateData),
+            {State2#state_data{ last_modified = ModificationDate,
+                           last_version = Version },
              Replies};
         {error, Error} ->
             report_event({load_attempt_finished, Source, {error, Error}}, StateData),
@@ -610,7 +627,7 @@ handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
     {StateData, []}.
 
 -spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
-maybe_try_saving_cached_tarball(_Tarball, _LastModified, #{ no_cache := true }) ->
+maybe_try_saving_cached_tarball(_Tarball, _LastModified, #state_data{no_cache = true}) ->
     ok;
 maybe_try_saving_cached_tarball(Tarball, LastModified, StateData) ->
     case save_cached_tarball(Tarball, LastModified, StateData) of
@@ -654,17 +671,17 @@ bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
 
 -spec update_period(state_data()) -> pos_integer().
-update_period(#{ last_modified := _ } = StateData) ->
-    maps:get(post_readiness_update_period, StateData);
-update_period(#{} = StateData) ->
-    maps:get(pre_readiness_update_period, StateData).
+update_period(#state_data{last_modified = undefined} = StateData) ->
+    StateData#state_data.pre_readiness_update_period;
+update_period(StateData) ->
+    StateData#state_data.post_readiness_update_period.
 
-request_headers(#{ last_modified := LastModified } = _StateData) ->
+request_headers(#state_data{last_modified = undefined}) ->
+    base_request_headers();
+request_headers(#state_data{last_modified = LastModified}) ->
     LocalLastModified = calendar:universal_time_to_local_time(LastModified),
     [{"if-modified-since", httpd_util:rfc1123_date(LocalLastModified)}
-     | base_request_headers()];
-request_headers(#{} = _StateData) ->
-    base_request_headers().
+     | base_request_headers()].
 
 base_request_headers() ->
     [{"accept", join_header_values(
@@ -709,28 +726,26 @@ clear_inbox_of_late_http_messages(RequestId) ->
 
 -spec maybe_enqueue_waiter(from(), state_data())
         -> {state_data(), [?gen_statem:reply_action()]}.
-maybe_enqueue_waiter(From, #{ last_version := LastVersion } = StateData) ->
-    {StateData, [{reply, From, {ok, LastVersion}}]};
-maybe_enqueue_waiter(From, StateData) ->
-    enqueue_waiter(From, StateData).
+maybe_enqueue_waiter(From, #state_data{last_version = undefined} = StateData) ->
+    enqueue_waiter(From, StateData);
+maybe_enqueue_waiter(From, #state_data{last_version = LastVersion} = StateData) ->
+    {StateData, [{reply, From, {ok, LastVersion}}]}.
 
 enqueue_waiter(From, StateData) ->
-    StateData2 =
-        ?maps_update_with3(
-          waiters,
-          fun (PrevWaiters) -> [From | PrevWaiters] end,
-          StateData),
-    {StateData2, []}.
+    #state_data{waiters = Waiters} = StateData,
+    UpdatedWaiters = [From | Waiters],
+    UpdatedStateData = StateData#state_data{waiters = UpdatedWaiters},
+    {UpdatedStateData, []}.
 
 -spec reply_to_waiters({ok, calendar:datetime()} | {error, term()}, state_data())
         -> {state_data(), [?gen_statem:reply_action()]}.
 reply_to_waiters(Result, StateData) ->
-    Waiters = maps:get(waiters, StateData),
+    #state_data{waiters = Waiters} = StateData,
     Replies = [{reply, From, Result} || From <- Waiters],
-    {StateData#{ waiters := [] }, Replies}.
+    {StateData#state_data{ waiters = [] }, Replies}.
 
 -spec report_event(event(), state_data()) -> ok.
-report_event(Event, #{ id := Id, event_subscribers := Subscribers }) ->
+report_event(Event, #state_data{id = Id, event_subscribers = Subscribers}) ->
     lists:foreach(
       fun (Module) when is_atom(Module) ->
               Module:report(Id, Event);
@@ -740,9 +755,7 @@ report_event(Event, #{ id := Id, event_subscribers := Subscribers }) ->
       Subscribers).
 
 handle_monitored_process_death(Pid, StateData) ->
-    StateData2 =
-        ?maps_update_with3(
-          event_subscribers,
-          fun (Subscribers) -> lists:delete(Pid, Subscribers) end,
-          StateData),
-    {keep_state, StateData2}.
+    #state_data{event_subscribers = Subscribers} = StateData,
+    {ok, UpdatedSubscribers} = locus_util:lists_take(Pid, Subscribers),
+    UpdatedStateData = StateData#state_data{event_subscribers = UpdatedSubscribers},
+    {keep_state, UpdatedStateData}.

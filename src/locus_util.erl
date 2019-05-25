@@ -37,7 +37,8 @@
    [read_file_and_its_modification_date/1,
     maybe_read_file_and_its_modification_date/2,
     load_database_from_tarball/3,
-    parse_ip_address/1
+    parse_ip_address/1,
+    lists_take/2
    ]).
 
 %% ------------------------------------------------------------------
@@ -115,6 +116,10 @@ parse_ip_address(String) when length(String) >= 0 ->
 parse_ip_address(_Invalid) ->
     {error, einval}.
 
+-spec lists_take(term(), list()) -> {ok, list()} | error.
+lists_take(Elem, List) ->
+    lists_take_recur(Elem, List, []).
+
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
@@ -146,3 +151,11 @@ has_mmdb_extension({Filename, _Type, _Size, _MTime, _Mode, _Uid, _Gid}) ->
     filename:extension(Filename) =:= ".mmdb" andalso {true, Filename};
 has_mmdb_extension(Filename) ->
     filename:extension(Filename) =:= ".mmdb".
+
+-spec lists_take_recur(term(), list(), list()) -> {ok, list()} | error.
+lists_take_recur(Elem, [H|T], Acc) when Elem =:= H ->
+    {ok, lists:reverse(Acc, T)};
+lists_take_recur(Elem, [H|T], Acc) ->
+    lists_take_recur(Elem, T, [H|Acc]);
+lists_take_recur(_, [], _) ->
+    error.
