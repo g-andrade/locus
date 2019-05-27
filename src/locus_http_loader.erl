@@ -638,8 +638,12 @@ maybe_try_saving_cached_tarball(Tarball, LastModified, StateData) ->
     end.
 
 -spec save_cached_tarball(binary(), calendar:datetime(), state_data())
-        -> {Status, Filename} when Status :: ok | {error, {exception, atom(), term()}},
-                                   Filename :: nonempty_string().
+        -> {Status, Filename} when Status :: ok | {error, Exception},
+                                   Filename :: nonempty_string(),
+                                   Exception :: {exception, Class, Reason, Stacktrace},
+                                   Class :: atom(),
+                                   Reason :: term(),
+                                   Stacktrace :: [term()].
 save_cached_tarball(Tarball, LastModified, StateData) ->
     Filename = cached_tarball_name(StateData),
     TmpSuffix = ".tmp." ++ integer_to_list(locus_rand_compat:uniform(1 bsl 32), 36),
@@ -655,7 +659,9 @@ save_cached_tarball(Tarball, LastModified, StateData) ->
         {ok, Filename}
     catch
         Class:Reason ->
-            {{error, {exception, Class, Reason}}, Filename}
+            Stacktrace = erlang:get_stacktrace(),
+            {{error, {exception, Class, Reason, Stacktrace}},
+             Filename}
     end.
 
 -spec bin_to_hex_str(binary()) -> [48..57 | 97..102].

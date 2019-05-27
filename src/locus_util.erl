@@ -81,7 +81,7 @@ maybe_read_file_and_its_modification_date(Filename, PrevModificationDate) ->
 
 -spec load_database_from_tarball(atom(), binary(), locus_mmdb:source())
         -> {ok, calendar:datetime()} |
-           {error, {exception, atom(), term()}}.
+           {error, {exception, atom(), term(), [term()]}}.
 load_database_from_tarball(Id, Tarball, Source) ->
     try
         BinDatabase = extract_database_from_tarball(Tarball),
@@ -89,7 +89,8 @@ load_database_from_tarball(Id, Tarball, Source) ->
         {ok, Version}
     catch
         Class:Reason ->
-            {error, {exception, Class, Reason}}
+            Stacktrace = erlang:get_stacktrace(),
+            {error, {exception, Class, Reason, Stacktrace}}
     end.
 
 -spec parse_ip_address(binary() | string() | inet:ip_address())

@@ -5,9 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [UNRELEASED]
+### Added
+- stacktrace of caught exceptions to event reporting (including logger)
 ### Changed
 - state data representation in HTTP loader from map to record
-
 
 ## [1.6.2] - 2019-03-16
 ### Fixed
