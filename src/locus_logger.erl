@@ -157,9 +157,9 @@ report(MinWeight, DatabaseId, {load_attempt_finished, Source, {ok, Version}}) ->
     end;
 report(MinWeight, DatabaseId, {load_attempt_finished, Source, {error, Error}}) ->
     if MinWeight =< ?debug ->
-           log_warning("~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
-       MinWeight =< ?warning ->
-           log_warning("~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
+           log_error("~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
+       MinWeight =< ?error ->
+           log_error("~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
        true ->
            ok
     end;
@@ -183,8 +183,8 @@ report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Error}}
 log_info(Fmt, Args) ->
     log(info_msg, Fmt, Args).
 
-log_warning(Fmt, Args) ->
-    log(warning_msg, Fmt, Args).
+%log_warning(Fmt, Args) ->
+%    log(warning_msg, Fmt, Args).
 
 log_error(Fmt, Args) ->
     log(error_msg, Fmt, Args).

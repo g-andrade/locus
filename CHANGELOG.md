@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - stacktrace of caught exceptions to event reporting (including logger)
 ### Changed
+- log level of database loading failures from warning to error
 - state data representation in HTTP loader from map to record
 
 ## [1.6.2] - 2019-03-16
