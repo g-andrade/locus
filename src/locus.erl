@@ -341,6 +341,7 @@ analyze(DatabaseId) ->
 
 -ifdef(ESCRIPTIZING).
 -spec main([string()]) -> no_return().
+%% @private
 main(Args) ->
     locus_cli:main(Args).
 -endif.
