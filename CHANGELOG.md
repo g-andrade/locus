@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - log level of database loading failures from warning to error
 - state data representation in HTTP loader from map to record
+- state management in HTTP loader as not to deal with the details
+  of downloading (which is now done on a temporary gen_server)
 ### Removed
 - OTP 17.4 and 17.5 support
 
