@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     - state data switched from map to record
     - all the downloading steps are now delegated to separe, temporary processes
     - behaviour was switched from `gen_statem` to `gen_server`
+- Dependency versions:
+    - `certifi` [2.4.2 => 2.5.1]
+    - `ssl_verify_fun` [1.1.4 => 1.1.5]
 ### Removed
 - OTP 17.4 and 17.5 support
 
