@@ -218,7 +218,7 @@ The API reference can be found on <a target="_parent" href="https://hexdocs.pm/l
 <h5 id="tested-setup">Tested setup</h5>
 
 <ul>
-<li>Erlang/OTP 17.4 or newer</li>
+<li>Erlang/OTP 18.0 or newer</li>
 <li>rebar3</li>
 </ul>
 

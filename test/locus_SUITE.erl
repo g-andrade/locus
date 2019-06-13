@@ -110,9 +110,8 @@ init_per_group(local_http_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     ok = locus_logger:set_loglevel(debug),
     {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
-    locus_rand_compat:seed(),
     DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
-    RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
+    RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
     DatabaseURL = BaseURL ++ "/GeoLite2-Country.tar.gz" ++ "#" ++ RandomAnchor,
     CorruptURL = BaseURL ++ "/corruption.tar.gz",
     ok = set_file_mtime(DatabasePath, ?VERSION1_TIMESTAMP),
@@ -127,8 +126,7 @@ init_per_group(local_http_tests, Config) ->
 init_per_group(remote_http_tests, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     ok = locus_logger:set_loglevel(debug),
-    locus_rand_compat:seed(),
-    RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
+    RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
     URL = ?REMOTE_COUNTRY_URL ++ "#" ++ RandomAnchor,
     CorruptURL = ?REMOTE_COUNTRY_CORRUPT_URL,
     BaseURL = ?REMOTE_COUNTRY_BASE_URL,
@@ -167,10 +165,6 @@ end_per_group(remote_http_tests, Config) ->
 %% Test Cases
 %% ------------------------------------------------------------------
 
--ifdef(BAD_HTTPC).
-cacheless_loading_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 cacheless_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = cacheless_loading_httptest,
@@ -189,13 +183,8 @@ cacheless_loading_httptest(Config) ->
     ?assertEqual({ok, {remote,URL}}, locus:get_info(Loader, source)),
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
--endif.
 
 
--ifdef(BAD_HTTPC).
-cold_remote_loading_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 cold_remote_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = cold_regular_loading_httptest,
@@ -216,12 +205,7 @@ cold_remote_loading_httptest(Config) ->
     ?assertEqual({ok, {remote,URL}}, locus:get_info(Loader, source)),
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-warm_remote_loading_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 warm_remote_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = warm_regular_loading_httptest,
@@ -240,12 +224,7 @@ warm_remote_loading_httptest(Config) ->
     ?assertEqual({ok, {cache,CacheFilename}}, locus:get_info(Loader, source)),
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-update_works_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 update_works_httptest(Config) ->
     IsRemote = proplists:get_value(is_remote, Config),
     update_works_httptest(IsRemote, Config).
@@ -283,12 +262,7 @@ update_works_httptest(_IsRemote, Config) ->
     ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod >= 0.90),
     %%
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv4_country_lookup_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv4_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv4_country_lookup_test,
@@ -299,12 +273,7 @@ ipv4_country_lookup_test(Config) ->
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv4_invalid_addr_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv4_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv4_invalid_addr_test,
@@ -312,12 +281,7 @@ ipv4_invalid_addr_test(Config) ->
     {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv6_country_lookup_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv6_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv6_country_lookup_test,
@@ -328,12 +292,7 @@ ipv6_country_lookup_test(Config) ->
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv6_invalid_addr_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv6_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv6_invalid_addr_test,
@@ -341,12 +300,7 @@ ipv6_invalid_addr_test(Config) ->
     {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifndef(POST_OTP_17).
-connect_timeout_httptest(_Config) ->
-    {skip, "Not working properly on OTP 17"}.
--else.
 connect_timeout_httptest(Config) ->
     % Undeterministic test case
     URL = proplists:get_value(url, Config),
@@ -367,7 +321,6 @@ connect_timeout_httptest(Config) ->
                      F(AttemptsLeft - 1)
              end
      end(MaxAttempts)).
--endif.
 
 download_start_timeout_httptest(Config) ->
     %% Undeterministic test case
@@ -390,10 +343,6 @@ download_start_timeout_httptest(Config) ->
              end
      end)(MaxAttempts).
 
--ifdef(BAD_HTTPC).
-idle_download_timeout_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 idle_download_timeout_httptest(Config) ->
     % Undeterministic test case
     URL = proplists:get_value(url, Config),
@@ -415,7 +364,6 @@ idle_download_timeout_httptest(Config) ->
                      F(AttemptsLeft - 1)
              end
      end(MaxAttempts)).
--endif.
 
 wrong_url_fstest(Config) ->
     BaseURL = proplists:get_value(base_url, Config),
@@ -511,10 +459,6 @@ subscriber_death_test(Config) ->
     ?assertEqual(OriginalPid, LoaderModule:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
--ifdef(BAD_HTTPC).
-async_waiter_success_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 async_waiter_success_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = async_waiter_success_test,
@@ -523,7 +467,6 @@ async_waiter_success_test(Config) ->
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     ?assertRecv({Ref, {ok, _LoadedVersion}}),
     ok = locus:stop_loader(Loader).
--endif.
 
 async_waiter_failure_test(Config) ->
     BaseURL = proplists:get_value(base_url, Config),

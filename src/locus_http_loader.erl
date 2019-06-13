@@ -237,7 +237,6 @@ callback_mode() -> [state_functions, state_enter].
         -> ?gen_statem:init_result(initializing).
 %% @private
 init([Id, URL, Opts]) ->
-    locus_rand_compat:seed(),
     locus_mmdb:create_table(Id),
     init(Id, URL, Opts).
 
@@ -646,7 +645,7 @@ maybe_try_saving_cached_tarball(Tarball, LastModified, StateData) ->
                                    Stacktrace :: [term()].
 save_cached_tarball(Tarball, LastModified, StateData) ->
     Filename = cached_tarball_name(StateData),
-    TmpSuffix = ".tmp." ++ integer_to_list(locus_rand_compat:uniform(1 bsl 32), 36),
+    TmpSuffix = ".tmp." ++ integer_to_list(rand:uniform(1 bsl 32), 36),
     TmpFilename = Filename ++ TmpSuffix,
     FileInfoMod = #file_info{ mtime = LastModified },
     try

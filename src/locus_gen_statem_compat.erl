@@ -43,12 +43,10 @@
     system_terminate/4,
     wakeup_from_hibernate/3]).
 
--ifdef(POST_OTP_17).
 -ignore_xref(
    [stop/1,
     stop/3
    ]).
--endif.
 
 %% API
 -export(
@@ -57,11 +55,9 @@
     enter_loop/4,enter_loop/5,enter_loop/6,
     reply/1,reply/2]).
 
--ifdef(POST_OTP_17).
 -export(
    [stop/1,stop/3
    ]).
--endif.
 
 %% gen callbacks
 -export(
@@ -432,7 +428,6 @@ start_link(Module, Args, Opts) ->
 start_link(ServerName, Module, Args, Opts) ->
     gen:start(?MODULE, link, ServerName, Module, Args, Opts).
 
--ifdef(POST_OTP_17).
 %% Stop a state machine
 -spec stop(ServerRef :: server_ref()) -> ok.
 stop(ServerRef) ->
@@ -444,7 +439,6 @@ stop(ServerRef) ->
     Timeout :: timeout()) -> ok.
 stop(ServerRef, Reason, Timeout) ->
     gen:stop(ServerRef, Reason, Timeout).
--endif.
 
 %% Send an event to a state machine that arrives with type 'event'
 -spec cast(ServerRef :: server_ref(), Msg :: term()) -> ok.
@@ -1799,7 +1793,6 @@ cancel_timer_by_type(TimerType, TimerTypes, CancelTimers) ->
         {TimerTypes,CancelTimers}
     end.
 
--ifdef(POST_OTP_17).
 cancel_timer(TimerRef) ->
     ok = erlang:cancel_timer(TimerRef, [{async,true}]).
 -else.
@@ -1808,6 +1801,5 @@ cancel_timer(TimerRef) ->
     Result = erlang:cancel_timer(TimerRef) ,
     self() ! {cancel_timer, TimerRef, Result},
     ok.
--endif.
 
 -endif.

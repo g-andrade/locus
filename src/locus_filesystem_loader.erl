@@ -159,7 +159,6 @@ list_subscribers(Id) ->
 -spec init([atom() | string() | opt(), ...]) -> {ok, state()}.
 %% @private
 init([Id, Path, Opts]) ->
-    locus_rand_compat:seed(),
     locus_mmdb:create_table(Id),
     init(Id, Path, Opts).
 
