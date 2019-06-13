@@ -1795,11 +1795,5 @@ cancel_timer_by_type(TimerType, TimerTypes, CancelTimers) ->
 
 cancel_timer(TimerRef) ->
     ok = erlang:cancel_timer(TimerRef, [{async,true}]).
--else.
-cancel_timer(TimerRef) ->
-    % one more dirty hack for retro compatibility - simulate VM behaviour
-    Result = erlang:cancel_timer(TimerRef) ,
-    self() ! {cancel_timer, TimerRef, Result},
-    ok.
 
 -endif.
