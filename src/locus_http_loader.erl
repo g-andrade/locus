@@ -27,7 +27,7 @@
 -include("locus_pre_otp19_compat.hrl").
 
 -module(locus_http_loader).
--behaviour(?gen_statem).
+-behaviour(gen_server).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -45,18 +45,17 @@
 -endif.
 
 %% ------------------------------------------------------------------
-%% gen_statem Function Exports
+%% gen_server Function Exports
 %% ------------------------------------------------------------------
 
--export([callback_mode/0]).
--export([init/1]).
-%% states
--export([initializing/3]).                  -ignore_xref({initializing,3}).
--export([ready/3]).                         -ignore_xref({ready,3}).
--export([downloading/3]).                   -ignore_xref({downloading,3}).
--export([processing_update/3]).             -ignore_xref({processing_update,3}).
-%%
--export([code_change/4]).
+-export(
+   [init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+   ]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -88,7 +87,7 @@
     {async_waiter, {pid(),reference()}}.
 -export_type([internal_opt/0]).
 
--record(state_data, {
+-record(state, {
           id :: atom(),
           url :: url(),
           waiters :: [from()],
@@ -97,12 +96,12 @@
           post_readiness_update_period :: pos_integer(),
           no_cache :: boolean(),
           download_opts :: [locus_http_download:opt()],
-
+          update_timer :: reference() | undefined,
           last_modified :: calendar:datetime() | undefined,
           last_version :: calendar:datetime() | undefined,
           download_pid :: pid() | undefined
          }).
--type state_data() :: #state_data{}.
+-type state() :: #state{}.
 
 -type filename() :: string().
 -export_type([filename/0]).
@@ -143,7 +142,7 @@
 %% @private
 start_link(Id, URL, Opts) ->
     ServerName = server_name(Id),
-    ?gen_statem:start_link({local, ServerName}, ?CB_MODULE, [Id, URL, Opts], []).
+    gen_server:start_link({local, ServerName}, ?CB_MODULE, [Id, URL, Opts], []).
 
 -spec wait(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
@@ -151,24 +150,24 @@ start_link(Id, URL, Opts) ->
 %% @private
 wait(Id, Timeout) ->
     ServerName = server_name(Id),
-    try ?gen_statem:call(ServerName, wait, Timeout) of
+    try gen_server:call(ServerName, wait, Timeout) of
         {ok, LoadedVersion} ->
             {ok, LoadedVersion};
         {error, LoadingError} ->
             {error, {loading, LoadingError}}
     catch
-        exit:{timeout, {?gen_statem,call,[ServerName|_]}} when Timeout =/= infinity ->
+        exit:{timeout, {gen_server,call,[ServerName|_]}} when Timeout =/= infinity ->
             {error, timeout};
-        %exit:{{nodedown,_RemoteNode}, {?gen_statem,call,[ServerName|_}} ->
+        %exit:{{nodedown,_RemoteNode}, {gen_server,call,[ServerName|_}} ->
         %    % Cannot happen (loader is always local)
         %    {error, database_unknown};
-        exit:{noproc, {?gen_statem,call,[ServerName|_]}} ->
+        exit:{noproc, {gen_server,call,[ServerName|_]}} ->
             {error, database_unknown};
-        exit:{normal, {?gen_statem,call, [ServerName|_]}} ->
+        exit:{normal, {gen_server,call, [ServerName|_]}} ->
             {error, database_unknown};
-        exit:{shutdown, {?gen_statem,call, [ServerName|_]}} ->
+        exit:{shutdown, {gen_server,call, [ServerName|_]}} ->
             {error, database_unknown};
-        exit:{{shutdown,_Reason}, {?gen_statem,call, [ServerName|_]}} ->
+        exit:{{shutdown,_Reason}, {gen_server,call, [ServerName|_]}} ->
             {error, database_unknown}
     end.
 
@@ -181,142 +180,65 @@ whereis(Id) ->
 %% @private
 list_subscribers(Id) ->
     ServerName = server_name(Id),
-    {_State, StateData} = sys:get_state(ServerName),
-    StateData#state_data.event_subscribers.
+    State = sys:get_state(ServerName),
+    State#state.event_subscribers.
 -endif.
 
 %% ------------------------------------------------------------------
-%% gen_statem Function Definitions
+%% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
--spec callback_mode() -> [state_functions | state_enter, ...].
-%% @private
-callback_mode() -> [state_functions, state_enter].
-
 -spec init([atom() | string() | [opt()], ...])
-        -> ?gen_statem:init_result(initializing).
+        -> {ok, state()}.
 %% @private
 init([Id, URL, Opts]) ->
     _ = process_flag(trap_exit, true),
     locus_mmdb:create_table(Id),
     init(Id, URL, Opts).
 
--spec initializing(enter, atom(), state_data())
-                   -> keep_state_and_data;
-                  (info, maybe_load_from_cache, state_data())
-                   -> {next_state, ready, state_data(),
-                       {next_event, internal, update_database}}.
-%% @private
-initializing(enter, _PrevState, _StateData) ->
-    keep_state_and_data;
-initializing(info, maybe_load_from_cache, #state_data{no_cache = true} = StateData) ->
-    {next_state, ready, StateData, {next_event, internal, update_database}};
-initializing(info, maybe_load_from_cache, StateData) ->
-    CachedTarballName = cached_tarball_name(StateData),
-    CachedTarballLookup = locus_util:read_file_and_its_modification_date(CachedTarballName),
-    {StateData2, Replies} = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, StateData),
-    {next_state, ready, StateData2, Replies ++ [{next_event, internal, update_database}]}.
+-spec handle_call(term(), {pid(),reference()}, state())
+        -> {noreply, state()} |
+           {stop, unexpected_call, state()}.
+handle_call(wait, From, State) ->
+    State2 = maybe_enqueue_waiter(From, State),
+    {noreply, State2};
+handle_call(_Call, _From, State) ->
+    {stop, unexpected_call, State}.
 
--spec ready(enter, atom(), state_data())
-            -> {keep_state_and_data, {state_timeout, pos_integer(), update_database}};
-           ({call,from()}, wait, state_data())
-           -> {keep_state, state_data(), [?gen_statem:reply_action()]};
-           (info, {'DOWN', reference(), process, pid(), term()}, state_data())
-           -> {keep_state, state_data()};
-           (internal, update_database, state_data())
-            -> {next_state, downloading, state_data()};
-           (state_timeout, update_database, state_data())
-            -> {repeat_state_and_data, {next_event, internal, update_database}}.
-%% @private
-ready(enter, _PrevState, StateData) ->
-    {keep_state_and_data, {state_timeout, update_period(StateData), update_database}};
-ready({call,From}, wait, StateData) ->
-    {StateData2, Actions} = maybe_enqueue_waiter(From, StateData),
-    {keep_state, StateData2, Actions};
-ready(info, {'DOWN', _Ref, process, Pid, _Reason}, StateData) ->
-    handle_monitored_process_death(Pid, StateData);
-ready(internal, update_database, StateData) ->
-    #state_data{url = URL, download_opts = Opts} = StateData,
-    Headers = request_headers(StateData),
-    {ok, DownloadPid} = locus_http_download:start_link(URL, Headers, Opts),
-    UpdatedStateData = StateData#state_data{ download_pid = DownloadPid },
-    {next_state, downloading, UpdatedStateData};
-ready(state_timeout, update_database, _StateData) ->
-    {repeat_state_and_data, {next_event, internal, update_database}}.
+-spec handle_cast(term(), state())
+        -> {stop, unexpected_cast, state()}.
+handle_cast(_Cast, State) ->
+    {stop, unexpected_cast, State}.
 
--spec downloading(enter, atom(), state_data())
-                   -> keep_state_and_data;
-                 ({call,from()}, wait, state_data())
-                   -> {keep_state, state_data(), [?gen_statem:reply_action()]};
-                 (info, {pid(),locus_http_download:msg()}, state_data())
-                   -> keep_state_and_data |
-                      {next_state, ready, state_data()} |
-                      {next_state, atom(), state_data(), [?gen_statem:action()]};
-                 (info, {'EXIT', pid(), term()}, state_data())
-                   -> {stop, {downloader_stopped, pid(), term()}}.
-%% @private
-downloading(enter, _PrevState, _StateData) ->
-    keep_state_and_data;
-downloading({call,From}, wait, StateData) ->
-    {UpdatedStateData, Actions} = maybe_enqueue_waiter(From, StateData),
-    {keep_state, UpdatedStateData, Actions};
-downloading(info, {DownloadPid, Msg}, StateData)
-  when DownloadPid =:= StateData#state_data.download_pid ->
-    case Msg of
-        {event, Event} ->
-            report_event(Event, StateData),
-            keep_state_and_data;
-        dismissed
-          when StateData#state_data.last_modified =/= undefined ->
-            stop_and_flush_link(DownloadPid),
-            UpdatedStateData = StateData#state_data{ download_pid = undefined },
-            {next_state, ready, UpdatedStateData};
-        {finished, Headers, Body} ->
-            stop_and_flush_link(DownloadPid),
-            UpdatedStateData = StateData#state_data{ download_pid = undefined },
-            Actions = [{next_event, internal, {load,Headers,Body}}],
-            {next_state, processing_update, UpdatedStateData, Actions};
-        {error, Reason} ->
-            stop_and_flush_link(DownloadPid),
-            StateData2 = StateData#state_data{ download_pid = undefined },
-            {StateData3, Replies} = reply_to_waiters({error, Reason}, StateData2),
-            {next_state, ready, StateData3, Replies}
-    end;
-downloading(info, {'EXIT', DownloadPid, Reason}, StateData)
-  when DownloadPid =:= StateData#state_data.download_pid ->
-    {stop, {downloader_stopped, DownloadPid, Reason}}.
+-spec handle_info(term(), state())
+        -> {noreply, state()} |
+           {stop, unexpected_info, state()}.
+handle_info(finish_initialization, State)
+  when State#state.update_timer =:= undefined ->
+    UpdatedState = finish_initialization(State),
+    {noreply, UpdatedState};
+handle_info(begin_update, State) ->
+    false = erlang:cancel_timer(State#state.update_timer),
+    State2 = State#state{ update_timer = undefined },
+    State3 = begin_update(State2),
+    {noreply, State3};
+handle_info({DownloadPid, Msg}, State)
+  when DownloadPid =:= State#state.download_pid ->
+    handle_download_msg(Msg, State);
+handle_info({'DOWN', _, process, Pid, _}, State) ->
+    handle_monitored_process_death(Pid, State);
+handle_info({'EXIT', Pid, Reason}, State) ->
+    handle_linked_process_death(Pid, Reason, State);
+handle_info(_Info, State) ->
+    {stop, unexpected_info, State}.
 
--spec processing_update(enter, atom(), state_data())
-                        -> keep_state_and_data;
-                       (internal, {load,headers(),body()}, state_data())
-                       -> {next_state, ready, state_data(), [?gen_statem:reply_action()]}.
-%% @private
-processing_update(enter, _PrevState, _StateData) ->
-    keep_state_and_data;
-processing_update(internal, {load,Headers,Body} , StateData) ->
-    #state_data{id = Id, url = URL} = StateData,
-    Source = {remote, URL},
-    case locus_util:load_database_from_tarball(Id, Body, Source) of
-        {ok, Version} ->
-            report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
-            LastModified = extract_last_modified_datetime_from_response_headers(Headers),
-            StateData2 = StateData#state_data{ last_modified = LastModified,
-                                               last_version = Version },
-            maybe_try_saving_cached_tarball(Body, LastModified, StateData2),
-            {StateData3, Replies} = reply_to_waiters({ok, Version}, StateData2),
-            {next_state, ready, StateData3, Replies};
-        {error, Error} ->
-            report_event({load_attempt_finished, Source, {error, Error}}, StateData),
-            {StateData2, Replies} = reply_to_waiters({error, Error}, StateData),
-            {next_state, ready, StateData2, Replies}
-    end.
+-spec terminate(term(), state()) -> ok.
+terminate(_Reason, _State) ->
+    ok.
 
--spec code_change(term(), atom(), state_data(), term()) -> {ok, atom(), state_data()}.
-%% @private
-code_change(_OldVsn, State, #state_data{} = StateData, _Extra) ->
-    {ok, State, StateData};
-code_change(_OldVsn, _State, StateData, _Extra) ->
-    {error, {unknown_date_data_format, StateData}}.
+-spec code_change(term(), state(), term()) -> {ok, state()}.
+code_change(_OldVsn, #state{} = State, _Extra) ->
+    {ok, State}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -327,12 +249,12 @@ server_name(Id) ->
     list_to_atom(atom_to_list(?MODULE) ++ "_" ++ atom_to_list(Id)).
 
 -spec init(atom(), string(), [opt()])
-        -> ?gen_statem:init_result(initializing) |
+        -> {ok, state()} |
            {stop, {invalid_opt, term()}}.
 init(Id, URL, Opts) ->
     {DownloadOpts, RemainingOpts} = locus_http_download:sieve_opts(Opts),
-    BaseStateData =
-        #state_data{
+    BaseState =
+        #state{
            id = Id,
            url = URL,
            waiters = [],
@@ -342,40 +264,109 @@ init(Id, URL, Opts) ->
            no_cache = false,
            download_opts = DownloadOpts
           },
-    init_opts(RemainingOpts, BaseStateData).
+    init_opts(RemainingOpts, BaseState).
 
-init_opts([{event_subscriber, Module} | Opts], StateData) when is_atom(Module), Module =/= undefined ->
-    #state_data{ event_subscribers = Subscribers } = StateData,
+init_opts([{event_subscriber, Module} | Opts], State) when is_atom(Module), Module =/= undefined ->
+    #state{ event_subscribers = Subscribers } = State,
     UpdatedSubscribers = [Module | Subscribers],
-    UpdatedStateData = StateData#state_data{ event_subscribers = UpdatedSubscribers },
-    init_opts(Opts, UpdatedStateData);
-init_opts([{event_subscriber, Pid} | Opts], StateData) when is_pid(Pid) ->
+    UpdatedState = State#state{ event_subscribers = UpdatedSubscribers },
+    init_opts(Opts, UpdatedState);
+init_opts([{event_subscriber, Pid} | Opts], State) when is_pid(Pid) ->
     _ = monitor(process, Pid),
-    #state_data{ event_subscribers = Subscribers } = StateData,
+    #state{ event_subscribers = Subscribers } = State,
     UpdatedSubscribers = [Pid | Subscribers],
-    UpdatedStateData = StateData#state_data{ event_subscribers = UpdatedSubscribers },
-    init_opts(Opts, UpdatedStateData);
-init_opts([{pre_readiness_update_period, Interval} | Opts], StateData) when ?is_pos_integer(Interval) ->
-    NewStateData = StateData#state_data{ pre_readiness_update_period = Interval },
-    init_opts(Opts, NewStateData);
-init_opts([{post_readiness_update_period, Interval} | Opts], StateData) when ?is_pos_integer(Interval) ->
-    NewStateData = StateData#state_data{ post_readiness_update_period = Interval },
-    init_opts(Opts, NewStateData);
-init_opts([no_cache | Opts], StateData) ->
-    NewStateData = StateData#state_data{ no_cache = true },
-    init_opts(Opts, NewStateData);
-init_opts([{internal, {async_waiter, {Pid,Ref}=From}} | Opts], StateData) when is_pid(Pid), is_reference(Ref) ->
-    {NewStateData, []} = enqueue_waiter(From, StateData),
-    init_opts(Opts, NewStateData);
-init_opts([InvalidOpt | _], _StateData) ->
+    UpdatedState = State#state{ event_subscribers = UpdatedSubscribers },
+    init_opts(Opts, UpdatedState);
+init_opts([{pre_readiness_update_period, Interval} | Opts], State) when ?is_pos_integer(Interval) ->
+    NewState = State#state{ pre_readiness_update_period = Interval },
+    init_opts(Opts, NewState);
+init_opts([{post_readiness_update_period, Interval} | Opts], State) when ?is_pos_integer(Interval) ->
+    NewState = State#state{ post_readiness_update_period = Interval },
+    init_opts(Opts, NewState);
+init_opts([no_cache | Opts], State) ->
+    NewState = State#state{ no_cache = true },
+    init_opts(Opts, NewState);
+init_opts([{internal, {async_waiter, {Pid,Ref}=From}} | Opts], State) when is_pid(Pid), is_reference(Ref) ->
+    NewState = enqueue_waiter(From, State),
+    init_opts(Opts, NewState);
+init_opts([InvalidOpt | _], _State) ->
     {stop, {invalid_opt, InvalidOpt}};
-init_opts([], StateData) ->
-    self() ! maybe_load_from_cache,
-    {ok, initializing, StateData}.
+init_opts([], State) ->
+    self() ! finish_initialization,
+    {ok, State}.
 
--spec cached_tarball_name(state_data()) -> nonempty_string().
-cached_tarball_name(StateData) ->
-    #state_data{url = URL} = StateData,
+finish_initialization(State) when State#state.no_cache ->
+    schedule_update(0, State);
+finish_initialization(State) ->
+    CachedTarballName = cached_tarball_name(State),
+    CachedTarballLookup = locus_util:read_file_and_its_modification_date(CachedTarballName),
+    UpdatedState = handle_cached_tarball_lookup(CachedTarballLookup, CachedTarballName, State),
+    schedule_update(0, UpdatedState).
+
+schedule_update(State) ->
+    case State#state.last_version of
+        undefined ->
+            schedule_update(State#state.pre_readiness_update_period, State);
+        {{_,_,_}, {_,_,_}} ->
+            schedule_update(State#state.post_readiness_update_period, State)
+    end.
+
+schedule_update(Interval, State)
+  when State#state.update_timer =:= undefined ->
+    NewTimer = erlang:send_after(Interval, self(), begin_update),
+    State#state{ update_timer = NewTimer }.
+
+begin_update(State)
+  when State#state.download_pid =:= undefined ->
+    #state{url = URL, download_opts = Opts} = State,
+    Headers = request_headers(State),
+    {ok, DownloadPid} = locus_http_download:start_link(URL, Headers, Opts),
+    State#state{ download_pid = DownloadPid }.
+
+handle_download_msg({event,Event}, State) ->
+    report_event(Event, State),
+    {noreply, State};
+handle_download_msg(dismissed, State)
+  when State#state.last_version =/= undefined ->
+    stop_and_flush_link(State#state.download_pid),
+    State2 = State#state{ download_pid = undefined },
+    State3 = schedule_update(State2),
+    {noreply, State3};
+handle_download_msg({finished, Headers, Body}, State) ->
+    stop_and_flush_link(State#state.download_pid),
+    State2 = State#state{ download_pid = undefined },
+    State3 = try_loading_downloaded_database(Headers, Body, State2),
+    State4 = schedule_update(State3),
+    {noreply, State4};
+handle_download_msg({error, Reason}, State) ->
+    stop_and_flush_link(State#state.download_pid),
+    State2 = State#state{ download_pid = undefined },
+    State3 = reply_to_waiters({error, Reason}, State2),
+    State4 = schedule_update(State3),
+    {noreply, State4}.
+
+try_loading_downloaded_database(Headers, Body, State) ->
+    #state{id = Id, url = URL} = State,
+    Source = {remote, URL},
+    case locus_util:load_database_from_tarball(Id, Body, Source) of
+        {ok, Version} ->
+            report_event({load_attempt_finished, Source, {ok, Version}}, State),
+            LastModified = extract_last_modified_datetime_from_response_headers(Headers),
+            State2 = State#state{ last_modified = LastModified, last_version = Version },
+            maybe_try_saving_cached_tarball(Body, LastModified, State2),
+            reply_to_waiters({ok, Version}, State2);
+        {error, Error} ->
+            report_event({load_attempt_finished, Source, {error, Error}}, State),
+            reply_to_waiters({error, Error}, State)
+    end.
+
+handle_linked_process_death(Pid, Reason, State)
+  when Pid =:= State#state.download_pid ->
+    {stop, {downloader_stopped, Pid, Reason}}.
+
+-spec cached_tarball_name(state()) -> nonempty_string().
+cached_tarball_name(State) ->
+    #state{url = URL} = State,
     cached_tarball_name_for_url(URL).
 
 -spec cached_tarball_name_for_url(string()) -> nonempty_string().
@@ -387,49 +378,48 @@ cached_tarball_name_for_url(URL) ->
     UserCachePath = ?filename_basedir(user_cache, "locus_erlang"),
     filename:join(UserCachePath, Filename).
 
--spec handle_cached_tarball_lookup(LookupResult, nonempty_string(), state_data())
-        -> {state_data(), [?gen_statem:reply_action()]}
+-spec handle_cached_tarball_lookup(LookupResult, nonempty_string(), state())
+        -> state()
              when LookupResult :: ({ok, binary(), calendar:datetime()} |
                                    {error, term()}).
-handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, StateData) ->
-    #state_data{ id = Id } = StateData,
+handle_cached_tarball_lookup({ok, Content, ModificationDate}, CachedTarballName, State) ->
+    #state{ id = Id } = State,
     Source = {cache, CachedTarballName},
     case locus_util:load_database_from_tarball(Id, Content, Source) of
         {ok, Version} ->
-            report_event({load_attempt_finished, Source, {ok, Version}}, StateData),
-            {State2, Replies} = reply_to_waiters({ok, Version}, StateData),
-            {State2#state_data{ last_modified = ModificationDate,
-                                last_version = Version },
-             Replies};
+            report_event({load_attempt_finished, Source, {ok, Version}}, State),
+            State2 = reply_to_waiters({ok, Version}, State),
+            State2#state{ last_modified = ModificationDate,
+                          last_version = Version };
         {error, Error} ->
-            report_event({load_attempt_finished, Source, {error, Error}}, StateData),
-            {StateData, []}
+            report_event({load_attempt_finished, Source, {error, Error}}, State),
+            State
     end;
-handle_cached_tarball_lookup({error, Error}, CachedTarballName, StateData) ->
+handle_cached_tarball_lookup({error, Error}, CachedTarballName, State) ->
     Source = {cache, CachedTarballName},
-    report_event({load_attempt_finished, Source, {error, Error}}, StateData),
-    {StateData, []}.
+    report_event({load_attempt_finished, Source, {error, Error}}, State),
+    State.
 
--spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state_data()) -> ok.
-maybe_try_saving_cached_tarball(_Tarball, _LastModified, #state_data{no_cache = true}) ->
+-spec maybe_try_saving_cached_tarball(binary(), calendar:datetime(), state()) -> ok.
+maybe_try_saving_cached_tarball(_Tarball, _LastModified, #state{no_cache = true}) ->
     ok;
-maybe_try_saving_cached_tarball(Tarball, LastModified, StateData) ->
-    case save_cached_tarball(Tarball, LastModified, StateData) of
+maybe_try_saving_cached_tarball(Tarball, LastModified, State) ->
+    case save_cached_tarball(Tarball, LastModified, State) of
         {ok, Filename} ->
-            report_event({cache_attempt_finished, Filename, ok}, StateData);
+            report_event({cache_attempt_finished, Filename, ok}, State);
         {{error, Error}, Filename} ->
-            report_event({cache_attempt_finished, Filename, {error, Error}}, StateData)
+            report_event({cache_attempt_finished, Filename, {error, Error}}, State)
     end.
 
--spec save_cached_tarball(binary(), calendar:datetime(), state_data())
+-spec save_cached_tarball(binary(), calendar:datetime(), state())
         -> {Status, Filename} when Status :: ok | {error, Exception},
                                    Filename :: nonempty_string(),
                                    Exception :: {exception, Class, Reason, Stacktrace},
                                    Class :: atom(),
                                    Reason :: term(),
                                    Stacktrace :: [term()].
-save_cached_tarball(Tarball, LastModified, StateData) ->
-    Filename = cached_tarball_name(StateData),
+save_cached_tarball(Tarball, LastModified, State) ->
+    Filename = cached_tarball_name(State),
     TmpSuffix = ".tmp." ++ integer_to_list(rand:uniform(1 bsl 32), 36),
     TmpFilename = Filename ++ TmpSuffix,
     FileInfoMod = #file_info{ mtime = LastModified },
@@ -460,15 +450,9 @@ bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
 bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
 
--spec update_period(state_data()) -> pos_integer().
-update_period(#state_data{last_modified = undefined} = StateData) ->
-    StateData#state_data.pre_readiness_update_period;
-update_period(StateData) ->
-    StateData#state_data.post_readiness_update_period.
-
-request_headers(#state_data{last_modified = undefined}) ->
+request_headers(#state{last_modified = undefined}) ->
     base_request_headers();
-request_headers(#state_data{last_modified = LastModified}) ->
+request_headers(#state{last_modified = LastModified}) ->
     LocalLastModified = calendar:universal_time_to_local_time(LastModified),
     [{"if-modified-since", httpd_util:rfc1123_date(LocalLastModified)}
      | base_request_headers()].
@@ -515,28 +499,26 @@ extract_last_modified_datetime_from_response_headers(Headers) ->
             {{1970,1,1}, {0,0,0}}
     end.
 
--spec maybe_enqueue_waiter(from(), state_data())
-        -> {state_data(), [?gen_statem:reply_action()]}.
-maybe_enqueue_waiter(From, #state_data{last_version = undefined} = StateData) ->
-    enqueue_waiter(From, StateData);
-maybe_enqueue_waiter(From, #state_data{last_version = LastVersion} = StateData) ->
-    {StateData, [{reply, From, {ok, LastVersion}}]}.
+-spec maybe_enqueue_waiter(from(), state()) -> state().
+maybe_enqueue_waiter(From, #state{last_version = undefined} = State) ->
+    enqueue_waiter(From, State);
+maybe_enqueue_waiter(From, #state{last_version = LastVersion} = State) ->
+    gen_server:reply(From, {ok,LastVersion}),
+    State.
 
-enqueue_waiter(From, StateData) ->
-    #state_data{waiters = Waiters} = StateData,
+enqueue_waiter(From, State) ->
+    #state{waiters = Waiters} = State,
     UpdatedWaiters = [From | Waiters],
-    UpdatedStateData = StateData#state_data{waiters = UpdatedWaiters},
-    {UpdatedStateData, []}.
+    State#state{ waiters = UpdatedWaiters }.
 
--spec reply_to_waiters({ok, calendar:datetime()} | {error, term()}, state_data())
-        -> {state_data(), [?gen_statem:reply_action()]}.
-reply_to_waiters(Result, StateData) ->
-    #state_data{waiters = Waiters} = StateData,
-    Replies = [{reply, From, Result} || From <- Waiters],
-    {StateData#state_data{ waiters = [] }, Replies}.
+-spec reply_to_waiters({ok, calendar:datetime()} | {error, term()}, state()) -> state().
+reply_to_waiters(Result, State) ->
+    #state{waiters = Waiters} = State,
+    lists:foreach(fun (From) -> gen_server:reply(From, Result) end, Waiters),
+    State#state{ waiters = [] }.
 
--spec report_event(event(), state_data()) -> ok.
-report_event(Event, #state_data{id = Id, event_subscribers = Subscribers}) ->
+-spec report_event(event(), state()) -> ok.
+report_event(Event, #state{id = Id, event_subscribers = Subscribers}) ->
     lists:foreach(
       fun (Module) when is_atom(Module) ->
               Module:report(Id, Event);
@@ -545,8 +527,8 @@ report_event(Event, #state_data{id = Id, event_subscribers = Subscribers}) ->
       end,
       Subscribers).
 
-handle_monitored_process_death(Pid, StateData) ->
-    #state_data{event_subscribers = Subscribers} = StateData,
+handle_monitored_process_death(Pid, State) ->
+    #state{event_subscribers = Subscribers} = State,
     {ok, UpdatedSubscribers} = locus_util:lists_take(Pid, Subscribers),
-    UpdatedStateData = StateData#state_data{event_subscribers = UpdatedSubscribers},
-    {keep_state, UpdatedStateData}.
+    UpdatedState = State#state{event_subscribers = UpdatedSubscribers},
+    {noreply, UpdatedState}.

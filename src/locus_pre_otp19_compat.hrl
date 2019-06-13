@@ -3,9 +3,3 @@
 -else.
 -define(filename_basedir, (fun locus_filename_compat:basedir/2)).
 -endif.
-
--ifdef(NO_GEN_STATEM).
--define(gen_statem, locus_gen_statem_compat).
--else.
--define(gen_statem, gen_statem).
--endif.

@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - stacktrace of caught exceptions to event reporting (including logger)
 ### Changed
 - log level of database loading failures from warning to error
-- state data representation in HTTP loader from map to record
-- state management in HTTP loader as not to deal with the details
-  of downloading (which is now done on a temporary gen_server)
+- HTTP loader structure and behaviour:
+    - state data switched from map to record
+    - all the downloading steps are now delegated to separe, temporary processes
+    - behaviour was switched from `gen_statem` to `gen_server`
 ### Removed
 - OTP 17.4 and 17.5 support
 
