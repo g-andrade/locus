@@ -138,7 +138,7 @@ expected_lookup_results_test(Config) ->
 %% ------------------------------------------------------------------
 
 guess_brokenness(GroupName) ->
-    LowerCase = string:lowercase(GroupName),
+    LowerCase = string:to_lower(GroupName),
     lists:any(
       fun (Pattern) ->
               string:str(LowerCase, Pattern) > 0
