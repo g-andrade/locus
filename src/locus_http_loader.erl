@@ -158,9 +158,6 @@ wait(Id, Timeout) ->
     catch
         exit:{timeout, {gen_server,call,[ServerName|_]}} when Timeout =/= infinity ->
             {error, timeout};
-        %exit:{{nodedown,_RemoteNode}, {gen_server,call,[ServerName|_}} ->
-        %    % Cannot happen (loader is always local)
-        %    {error, database_unknown};
         exit:{noproc, {gen_server,call,[ServerName|_]}} ->
             {error, database_unknown};
         exit:{normal, {gen_server,call, [ServerName|_]}} ->
