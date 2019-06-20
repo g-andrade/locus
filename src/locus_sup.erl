@@ -122,10 +122,7 @@ child_spec(DatabaseId, URLType, DatabaseURL, Opts) ->
     {Id, Start, Restart, Shutdown, Type, Modules}.
 
 child_id(DatabaseId) ->
-    % FIXME this is incorrect for filesystem URLs.
-    % It was left like this so we wouldn't break interface.
-    % Fix it the next time we do break interface.
-    {http_loader, DatabaseId}.
+    {loader, DatabaseId}.
 
 child_module(http) -> locus_http_loader;
 child_module(filesystem) -> locus_filesystem_loader.
