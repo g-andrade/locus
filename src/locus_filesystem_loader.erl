@@ -99,6 +99,7 @@
        modules => [?MODULE, ...]
      }.
 -endif.
+-export_type([static_child_spec/0]).
 
 -record(state, {
           id :: atom(),
