@@ -80,6 +80,7 @@
     {async_waiter, {pid(),reference()}}.
 -export_type([internal_opt/0]).
 
+-ifdef(POST_OTP_18).
 -type static_child_spec() ::
     #{ id := term(),
        start := {?MODULE, start_link, [atom() | string() | [opt()], ...]},
@@ -88,7 +89,16 @@
        type := worker,
        modules := [?MODULE, ...]
      }.
--export_type([static_child_spec/0]).
+-else.
+-type static_child_spec() ::
+    #{ id => term(),
+       start => {?MODULE, start_link, [atom() | string() | [opt()], ...]},
+       restart => permanent,
+       shutdown => non_neg_integer(),
+       type => worker,
+       modules => [?MODULE, ...]
+     }.
+-endif.
 
 -record(state, {
           id :: atom(),
