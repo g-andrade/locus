@@ -34,6 +34,8 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/3]).                    -ignore_xref({start_link, 3}).
+-export([dynamic_child_spec/1]).
+-export([static_child_spec/4]).
 -export([wait/2]).
 
 -ifdef(TEST).
@@ -78,6 +80,16 @@
     {async_waiter, {pid(),reference()}}.
 -export_type([internal_opt/0]).
 
+-type static_child_spec() ::
+    #{ id := term(),
+       start := {?MODULE, start_link, [atom() | string() | [opt()], ...]},
+       restart := permanent,
+       shutdown := non_neg_integer(),
+       type := worker,
+       modules := [?MODULE, ...]
+     }.
+-export_type([static_child_spec/0]).
+
 -record(state, {
           id :: atom(),
           path :: filename(),
@@ -106,11 +118,33 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start_link(atom(), string(), [opt()]) -> {ok, pid()}.
+-spec start_link(atom(), string(), [opt()]) -> {ok, pid()} | {error,term()}.
 %% @private
 start_link(Id, Path, Opts) ->
     ServerName = server_name(Id),
-    gen_server:start_link({local, ServerName}, ?CB_MODULE, [Id, Path, Opts], []).
+    gen_server:start_link({local,ServerName}, ?MODULE, [Id, Path, Opts], []).
+
+-spec dynamic_child_spec(term()) -> supervisor:child_spec().
+%% @private
+dynamic_child_spec(ChildId) ->
+    #{ id => ChildId,
+       start => {?MODULE, start_link, []},
+       restart => transient,
+       shutdown => timer:seconds(5),
+       type => worker,
+       modules => [?MODULE]
+     }.
+
+-spec static_child_spec(term(), atom(), string(), [opt()]) -> static_child_spec().
+%% @private
+static_child_spec(ChildId, DatabaseId, URL, Opts) ->
+    #{ id => ChildId,
+       start => {?MODULE, start_link, [DatabaseId, URL, Opts]},
+       restart => permanent,
+       shutdown => timer:seconds(5),
+       type => worker,
+       modules => [?MODULE]
+     }.
 
 -spec wait(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
@@ -156,11 +190,16 @@ list_subscribers(Id) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([atom() | string() | opt(), ...]) -> {ok, state()}.
+-spec init([atom() | string() | opt(), ...])
+        -> {ok,state()} | {stop,{shutdown,already_started}}.
 %% @private
 init([Id, Path, Opts]) ->
-    locus_mmdb:create_table(Id),
-    init(Id, Path, Opts).
+    case locus_mmdb:create_table(Id) of
+        ok ->
+            init(Id, Path, Opts);
+        {error, already_created} ->
+            {stop, {shutdown, already_started}}
+    end.
 
 -spec handle_call(term(), from(), state())
         -> {reply, {ok, calendar:datetime()}, state()} |

@@ -433,12 +433,22 @@ database_still_loading_httptest(Config) ->
     ok = locus:stop_loader(Loader).
 
 invalid_args_test(Config) ->
+    _ = process_flag(trap_exit, true),
     URL = proplists:get_value(url, Config),
     NotAnURL = not_an_url,
     Loader = invalid_args_test,
+    NotAnOpt = not_an_opt,
+    InvalidOpts = [NotAnOpt],
+
+    % regular loaders
     ?assertEqual({error, invalid_url}, locus:start_loader(Loader, NotAnURL)),
-    InvalidOpts = [not_an_opt],
-    ?assertEqual({error, {invalid_opt, not_an_opt}}, locus:start_loader(Loader, URL, InvalidOpts)).
+    ?assertEqual({error, {invalid_opt, NotAnOpt}}, locus:start_loader(Loader, URL, InvalidOpts)),
+
+    % child spec'd loaders
+    ?assertMatch({error, {invalid_url,_}},
+                 custom_loader_sup:start_link(Loader, NotAnURL)),
+    ?assertMatch({error, {shutdown, {failed_to_start_child,_,{invalid_opt,NotAnOpt}}}},
+                 custom_loader_sup:start_link(Loader, URL, InvalidOpts)).
 
 subscriber_death_test(Config) ->
     LoaderModule =
@@ -477,6 +487,42 @@ async_waiter_failure_test(Config) ->
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     ?assertRecv({Ref, {error, _Reason}}),
     ok = locus:stop_loader(Loader).
+
+loader_child_spec_test(Config) ->
+    _ = process_flag(trap_exit, true),
+    URL = proplists:get_value(url, Config),
+    Loader = loader_child_spec_test,
+
+    {ok, Supervisor} = custom_loader_sup:start_link(Loader, URL),
+    {ok, _} = locus:wait_for_loader(Loader, 10000),
+
+    % it conflicts with supervisor-spawned loaders under the same name
+    ?assertMatch({error, {shutdown, {failed_to_start_child,_,{already_started,_}}}},
+                 custom_loader_sup:start_link(Loader, URL)),
+
+    % it conflicts with regular loaders under the same name
+    ?assertMatch({error, already_started}, locus:start_loader(Loader, URL)),
+
+    % addresses can be looked up like in regular loaders
+    ?assertEqual({error, not_found}, locus:lookup(Loader, "127.0.0.1")),
+    ?assertMatch({ok, #{}},          locus:lookup(Loader, ?IPV4_STR_ADDR)),
+    ?assertMatch({ok, #{}},          locus:lookup(Loader, ?IPV6_STR_ADDR)),
+
+    % if stopped like a regular loader,
+    % its supervisor will decide whether to restart it
+    % (and it will, in this case)
+    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+    ?assertEqual(ok, locus:stop_loader(Loader)),
+    timer:sleep(500),
+    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+
+    % it can be permanently stopped by stopping its supervisor
+    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+    ok = custom_loader_sup:stop(Supervisor),
+    timer:sleep(500),
+    ?assertEqual({error,database_unknown}, locus:get_info(Loader)),
+
+    ok.
 
 %%%
 

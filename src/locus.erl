@@ -33,6 +33,9 @@
 -export([start_loader/2]).                -ignore_xref({start_loader,2}).
 -export([start_loader/3]).                -ignore_xref({start_loader,3}).
 -export([stop_loader/1]).                 -ignore_xref({stop_loader,1}).
+-export([loader_child_spec/2]).           -ignore_xref({loader_child_spec,2}).
+-export([loader_child_spec/3]).           -ignore_xref({loader_child_spec,3}).
+-export([loader_child_spec/4]).           -ignore_xref({loader_child_spec,4}).
 -export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
 -export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
 -export([lookup/2]).                      -ignore_xref({lookup,2}).
@@ -140,8 +143,10 @@ start_loader(DatabaseId, DatabaseURL) ->
 start_loader(DatabaseId, DatabaseURL, Opts) ->
     OptsWithDefaults = opts_with_defaults(Opts),
     case parse_url(DatabaseURL) of
-        {URLType, ParsedURL} -> locus_sup:start_child(DatabaseId, URLType, ParsedURL, OptsWithDefaults);
-        false -> {error, invalid_url}
+        {URLType, ParsedURL} ->
+            locus_loader_sup:start_child(URLType, [DatabaseId, ParsedURL, OptsWithDefaults]);
+        false ->
+            {error, invalid_url}
     end.
 
 %% @doc Stops the database loader under id `DatabaseId'.
@@ -155,7 +160,98 @@ start_loader(DatabaseId, DatabaseURL, Opts) ->
             when DatabaseId :: atom(),
                  Error :: not_found.
 stop_loader(DatabaseId) ->
-    locus_sup:stop_child(DatabaseId).
+    Owner = locus_mmdb:owner(DatabaseId),
+    try gen:stop(Owner, normal, 5000) of
+        ok ->
+            ok
+    catch
+        exit:noproc -> {error, not_found};
+        exit:normal -> ok;
+        exit:shutdown -> ok;
+        exit:{shutdown,_} -> ok
+    end.
+
+%% @doc Like `:loader_child_spec/2' but with default options
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>A `supervisor:child_spec()'.</li>
+%% </ul>
+%% @see loader_child_spec/3
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/2
+-spec loader_child_spec(DatabaseId, DatabaseURL) -> ChildSpec | no_return()
+            when DatabaseId :: atom(),
+                 DatabaseURL :: string() | binary(),
+                 ChildSpec :: (locus_http_loader:static_child_spec() |
+                               locus_filesystem_loader:static_child_spec()).
+loader_child_spec(DatabaseId, DatabaseURL) ->
+    loader_child_spec(DatabaseId, DatabaseURL, []).
+
+%% @doc Like `:loader_child_spec/3' but with default child id
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`Opts' must be either a list of `locus_http_loader:opt()' or a list of `locus_filesystem_loader:opt()' values</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>A `supervisor:child_spec()'.</li>
+%% </ul>
+%% @see loader_child_spec/4
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/3
+-spec loader_child_spec(DatabaseId, DatabaseURL, Opts) -> ChildSpec | no_return()
+            when DatabaseId :: atom(),
+                 DatabaseURL :: string() | binary(),
+                 Opts :: [locus_http_loader:opt()] | [locus_filesystem_loader:opt()],
+                 ChildSpec :: (locus_http_loader:static_child_spec() |
+                               locus_filesystem_loader:static_child_spec()).
+loader_child_spec(DatabaseId, DatabaseURL, Opts) ->
+    loader_child_spec({locus_loader,DatabaseId}, DatabaseId, DatabaseURL, Opts).
+
+%% @doc Returns a supervisor child spec for a database loader under id `DatabaseId' with options `Opts'.
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`Opts' must be either a list of `locus_http_loader:opt()' or a list of `locus_filesystem_loader:opt()' values</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>A `supervisor:child_spec()'.</li>
+%% </ul>
+%% @see loader_child_spec/3
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/3
+-spec loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts) -> ChildSpec | no_return()
+            when ChildId :: term(),
+                 DatabaseId :: atom(),
+                 DatabaseURL :: string() | binary(),
+                 Opts :: [locus_http_loader:opt()] | [locus_filesystem_loader:opt()],
+                 ChildSpec :: (locus_http_loader:static_child_spec() |
+                               locus_filesystem_loader:static_child_spec()).
+loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts) ->
+    OptsWithDefaults = opts_with_defaults(Opts),
+    case parse_url(DatabaseURL) of
+        {http, ParsedURL} ->
+            locus_http_loader:static_child_spec(ChildId, DatabaseId, ParsedURL, OptsWithDefaults);
+        {filesystem, ParsedURL} ->
+            locus_filesystem_loader:static_child_spec(ChildId, DatabaseId, ParsedURL, OptsWithDefaults);
+        false ->
+            error(invalid_url)
+    end.
 
 %% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails.
 %%

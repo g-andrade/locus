@@ -35,7 +35,9 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/3]).                    -ignore_xref({start_link, 3}).
+-export([start_link/3]).                    -ignore_xref({start_link,3}).
+-export([dynamic_child_spec/1]).
+-export([static_child_spec/4]).
 -export([wait/2]).
 
 -ifdef(TEST).
@@ -61,8 +63,6 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
--define(CB_MODULE, ?MODULE).
-
 -define(DEFAULT_PRE_READINESS_UPDATE_PERIOD, (timer:minutes(1))).
 -define(DEFAULT_POST_READINESS_UPDATE_PERIOD, (timer:hours(6))).
 
@@ -86,6 +86,16 @@
 -opaque internal_opt() ::
     {async_waiter, {pid(),reference()}}.
 -export_type([internal_opt/0]).
+
+-type static_child_spec() ::
+    #{ id := term(),
+       start := {?MODULE, start_link, [atom() | string() | [opt()], ...]},
+       restart := permanent,
+       shutdown := non_neg_integer(),
+       type := worker,
+       modules := [?MODULE, ...]
+     }.
+-export_type([static_child_spec/0]).
 
 -record(state, {
           id :: atom(),
@@ -138,11 +148,34 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start_link(atom(), string(), [opt()]) -> {ok, pid()}.
+-spec start_link(atom(), string(), [opt()])
+        -> {ok, pid()} | {error, term()}.
 %% @private
 start_link(Id, URL, Opts) ->
     ServerName = server_name(Id),
-    gen_server:start_link({local, ServerName}, ?CB_MODULE, [Id, URL, Opts], []).
+    gen_server:start_link({local,ServerName}, ?MODULE, [Id, URL, Opts], []).
+
+-spec dynamic_child_spec(term()) -> supervisor:child_spec().
+%% @private
+dynamic_child_spec(ChildId) ->
+    #{ id => ChildId,
+       start => {?MODULE, start_link, []},
+       restart => transient,
+       shutdown => timer:seconds(5),
+       type => worker,
+       modules => [?MODULE]
+     }.
+
+-spec static_child_spec(term(), atom(), string(), [opt()]) -> static_child_spec().
+%% @private
+static_child_spec(ChildId, DatabaseId, URL, Opts) ->
+    #{ id => ChildId,
+       start => {?MODULE, start_link, [DatabaseId, URL, Opts]},
+       restart => permanent,
+       shutdown => timer:seconds(5),
+       type => worker,
+       modules => [?MODULE]
+     }.
 
 -spec wait(atom(), timeout())
         -> {ok, LoadedVersion :: calendar:datetime()} |
@@ -186,12 +219,17 @@ list_subscribers(Id) ->
 %% ------------------------------------------------------------------
 
 -spec init([atom() | string() | [opt()], ...])
-        -> {ok, state()}.
+        -> {ok, state()} |
+           {stop, {shutdown, already_started}}.
 %% @private
 init([Id, URL, Opts]) ->
     _ = process_flag(trap_exit, true),
-    locus_mmdb:create_table(Id),
-    init(Id, URL, Opts).
+    case locus_mmdb:create_table(Id) of
+        ok ->
+            init(Id, URL, Opts);
+        {error, already_created} ->
+            {stop, {shutdown, already_started}}
+    end.
 
 -spec handle_call(term(), {pid(),reference()}, state())
         -> {noreply, state()} |

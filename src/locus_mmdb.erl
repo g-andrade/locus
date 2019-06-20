@@ -37,6 +37,7 @@
 -export([lookup/2]).
 -export([get_parts/1]).
 -export([analyze/1]).
+-export([owner/1]).
 
 -ifdef(TEST).
 -export([decode_database_parts/2]).
@@ -196,12 +197,19 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec create_table(atom()) -> ok.
+-spec create_table(atom()) -> ok | {error, already_created}.
 %% @private
 create_table(Id) ->
     Table = table_name(Id),
-    _ = ets:new(Table, [named_table, protected, {read_concurrency,true}]),
-    ok.
+    ExistingOwner = owner(Id),
+    try ets:new(Table, [named_table, protected, {read_concurrency,true}]) of
+        Table ->
+            ok
+    catch
+        error:badarg
+          when ExistingOwner =/= undefined ->
+            {error, already_created}
+    end.
 
 -spec decode_and_update(atom(), bin_database(), source()) -> calendar:datetime().
 %% @private
@@ -253,6 +261,12 @@ analyze(Id) ->
     Table = table_name(Id),
     DatabaseLookup = ets:info(Table, name) =:= Table andalso ets:lookup(Table, database),
     analyze_(DatabaseLookup).
+
+-spec owner(atom()) -> pid() | undefined.
+%% @private
+owner(Id) ->
+    Table = table_name(Id),
+    ets:info(Table, owner).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Initialization and Data Decoding

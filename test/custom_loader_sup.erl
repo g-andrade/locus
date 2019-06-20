@@ -1,4 +1,4 @@
-%% Copyright (c) 2017-2019 Guilherme Andrade
+%% Copyright (c) 2019 Guilherme Andrade
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -24,15 +24,18 @@
 %% locus includes code extracted from OTP source code, by Ericsson AB,
 %% released under the Apache License 2.0.
 
-%% @private
--module(locus_sup).
+-module(custom_loader_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0]).                      -ignore_xref({start_link,0}).
+-export(
+   [start_link/2,
+    start_link/3,
+    stop/1
+   ]).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
@@ -41,42 +44,39 @@
 -export([init/1]).
 
 %% ------------------------------------------------------------------
-%% Macro Definitions
-%% ------------------------------------------------------------------
-
--define(SERVER, ?MODULE).
-
-%% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start_link() -> {ok, pid()}.
-start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+-spec start_link(atom(), string()) -> {ok, pid()}.
+start_link(DatabaseId, DatabaseURL) ->
+    supervisor:start_link(?MODULE, [DatabaseId, DatabaseURL]).
+
+-spec start_link(atom(), string(), [term()]) -> {ok, pid()}.
+start_link(DatabaseId, DatabaseURL, Opts) ->
+    supervisor:start_link(?MODULE, [DatabaseId, DatabaseURL, Opts]).
+
+-spec stop(pid()) -> ok.
+stop(Pid) ->
+    gen:stop(Pid, normal, 5000).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
-init([]) ->
+-spec init([InitArg, ...])
+         -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}
+        when InitArg :: DatabaseId | DatabaseURL,
+             DatabaseId :: atom(),
+             DatabaseURL :: string().
+init([DatabaseId, DatabaseURL | TailArgs])
+  when length(TailArgs) =:= 0;
+       length(TailArgs) =:= 1 ->
     SupFlags =
-        #{strategy => one_for_one,
-          intensity => 5,
-          period => 1
+        #{ strategy => one_for_one,
+           intensity => 5,
+           period => 1
          },
     ChildSpecs =
-        [loader_sup_child_spec(http),
-         loader_sup_child_spec(filesystem)
+        [apply(locus, loader_child_spec, [DatabaseId, DatabaseURL | TailArgs])
         ],
     {ok, {SupFlags, ChildSpecs}}.
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions
-%% ------------------------------------------------------------------
-
-loader_sup_child_spec(URLType) ->
-    #{ id => {loader_sup, URLType},
-       start => {locus_loader_sup, start_link, [URLType]},
-       type => supervisor
-     }.
