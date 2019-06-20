@@ -99,7 +99,6 @@ stop_child(DatabaseId) ->
 
 -spec init([]) -> {ok, {sup_flags(), []}}.
 init([]) ->
-    % TODO consider simple_one_for_one strategy with transient children
     SupFlags = {one_for_one, 10, 5},
     {ok, {SupFlags, []}}.
 
