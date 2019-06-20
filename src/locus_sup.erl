@@ -99,7 +99,11 @@ stop_child(DatabaseId) ->
 
 -spec init([]) -> {ok, {sup_flags(), []}}.
 init([]) ->
-    SupFlags = {one_for_one, 10, 5},
+    SupFlags =
+        #{strategy => one_for_one,
+          intensity => 10,
+          period => 5
+         },
     {ok, {SupFlags, []}}.
 
 %% ------------------------------------------------------------------
