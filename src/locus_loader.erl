@@ -693,7 +693,7 @@ report_event(Event, #state{id = Id, subscribers = Subscribers}) ->
 
 handle_monitored_process_death(Ref, State) ->
     #state{subscribers = Subscribers, subscriber_mons = SubscriberMons} = State,
-    {Pid, UpdatedSubscriberMons} = maps:take(Ref, SubscriberMons),
+    {Pid, UpdatedSubscriberMons} = locus_util:maps_take(Ref, SubscriberMons),
     {ok, UpdatedSubscribers} = locus_util:lists_take(Pid, Subscribers),
     UpdatedState = State#state{ subscribers = UpdatedSubscribers,
                                 subscriber_mons = UpdatedSubscriberMons },
