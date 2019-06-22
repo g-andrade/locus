@@ -538,7 +538,8 @@ handle_cacher_msg({finished,Status}, State) ->
             handle_update_conclusion(Source, UpdatedState)
     end.
 
-handle_database_fetch_dismissal(Source, State) ->
+handle_database_fetch_dismissal(Source, State)
+  when State#state.last_modified =/= undefined -> % sanity check
     handle_update_conclusion(Source, State).
 
 handle_database_fetch_success(Source, Success, State) ->
