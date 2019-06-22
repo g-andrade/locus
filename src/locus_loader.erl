@@ -701,7 +701,7 @@ handle_monitored_process_death(Ref, State) ->
 
 handle_linked_process_death(Pid, Reason, State)
   when Pid =:= State#state.fetcher_pid ->
-    {stop, {fetched_stopped, Pid, Reason}, State};
+    {stop, {fetcher_stopped, Pid, Reason}, State};
 handle_linked_process_death(Pid, Reason, State)
   when Pid =:= State#state.cacher_pid ->
     {stop, {cacher_stopped, Pid, Reason}, State}.
