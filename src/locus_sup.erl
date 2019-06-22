@@ -66,8 +66,7 @@ init([]) ->
           period => 1
          },
     ChildSpecs =
-        [loader_sup_child_spec(http),
-         loader_sup_child_spec(filesystem)
+        [loader_sup_child_spec()
         ],
     {ok, {SupFlags, ChildSpecs}}.
 
@@ -75,8 +74,8 @@ init([]) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-loader_sup_child_spec(URLType) ->
-    #{ id => {loader_sup, URLType},
-       start => {locus_loader_sup, start_link, [URLType]},
+loader_sup_child_spec() ->
+    #{ id => loader_sup,
+       start => {locus_loader_sup, start_link, []},
        type => supervisor
      }.

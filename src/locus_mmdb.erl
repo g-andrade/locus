@@ -37,7 +37,6 @@
 -export([lookup/2]).
 -export([get_parts/1]).
 -export([analyze/1]).
--export([owner/1]).
 
 -ifdef(TEST).
 -export([decode_database_parts/2]).
@@ -79,19 +78,8 @@
 -type bin_database() :: <<_:64,_:_*8>>.
 -export_type([bin_database/0]).
 
--type source() ::
-        http_loader_source() |
-        filesystem_loader_source().
+-type source() :: locus_loader:source().
 -export_type([source/0]).
-
--type http_loader_source() ::
-        {cache, Path :: string()} |
-        {remote, URL :: string()}.
--export_type([http_loader_source/0]).
-
--type filesystem_loader_source() ::
-        {filesystem, Path :: string()}.
--export_type([filesystem_loader_source/0]).
 
 -ifdef(POST_OTP_18).
 -type parts() ::
@@ -197,19 +185,12 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec create_table(atom()) -> ok | {error, already_created}.
+-spec create_table(atom()) -> ok.
 %% @private
 create_table(Id) ->
     Table = table_name(Id),
-    ExistingOwner = owner(Id),
-    try ets:new(Table, [named_table, protected, {read_concurrency,true}]) of
-        Table ->
-            ok
-    catch
-        error:badarg
-          when ExistingOwner =/= undefined ->
-            {error, already_created}
-    end.
+    _ = ets:new(Table, [named_table, protected, {read_concurrency,true}]),
+    ok.
 
 -spec decode_and_update(atom(), bin_database(), source()) -> calendar:datetime().
 %% @private
@@ -261,12 +242,6 @@ analyze(Id) ->
     Table = table_name(Id),
     DatabaseLookup = ets:info(Table, name) =:= Table andalso ets:lookup(Table, database),
     analyze_(DatabaseLookup).
-
--spec owner(atom()) -> pid() | undefined.
-%% @private
-owner(Id) ->
-    Table = table_name(Id),
-    ets:info(Table, owner).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Initialization and Data Decoding

@@ -1,4 +1,4 @@
-%% Copyright (c) 2019 Guilherme Andrade
+%% Copyright (c) 2017-2019 Guilherme Andrade
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -77,9 +77,9 @@
 
 -type msg() ::
     {event, event()} |
-    {finished, headers(), body()} |
-    dismissed |
-    {error, term()}.
+    {finished, {success, success()}} |
+    {finished, dismissed} |
+    {finished, {error, term()}}.
 -export_type([msg/0]).
 
 -type url() :: string().
@@ -125,6 +125,19 @@
         {download_finished, BodySize :: non_neg_integer(), {error, term()}} |
         {download_finished, BodySize :: non_neg_integer(), {error, timeout}}.
 -export_type([event_download_finished/0]).
+
+-ifdef(POST_OTP_18).
+-type success() ::
+        #{ headers := headers(),
+           body := binary()
+         }.
+-else.
+-type success() ::
+        #{ headers => headers(),
+           body => binary()
+         }.
+-endif.
+-export_type([success/0]).
 
 -record(state, {
           owner_pid :: pid(),
@@ -275,15 +288,15 @@ handle_httpc_message(Msg, State)
             {noreply, State4};
         {_, {{_,StatusCode,StatusDesc}, Headers, Body}} when StatusCode =:= 304 ->
             report_event({download_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, State),
-            notify_owner(dismissed, State),
+            notify_owner({finished, dismissed}, State),
             {stop, normal, State};
         {_, {{_,StatusCode,StatusDesc}, Headers, Body}} ->
             report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, State),
-            notify_owner({error, {http,StatusCode,StatusDesc}}, State),
+            notify_owner({finished, {error, {http,StatusCode,StatusDesc}}}, State),
             {stop, normal, State};
         {_, {error, Reason}} ->
             report_event({download_failed_to_start, {error, Reason}}, State),
-            notify_owner({error, {http,Reason}}, State),
+            notify_owner({finished, {error, {http,Reason}}}, State),
             {stop, normal, State}
     end;
 handle_httpc_message(Msg, State)
@@ -301,13 +314,14 @@ handle_httpc_message(Msg, State)
             Body = iolist_to_binary(BodyAcc),
             BodySize = byte_size(Body),
             report_event({download_finished, BodySize, {ok,TrailingHeaders}}, State),
-            notify_owner({finished, Headers, Body}, State),
+            Success = #{headers => Headers, body => Body},
+            notify_owner({finished, {success, Success}}, State),
             {stop, normal, State};
         {_, {error, Reason}} ->
             #state{response_body = BodyAcc} = State,
             BodySizeSoFar = iolist_size(BodyAcc),
             report_event({download_finished, BodySizeSoFar, {error, Reason}}, State),
-            notify_owner({error, {http,Reason}}, State),
+            notify_owner({finished, {error, {http,Reason}}}, State),
             {stop, normal, State}
     end.
 
@@ -369,14 +383,14 @@ reschedule_timeout(OptName, DefaultValue, State) ->
 handle_timeout(download_start_timeout, State) ->
     ok = httpc:cancel_request(State#state.request_id),
     report_event({download_failed_to_start, timeout}, State),
-    notify_owner({error, {timeout, waiting_stream_start}}, State),
+    notify_owner({finished, {error, {timeout, waiting_stream_start}}}, State),
     {stop, normal, State};
 handle_timeout(idle_download_timeout, State) ->
     ok = httpc:cancel_request(State#state.request_id),
     #state{response_body = BodyAcc} = State,
     BodySizeSoFar = iolist_size(BodyAcc),
     report_event({download_finished, BodySizeSoFar, {error, timeout}}, State),
-    notify_owner({error, {timeout, waiting_stream_end}}, State),
+    notify_owner({finished, {error, {timeout, waiting_stream_end}}}, State),
     {stop, normal, State}.
 
 %% ------------------------------------------------------------------

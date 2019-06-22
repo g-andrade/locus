@@ -142,7 +142,7 @@ end_per_group(filesystem_tests, Config) ->
     Config;
 end_per_group(local_http_tests, Config) ->
     URL = proplists:get_value(url, Config),
-    CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
+    CacheFilename = locus_loader:cached_tarball_path_for_url(URL),
     HttpdPid = proplists:get_value(httpd_pid, Config),
 
     ok = application:stop(locus),
@@ -151,7 +151,7 @@ end_per_group(local_http_tests, Config) ->
     Config;
 end_per_group(remote_http_tests, Config) ->
     URL = proplists:get_value(url, Config),
-    CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
+    CacheFilename = locus_loader:cached_tarball_path_for_url(URL),
 
     ok = application:stop(locus),
     _ = file:delete(CacheFilename),
@@ -212,7 +212,7 @@ warm_remote_loading_httptest(Config) ->
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
+    CacheFilename = locus_loader:cached_tarball_path_for_url(URL),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {ok,LoadedVersion}}}),
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
@@ -451,22 +451,17 @@ invalid_args_test(Config) ->
                  custom_loader_sup:start_link(Loader, URL, InvalidOpts)).
 
 subscriber_death_test(Config) ->
-    LoaderModule =
-        case proplists:get_value(is_http, Config) of
-            false -> locus_filesystem_loader;
-            true -> locus_http_loader
-        end,
     URL = proplists:get_value(url, Config),
     Loader = subscriber_death_test,
     Subscribers = [spawn(fun () -> timer:sleep(X*100) end) || X <- [2,3,4,5]],
     LoaderOpts = [{event_subscriber, Pid} || Pid <- Subscribers],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
-    OriginalPid = LoaderModule:whereis(Loader),
+    OriginalPid = locus_loader:whereis(Loader),
     ?assertEqual(lists:sort([locus_logger | Subscribers]),
-                 lists:sort(LoaderModule:list_subscribers(Loader))),
+                 lists:sort(locus_loader:list_subscribers(Loader))),
     timer:sleep(750),
-    ?assertEqual([locus_logger], LoaderModule:list_subscribers(Loader)),
-    ?assertEqual(OriginalPid, LoaderModule:whereis(Loader)),
+    ?assertEqual([locus_logger], locus_loader:list_subscribers(Loader)),
+    ?assertEqual(OriginalPid, locus_loader:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
 async_waiter_success_test(Config) ->

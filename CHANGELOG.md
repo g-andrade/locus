@@ -10,14 +10,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - ability of launching database loaders under library consumers' own supervisors
 ### Changed
 - log level of database loading failures from warning to error
-- HTTP loader structure and behaviour:
-    - state data switched from map to record
-    - all the downloading steps are now delegated to separe, temporary processes
-    - behaviour was switched from `gen_statem` to `gen_server`
-- supervision structure:
-    - single, `one_for_one` database loader supervisor was split into two
-      `simple_one_for_one` supervisors, each running transient children
-    - database loaders are now stopped directly rather than through their supervisor
+- HTTP loader and filesystem loader into a single loader codebase
+- supervision structure as to launch database loaders as transient processes
+  under a new `simple_one_for_one` supervisor
 - Dependency versions:
     - `certifi` [2.4.2 => 2.5.1]
     - `ssl_verify_fun` [1.1.4 => 1.1.5]
