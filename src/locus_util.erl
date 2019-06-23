@@ -38,7 +38,8 @@
     lists_anymap/2,
     lists_take/2,
     maps_take/2,
-    bin_to_hex_str/1
+    bin_to_hex_str/1,
+    flush_link_exit/2
    ]).
 
 %% ------------------------------------------------------------------
@@ -116,6 +117,14 @@ bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
     bin_to_hex_str_recur(Rest, [$a + Nibble | Acc]);
 bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
+
+-spec flush_link_exit(pid(), timeout()) -> boolean().
+flush_link_exit(Pid, Timeout) ->
+    receive
+        {'EXIT', Pid, _} -> true
+    after
+        Timeout -> false
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

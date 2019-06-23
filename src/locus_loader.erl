@@ -514,7 +514,7 @@ handle_fetcher_msg({event,Event}, State) ->
     end;
 handle_fetcher_msg({finished,Status}, State) ->
     #state{fetcher_pid = FetcherPid, fetcher_source = Source} = State,
-    stop_and_flush_link(FetcherPid),
+    expect_linked_process_termination(FetcherPid),
     UpdatedState = State#state{ fetcher_pid = undefined, fetcher_source = undefined },
     case Status of
         dismissed ->
@@ -528,7 +528,7 @@ handle_fetcher_msg({finished,Status}, State) ->
 handle_cacher_msg({finished,Status}, State) ->
     #state{cacher_pid = CacherPid, cacher_path = CacherPath, cacher_source = Source} = State,
 
-    stop_and_flush_link(CacherPid),
+    expect_linked_process_termination(CacherPid),
     UpdatedState = State#state{ cacher_pid = undefined,
                                 cacher_path = undefined,
                                 cacher_source = undefined },
@@ -663,22 +663,12 @@ fetched_database_modification_datetime({cache,_}, #{modified_on := ModificationD
 fetched_database_modification_datetime({filesystem,_}, #{modified_on := ModificationDate}) ->
     ModificationDate.
 
-stop_and_flush_link(Pid) ->
-    try gen:stop(Pid, normal, 5000) of
-        ok ->
-            flush_link(Pid)
-    catch
-        exit:Reason when Reason =:= normal;
-                         Reason =:= shutdown;
-                         Reason =:= noproc ->
-            flush_link(Pid)
-    end.
-
-flush_link(Pid) ->
-    receive
-        {'EXIT', Pid, _} -> true
-    after
-        0 -> false
+expect_linked_process_termination(Pid) ->
+    case locus_util:flush_link_exit(Pid, 5000) of
+        true -> true;
+        false ->
+            exit(Pid, kill),
+            locus_util:flush_link_exit(Pid, 1000)
     end.
 
 %% ------------------------------------------------------------------
