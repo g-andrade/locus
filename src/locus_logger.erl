@@ -193,6 +193,6 @@ log(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt ++ "~n",
     error_logger:(Fun)(FullFmt, Args).
 
--spec resumed_source(locus_mmdb:source()) -> cache | remote | filesystem.
+-spec resumed_source(locus_loader:source()) -> cache | remote | filesystem.
 resumed_source({SourceType, _SourceLocation}) ->
     SourceType.

@@ -32,7 +32,7 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [sieve_opts/1,
+   [validate_opts/1,
     start_link/3
    ]).
 
@@ -82,18 +82,6 @@
     {finished, {error, term()}}.
 -export_type([msg/0]).
 
--type url() :: string().
--export_type([url/0]).
-
--type response_status() :: {100..999, binary()}.
--export_type([response_status/0]).
-
--type headers() :: [{string(), string()}].
--export_type([headers/0]).
-
--type body() :: binary().
--export_type([body/0]).
-
 -type event() ::
         event_request_sent() |
         event_download_dismissed() |
@@ -139,6 +127,18 @@
 -endif.
 -export_type([success/0]).
 
+-type url() :: string().
+-export_type([url/0]).
+
+-type response_status() :: {100..999, binary()}.
+-export_type([response_status/0]).
+
+-type headers() :: [{string(), string()}].
+-export_type([headers/0]).
+
+-type body() :: binary().
+-export_type([body/0]).
+
 -record(state, {
           owner_pid :: pid(),
           url :: url(),
@@ -155,24 +155,34 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec sieve_opts(proplists:proplist()) -> {[opt()], proplists:proplist()}.
+-spec validate_opts(proplists:proplist())
+        -> {ok, {[opt()], proplists:proplist()}} |
+           {error, BadOpt :: term()}.
 %% @private
-sieve_opts(MixedOpts) ->
-    lists:partition(
-      fun ({connect_timeout, Value}) ->
-              ?is_timeout(Value);
-          ({download_start_timeout, Value}) ->
-              ?is_timeout(Value);
-          ({idle_download_timeout, Value}) ->
-              ?is_timeout(Value);
-          (insecure) ->
-              true;
-          ({insecure,Insecure}) ->
-              is_boolean(Insecure);
-          (_) ->
-              false
-      end,
-      MixedOpts).
+validate_opts(MixedOpts) ->
+    try
+        lists:partition(
+          fun ({connect_timeout, Value} = Opt) ->
+                  ?is_timeout(Value) orelse error({badopt,Opt});
+              ({download_start_timeout, Value} = Opt) ->
+                  ?is_timeout(Value) orelse error({badopt,Opt});
+              ({idle_download_timeout, Value} = Opt) ->
+                  ?is_timeout(Value) orelse error({badopt,Opt});
+              (insecure) ->
+                  true;
+              ({insecure,Insecure} = Opt) ->
+                  is_boolean(Insecure) orelse error({badopt,Opt});
+              (_) ->
+                  false
+          end,
+          MixedOpts)
+    of
+        {MyOpts, OtherOpts} ->
+            {ok, {MyOpts, OtherOpts}}
+    catch
+        error:{badopt,BadOpt} ->
+            {error, BadOpt}
+    end.
 
 -spec start_link(url(), headers(), [opt()]) -> {ok, pid()}.
 %% @private
@@ -249,6 +259,7 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec send_request(state()) -> state().
 send_request(State)
   when State#state.request_id =:= undefined ->
     #state{url = URL, headers = Headers, opts = Opts} = State,
@@ -277,6 +288,7 @@ send_request(State)
     State2 = State#state{ request_id = RequestId },
     _State3 = schedule_download_start_timeout(State2).
 
+-spec handle_httpc_message(tuple(), state()) -> {noreply, state()} | {stop, normal, state()}.
 handle_httpc_message(Msg, State)
   when State#state.response_headers =:= undefined ->
     case Msg of
@@ -329,15 +341,19 @@ handle_httpc_message(Msg, State)
 %% Internal Function Definitions - Timeouts
 %% ------------------------------------------------------------------
 
+-spec schedule_download_start_timeout(state()) -> state().
 schedule_download_start_timeout(State) ->
     schedule_timeout(download_start_timeout, ?DEFAULT_DOWNLOAD_START_TIMEOUT, State).
 
+-spec cancel_download_start_timeout(state()) -> state().
 cancel_download_start_timeout(State) ->
     cancel_timeout(download_start_timeout, State).
 
+-spec schedule_idle_download_timeout(state()) -> state().
 schedule_idle_download_timeout(State) ->
     schedule_timeout(idle_download_timeout, ?DEFAULT_IDLE_DOWNLOAD_TIMEOUT, State).
 
+-spec reschedule_idle_download_timeout(state()) -> state().
 reschedule_idle_download_timeout(State) ->
     reschedule_timeout(idle_download_timeout, ?DEFAULT_IDLE_DOWNLOAD_TIMEOUT, State).
 
@@ -411,6 +427,7 @@ notify_owner(Msg, State) ->
 %% Internal Function Definitions - Death
 %% ------------------------------------------------------------------
 
+-spec handle_linked_process_death(pid(), state()) -> {stop, normal, state()}.
 handle_linked_process_death(Pid, State)
   when Pid =:= State#state.owner_pid ->
     {stop, normal, State}.

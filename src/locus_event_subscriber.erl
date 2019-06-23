@@ -46,5 +46,5 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
--type event() :: locus_loader:event().
+-type event() :: locus_database:event().
 -export_type([event/0]).

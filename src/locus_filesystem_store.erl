@@ -139,6 +139,7 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec handle_write(state()) -> {stop, normal, state()}.
 handle_write(State) ->
     try do_write(State) of
         ok ->
@@ -151,6 +152,7 @@ handle_write(State) ->
             {stop, normal, State}
     end.
 
+-spec do_write(state()) -> ok | no_return().
 do_write(State) ->
     #state{path = Path, content = Content, modified_on = ModificationDT} = State,
     TmpSuffix = ".tmp." ++ integer_to_list(rand:uniform(1 bsl 32), 36),

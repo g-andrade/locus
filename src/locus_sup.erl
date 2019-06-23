@@ -66,7 +66,7 @@ init([]) ->
           period => 1
          },
     ChildSpecs =
-        [loader_sup_child_spec()
+        [database_sup_child_spec()
         ],
     {ok, {SupFlags, ChildSpecs}}.
 
@@ -74,8 +74,8 @@ init([]) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-loader_sup_child_spec() ->
-    #{ id => loader_sup,
-       start => {locus_loader_sup, start_link, []},
+database_sup_child_spec() ->
+    #{ id => database_sup,
+       start => {locus_database_sup, start_link, []},
        type => supervisor
      }.

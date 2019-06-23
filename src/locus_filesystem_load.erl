@@ -166,6 +166,7 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec handle_read(state()) -> {stop, normal, state()}.
 handle_read(State) ->
     #state{source = Source, previously_modified_on = PrevModificationDT} = State,
     {_, Path} = Source,
@@ -187,6 +188,7 @@ handle_read(State) ->
             {stop, normal, State}
     end.
 
+-spec handle_new_read(path(), calendar:datetime(), state()) -> {stop, normal, state()}.
 handle_new_read(Path, ModificationDT, State) ->
     case file:read_file(Path) of
         {ok, Content} ->

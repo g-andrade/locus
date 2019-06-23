@@ -33,13 +33,13 @@
 %% ------------------------------------------------------------------
 
 -export([create_table/1]).
--export([decode_and_update/3]).
+-export([decode_database_parts/2]).
+-export([update/2]).
 -export([lookup/2]).
 -export([get_parts/1]).
 -export([analyze/1]).
 
 -ifdef(TEST).
--export([decode_database_parts/2]).
 -export([lookup_/2]).
 -export([analyze_/1]).
 -endif.
@@ -87,7 +87,7 @@
            data_section := binary(),
            metadata := metadata(),
            ipv4_root_index := non_neg_integer(),
-           source := string(),
+           source := source(),
            version := calendar:datetime()
          }.
 -else.
@@ -96,7 +96,7 @@
            data_section => binary(),
            metadata => metadata(),
            ipv4_root_index => non_neg_integer(),
-           source => string(),
+           source => source(),
            version => calendar:datetime()
          }.
 -endif.
@@ -192,13 +192,35 @@ create_table(Id) ->
     _ = ets:new(Table, [named_table, protected, {read_concurrency,true}]),
     ok.
 
--spec decode_and_update(atom(), bin_database(), source()) -> calendar:datetime().
+-spec decode_database_parts(source(), bin_database()) -> {calendar:datetime(), parts()}.
 %% @private
-decode_and_update(Id, BinDatabase, Source) ->
+decode_database_parts(Source, BinDatabase) ->
+    BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
+    {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
+    <<TreeAndDataSection:BinMetadataStart/bytes, ?METADATA_MARKER, BinMetadata/bytes>>
+        = BinDatabase,
+    Metadata = decode_metadata(BinMetadata),
+    RecordSize = maps:get(<<"record_size">>, Metadata),
+    NodeCount = maps:get(<<"node_count">>, Metadata),
+    BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
+    FmtMajorVersion = maps:get(<<"binary_format_major_version">>, Metadata),
+    FmtMinorVersion = maps:get(<<"binary_format_minor_version">>, Metadata),
+    ?assert(is_known_database_format(FmtMajorVersion),
+            {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
+    TreeSize = ((RecordSize * 2) div 8) * NodeCount,
+    <<Tree:TreeSize/bytes, 0:128, DataSection/bytes>> = TreeAndDataSection,
+    IPv4RootIndex = find_ipv4_root_index(Tree, Metadata),
+    Version = epoch_to_datetime(BuildEpoch),
+    DatabaseParts = #{ tree => Tree, data_section => DataSection,
+                       metadata => Metadata, ipv4_root_index => IPv4RootIndex,
+                       source => Source, version => Version },
+    {Version, DatabaseParts}.
+
+-spec update(atom(), parts()) -> true.
+%% @private
+update(Id, DatabaseParts) ->
     Table = table_name(Id),
-    {DatabaseParts, Version} = decode_database_parts(BinDatabase, Source),
-    ets:insert(Table, {database, DatabaseParts}),
-    Version.
+    ets:insert(Table, {database,DatabaseParts}).
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
         -> {ok, #{ prefix => {inet:ip_address(), 0..128},
@@ -250,30 +272,6 @@ analyze(Id) ->
 -spec table_name(atom()) -> atom().
 table_name(Id) ->
     list_to_atom("locus_mmdb_" ++ atom_to_list(Id)).
-
--spec decode_database_parts(bin_database(), source()) -> {parts(), calendar:datetime()}.
-%% @private
-decode_database_parts(BinDatabase, Source) ->
-    BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
-    {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
-    <<TreeAndDataSection:BinMetadataStart/bytes, ?METADATA_MARKER, BinMetadata/bytes>>
-        = BinDatabase,
-    Metadata = decode_metadata(BinMetadata),
-    RecordSize = maps:get(<<"record_size">>, Metadata),
-    NodeCount = maps:get(<<"node_count">>, Metadata),
-    BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
-    FmtMajorVersion = maps:get(<<"binary_format_major_version">>, Metadata),
-    FmtMinorVersion = maps:get(<<"binary_format_minor_version">>, Metadata),
-    ?assert(is_known_database_format(FmtMajorVersion),
-            {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
-    TreeSize = ((RecordSize * 2) div 8) * NodeCount,
-    <<Tree:TreeSize/bytes, 0:128, DataSection/bytes>> = TreeAndDataSection,
-    IPv4RootIndex = find_ipv4_root_index(Tree, Metadata),
-    Version = epoch_to_datetime(BuildEpoch),
-    DatabaseParts = #{ tree => Tree, data_section => DataSection,
-                       metadata => Metadata, ipv4_root_index => IPv4RootIndex,
-                       source => Source, version => Version },
-    {DatabaseParts, Version}.
 
 -spec decode_metadata(binary()) -> metadata().
 decode_metadata(BinMetadata) ->

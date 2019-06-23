@@ -25,7 +25,7 @@
 %% released under the Apache License 2.0.
 
 %% @private
--module(locus_loader_sup).
+-module(locus_database_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
@@ -71,5 +71,5 @@ init([]) ->
           intensity => 10,
           period => 5
          },
-    ChildSpec = locus_loader:dynamic_child_spec(loader),
+    ChildSpec = locus_database:dynamic_child_spec(database),
     {ok, {SupFlags, [ChildSpec]}}.

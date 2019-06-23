@@ -456,12 +456,12 @@ subscriber_death_test(Config) ->
     Subscribers = [spawn(fun () -> timer:sleep(X*100) end) || X <- [2,3,4,5]],
     LoaderOpts = [{event_subscriber, Pid} || Pid <- Subscribers],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
-    OriginalPid = locus_loader:whereis(Loader),
+    OriginalPid = locus_database:whereis(Loader),
     ?assertEqual(lists:sort([locus_logger | Subscribers]),
-                 lists:sort(locus_loader:list_subscribers(Loader))),
+                 lists:sort(locus_database:list_subscribers(Loader))),
     timer:sleep(750),
-    ?assertEqual([locus_logger], locus_loader:list_subscribers(Loader)),
-    ?assertEqual(OriginalPid, locus_loader:whereis(Loader)),
+    ?assertEqual([locus_logger], locus_database:list_subscribers(Loader)),
+    ?assertEqual(OriginalPid, locus_database:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
 async_waiter_success_test(Config) ->

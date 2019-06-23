@@ -105,4 +105,4 @@ database_path(TailPath) ->
 
 decode_database_parts(BinDatabase) ->
     Source = {filesystem, ""},
-    locus_mmdb:decode_database_parts(BinDatabase, Source).
+    locus_mmdb:decode_database_parts(Source, BinDatabase).
