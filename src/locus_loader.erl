@@ -343,7 +343,11 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 
 -spec server_name(atom()) -> atom().
 server_name(Id) ->
-    list_to_atom(atom_to_list(?MODULE) ++ "_" ++ atom_to_list(Id)).
+    list_to_atom(
+      atom_to_list(?MODULE)
+      ++ "."
+      ++ atom_to_list(Id)
+     ).
 
 -spec init(atom(), origin(), [opt()])
         -> {ok, state()} |
