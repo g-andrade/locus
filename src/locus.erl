@@ -112,7 +112,8 @@
 -spec start_loader(DatabaseId, DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseURL :: string() | binary(),
-                 Error :: invalid_url | already_started.
+                 Error :: (invalid_url | already_started |
+                           {invalid_opt,term()} | application_not_running).
 start_loader(DatabaseId, DatabaseURL) ->
     start_loader(DatabaseId, DatabaseURL, []).
 
@@ -137,7 +138,8 @@ start_loader(DatabaseId, DatabaseURL) ->
             when DatabaseId :: atom(),
                  DatabaseURL :: string() | binary(),
                  Opts :: [locus_database:opt()],
-                 Error :: invalid_url | already_started.
+                 Error :: (invalid_url | already_started |
+                           {invalid_opt,term()} | application_not_running).
 start_loader(DatabaseId, DatabaseURL, Opts) ->
     case parse_url(DatabaseURL) of
         false ->

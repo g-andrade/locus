@@ -146,7 +146,8 @@
 -spec start(atom(), origin(), [opt()])
         -> ok |
            {error, already_started} |
-           {error, {invalid_opt,term()}}.
+           {error, {invalid_opt,term()}} |
+           {error, application_not_running}.
 %% @private
 start(Id, Origin, Opts) ->
     case locus_database_sup:start_child([Id, Origin, Opts]) of
@@ -154,7 +155,7 @@ start(Id, Origin, Opts) ->
             ok;
         {error, {already_started, _Pid}} ->
             {error, already_started};
-        {error, {invalid_opt,_} = Reason} ->
+        {error, Reason} ->
             {error, Reason}
     end.
 
