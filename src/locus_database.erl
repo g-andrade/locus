@@ -34,10 +34,10 @@
 -export(
    [start/3,
     stop/1,
-    wait/2,
     start_link/3,
     dynamic_child_spec/1,
-    static_child_spec/4
+    static_child_spec/4,
+    enqueue_waiter/1
    ]).
 
 -ignore_xref(
@@ -89,7 +89,7 @@
 -export_type([database_opt/0]).
 
 -opaque internal_opt() ::
-    {async_waiter, {pid(),reference()}}.
+    {async_waiter, reference(), pid()}.
 -export_type([internal_opt/0]).
 
 -ifdef(POST_OTP_18).
@@ -118,7 +118,8 @@
           loader_pid :: pid(),
           subscribers :: [module() | pid()],
           subscriber_mons :: #{monitor() => pid()},
-          waiters :: [{reference(),pid()}],
+          waiters :: #{reference() => pid()},
+          waiter_mons :: #{monitor() => reference()},
           last_version :: calendar:datetime() | undefined
          }).
 -type state() :: #state{}.
@@ -170,29 +171,6 @@ stop(Id) ->
         exit:{shutdown,_} -> ok
     end.
 
--spec wait(atom(), timeout()) -> {ok, calendar:datetime()} | {error, Reason}
-        when Reason :: database_unknown | timeout | {loading, term()}.
-%% @private
-wait(Id, Timeout) ->
-    ServerName = server_name(Id),
-    try gen_server:call(ServerName, wait, Timeout) of
-        {ok, LoadedVersion} ->
-            {ok, LoadedVersion};
-        {error, LoadingError} ->
-            {error, {loading, LoadingError}}
-    catch
-        exit:{timeout, {gen_server,call,[ServerName|_]}} when Timeout =/= infinity ->
-            {error, timeout};
-        exit:{noproc, {gen_server,call,[ServerName|_]}} ->
-            {error, database_unknown};
-        exit:{normal, {gen_server,call, [ServerName|_]}} ->
-            {error, database_unknown};
-        exit:{shutdown, {gen_server,call, [ServerName|_]}} ->
-            {error, database_unknown};
-        exit:{{shutdown,_Reason}, {gen_server,call, [ServerName|_]}} ->
-            {error, database_unknown}
-    end.
-
 -spec start_link(atom(), origin(), [opt()]) -> {ok, pid()}.
 %% @private
 start_link(Id, Origin, Opts) ->
@@ -220,6 +198,14 @@ static_child_spec(ChildId, DatabaseId, Origin, Opts) ->
        type => worker,
        modules => [?MODULE]
      }.
+
+-spec enqueue_waiter(atom()) -> reference().
+enqueue_waiter(DatabaseId) ->
+    ServerName = server_name(DatabaseId),
+    Pid = erlang:whereis(ServerName),
+    Ref = monitor(process, Pid),
+    gen_server:cast(Pid, {enqueue_waiter, Ref, self()}),
+    Ref.
 
 -ifdef(TEST).
 %% @private
@@ -252,19 +238,18 @@ init([Id, Origin, Opts]) ->
     end.
 
 -spec handle_call(term(), {pid(),reference()}, state())
-        -> {reply, {ok,calendar:datetime()}, state()} |
-           {noreply, state()} |
-           {stop, unexpected_call, state()}.
+        -> {stop, unexpected_call, state()}.
 %% @private
-handle_call(wait, From, State) ->
-    State2 = maybe_enqueue_waiter(From, State),
-    {noreply, State2};
 handle_call(_Call, _From, State) ->
     {stop, unexpected_call, State}.
 
 -spec handle_cast(term(), state())
-        -> {stop, unexpected_cast, state()}.
+        -> {noreply, state()} |
+           {stop, unexpected_cast, state()}.
 %% @private
+handle_cast({enqueue_waiter,Ref,Pid}, State) ->
+    State2 = maybe_enqueue_waiter(Ref, Pid, State),
+    {noreply, State2};
 handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
 
@@ -325,7 +310,7 @@ validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts) ->
                   Module =:= undefined;
               ({event_subscriber, Pid}) ->
                   not is_pid(Pid);
-              ({internal, {async_waiter,{Pid,Ref}}}) ->
+              ({internal, {async_waiter, Ref, Pid}}) ->
                   not (is_pid(Pid) andalso is_reference(Ref));
               (_) ->
                   true
@@ -348,7 +333,8 @@ init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts) ->
            loader_pid = LoaderPid,
            subscribers = [],
            subscriber_mons = #{},
-           waiters = []
+           waiters = #{},
+           waiter_mons = #{}
           },
     init_opts(DatabaseOpts, BaseState).
 
@@ -367,9 +353,9 @@ init_opts([{event_subscriber,Pid} | Opts], State) ->
     UpdatedState = State#state{ subscribers = UpdatedSubscribers,
                                 subscriber_mons = UpdatedSubscriberMons },
     init_opts(Opts, UpdatedState);
-init_opts([{internal, {async_waiter, {Pid,Ref}=From}} | Opts], State)
+init_opts([{internal, {async_waiter, Ref, Pid}} | Opts], State)
   when is_pid(Pid), is_reference(Ref) ->
-    NewState = enqueue_waiter(From, State),
+    NewState = enqueue_waiter(Ref, Pid, State),
     init_opts(Opts, NewState);
 init_opts([], State) ->
     locus_mmdb:create_table(State#state.id),
@@ -409,11 +395,20 @@ report_event(Event, #state{id = Id, subscribers = Subscribers}) ->
 -spec handle_monitored_process_death(monitor(), state()) -> {noreply, state()}.
 handle_monitored_process_death(Ref, State) ->
     #state{subscribers = Subscribers, subscriber_mons = SubscriberMons} = State,
-    {Pid, UpdatedSubscriberMons} = locus_util:maps_take(Ref, SubscriberMons),
-    {ok, UpdatedSubscribers} = locus_util:lists_take(Pid, Subscribers),
-    UpdatedState = State#state{ subscribers = UpdatedSubscribers,
-                                subscriber_mons = UpdatedSubscriberMons },
-    {noreply, UpdatedState}.
+    case locus_util:maps_take(Ref, SubscriberMons) of
+        {Pid, UpdatedSubscriberMons} ->
+            {ok, UpdatedSubscribers} = locus_util:lists_take(Pid, Subscribers),
+            UpdatedState = State#state{ subscribers = UpdatedSubscribers,
+                                        subscriber_mons = UpdatedSubscriberMons },
+            {noreply, UpdatedState};
+        error ->
+            #state{waiters = Waiters, waiter_mons = WaiterMons} = State,
+            {WaiterRef, UpdatedWaiterMons} = locus_util:maps_take(Ref, WaiterMons),
+            {_, UpdatedWaiters} = locus_util:maps_take(WaiterRef, Waiters),
+            UpdatedState = State#state{ waiters = UpdatedWaiters,
+                                        waiter_mons = UpdatedWaiterMons },
+            {noreply, UpdatedState}
+    end.
 
 -spec handle_linked_process_death(pid(), term(), state())
         -> {stop, {loader_stopped, pid(), term()}, state()}.
@@ -425,21 +420,37 @@ handle_linked_process_death(Pid, Reason, State)
 %% Internal Function Definitions - Waiters
 %% ------------------------------------------------------------------
 
--spec maybe_enqueue_waiter({pid(),reference()}, state()) -> state().
-maybe_enqueue_waiter(From, #state{last_version = undefined} = State) ->
-    enqueue_waiter(From, State);
-maybe_enqueue_waiter(From, #state{last_version = LastVersion} = State) ->
-    gen_server:reply(From, {ok,LastVersion}),
+-spec maybe_enqueue_waiter(reference(), pid(), state()) -> state().
+maybe_enqueue_waiter(Ref, Pid, #state{last_version = undefined} = State) ->
+    enqueue_waiter(Ref, Pid, State);
+maybe_enqueue_waiter(Ref, Pid, #state{last_version = LastVersion} = State) ->
+    _ = Pid ! {Ref, {ok,LastVersion}},
     State.
 
--spec enqueue_waiter({reference(),pid()}, state()) -> state().
-enqueue_waiter(From, State) ->
-    #state{waiters = Waiters} = State,
-    UpdatedWaiters = [From | Waiters],
-    State#state{ waiters = UpdatedWaiters }.
+-spec enqueue_waiter(reference(), pid(), state()) -> state().
+enqueue_waiter(Ref, Pid, State) ->
+    #state{waiters = Waiters, waiter_mons = WaiterMons} = State,
+    Mon = monitor(process, Pid),
+    UpdatedWaiters = Waiters#{ Ref => Pid },
+    UpdatedWaiterMons = WaiterMons#{ Mon => Ref },
+    State#state{ waiters = UpdatedWaiters,
+                 waiter_mons = UpdatedWaiterMons }.
 
 -spec reply_to_waiters({ok, calendar:datetime()} | {error, term()}, state()) -> state().
 reply_to_waiters(Result, State) ->
-    #state{waiters = Waiters} = State,
-    lists:foreach(fun (From) -> gen_server:reply(From, Result) end, Waiters),
-    State#state{ waiters = [] }.
+    #state{waiters = Waiters, waiter_mons = WaiterMons} = State,
+
+    _ = maps:fold(
+          fun (Mon, _, _) ->
+                  demonitor(Mon, [flush])
+          end,
+          ok, WaiterMons),
+
+    _ = maps:fold(
+          fun (Ref, Pid, _) ->
+                  _ = Pid ! {Ref, Result},
+                  ok
+          end,
+          ok, Waiters),
+
+    State#state{ waiters = #{}, waiter_mons = #{} }.

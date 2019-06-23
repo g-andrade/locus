@@ -38,6 +38,7 @@
 -export([loader_child_spec/4]).           -ignore_xref({loader_child_spec,4}).
 -export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
 -export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
+-export([wait_for_loaders/2]).            -ignore_xref({wait_for_loaders,2}).
 -export([lookup/2]).                      -ignore_xref({lookup,2}).
 -export([get_version/1]).                 -ignore_xref({get_version,1}).
 -export([get_info/1]).                    -ignore_xref({get_info,1}).
@@ -282,7 +283,46 @@ wait_for_loader(DatabaseId) ->
                  Error :: database_unknown | timeout | {loading, LoadingError},
                  LoadingError :: term().
 wait_for_loader(DatabaseId, Timeout) ->
-    locus_database:wait(DatabaseId, Timeout).
+    case wait_for_loaders([DatabaseId], Timeout) of
+        {ok, #{DatabaseId := LoadedVersion}} ->
+            {ok, LoadedVersion};
+        {error, {DatabaseId, Reason}} ->
+            {error, Reason};
+        {error, timeout} ->
+            {error, timeout}
+    end.
+
+%% @doc Like `wait_for_loader/2' but it can concurrently await status from more than one database.
+%%
+%% <ul>
+%% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
+%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
+%% <li>`{error, {DatabaseId, database_unknown}}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
+%% <li>`{error, {DatabaseId, {loading, term()}}}' if loading `DatabaseId' failed for some reason.</li>
+%% </ul>
+%% @see wait_for_loader/1
+%% @see start_loader/2
+-spec wait_for_loaders(DatabaseIds, Timeout) -> {ok, LoadedVersionPerDatabase} | {error, Reason}
+            when DatabaseIds :: [DatabaseId],
+                 Timeout :: timeout(),
+                 LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
+                 LoadedVersion :: database_version(),
+                 Reason :: {DatabaseId, DatabaseErrorReason} | timeout,
+                 DatabaseErrorReason :: {loading, term()}.
+wait_for_loaders(DatabaseIds, Timeout) ->
+    {WaiterPid, WaiterMon} = locus_waiter:start(DatabaseIds, Timeout),
+    case perform_wait(WaiterPid, WaiterMon) of
+        {ok, LoadedVersionPerDatabase} ->
+            {ok, LoadedVersionPerDatabase};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses.
 %%
@@ -465,3 +505,32 @@ info_from_db_parts(Parts) ->
 
 opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
+
+perform_wait(WaiterPid, WaiterMon) ->
+    receive
+        {WaiterPid, Result} ->
+            demonitor(WaiterMon, [flush]),
+            handle_waiter_result(Result);
+        {'DOWN', WaiterMon, _, _, Reason} ->
+            error({waiter_stopped, WaiterPid, Reason})
+    end.
+
+handle_waiter_result({ok, LoadedVersionPerDatabase}) ->
+    {ok, LoadedVersionPerDatabase};
+handle_waiter_result({error, DatabaseId, Reason}) ->
+    {error, {DatabaseId, Reason}};
+handle_waiter_result({down, DatabaseId, Reason}) ->
+    case Reason of
+        noproc ->
+            {error, {DatabaseId, database_unknown}};
+        normal ->
+            {error, {DatabaseId, database_unknown}};
+        shutdown ->
+            {error, {DatabaseId, database_unknown}};
+        {shutdown,_} ->
+            {error, {DatabaseId, database_unknown}};
+        _ ->
+            exit(Reason)
+    end;
+handle_waiter_result(timeout) ->
+    {error, timeout}.

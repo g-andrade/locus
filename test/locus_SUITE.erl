@@ -468,7 +468,7 @@ async_waiter_success_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = async_waiter_success_test,
     Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, {self(),Ref}}}],
+    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     ?assertRecv({Ref, {ok, _LoadedVersion}}),
     ok = locus:stop_loader(Loader).
@@ -478,7 +478,7 @@ async_waiter_failure_test(Config) ->
     URL = BaseURL ++ "/foobarbarfoofoobar",
     Loader = async_waiter_failure_test,
     Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, {self(),Ref}}}],
+    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     ?assertRecv({Ref, {error, _Reason}}),
     ok = locus:stop_loader(Loader).
