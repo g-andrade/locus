@@ -384,13 +384,27 @@ consume_data_section_chunk(DataSection, Path, Chunk) ->
     end.
 
 consume_utf8_string(Size, Chunk) ->
-    {Text, Remaining} = consume_bytes(Size, Chunk),
-    case unicode:characters_to_binary(Text, utf8) of
-        <<ValidatedText/bytes>> ->
-            {ValidatedText, Remaining};
-        Failure ->
-            error({not_utf8_text, Failure})
+    <<Bytes:Size/bytes, Remaining/bytes>> = Chunk,
+    case is_utf8_binary(Bytes) of
+        true ->
+            CopiedBytes = binary:copy(Bytes),
+            {CopiedBytes, Remaining};
+        _ ->
+            error(not_utf8_text)
     end.
+
+is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<>>) ->
+    true;
+is_utf8_binary(<<_/bytes>>) ->
+    false.
 
 consume_bytes(Size, Chunk) ->
     <<Bytes:Size/bytes, Remaining/bytes>> = Chunk,
