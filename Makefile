@@ -73,6 +73,6 @@ publish: $(REBAR3)
 	@$(REBAR3) as publish hex publish
 	@$(REBAR3) as publish hex docs
 
-cli:
+cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
