@@ -55,6 +55,9 @@
 -define(warning, 2).
 -define(error, 3).
 
+-define(case_match(Value, Pattern, Then, OrElse),
+        (case (Value) of (Pattern) -> (Then); _ -> (OrElse) end)).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -156,10 +159,11 @@ report(MinWeight, DatabaseId, {load_attempt_finished, Source, {ok, Version}}) ->
            ok
     end;
 report(MinWeight, DatabaseId, {load_attempt_finished, Source, {error, Error}}) ->
+    LogFun = ?case_match(Source, {cache,_}, warning_msg, error_msg),
     if MinWeight =< ?debug ->
-           log_error("~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
+           log(LogFun, "~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
        MinWeight =< ?error ->
-           log_error("~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
+           log(LogFun, "~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
        true ->
            ok
     end;

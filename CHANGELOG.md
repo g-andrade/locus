@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - ability of launching database loaders under library consumers' own supervisors
 - `wait_for_loaders/2` method for waiting on multiple databases concurrently
 ### Changed
-- log level of database loading failures from warning to error
+- log level of HTTP and filesystem database loading failures from warning to error
 - HTTP loader and filesystem loader into a single loader codebase
 - supervision structure as to launch database loaders as transient processes
   under a new `simple_one_for_one` supervisor
