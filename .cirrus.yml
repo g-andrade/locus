@@ -1,3 +1,4 @@
+# vim: set expandtab:
 test_task:
   container:
     matrix:
@@ -19,4 +20,4 @@ test_task:
       - image: erlang:18.1
       - image: erlang:18.0
   test_script: |
-	make test
+      make test
