@@ -287,61 +287,69 @@ epoch_to_datetime(Epoch) ->
     calendar:gregorian_seconds_to_datetime(GregorianEpoch + Epoch).
 
 consume_data_section_on_index(DataSection, Index) ->
-    Chunk = binary:part(DataSection, {Index, byte_size(DataSection) - Index}),
-    consume_data_section_chunk(DataSection, Chunk).
+    consume_data_section_on_index(DataSection, [], Index).
 
-consume_data_section_chunk(DataSection, Chunk) ->
+consume_data_section_on_index(DataSection, Path, Index) ->
+    Chunk = binary:part(DataSection, {Index, byte_size(DataSection) - Index}),
+    UpdatedPath = [Index | Path],
+    case lists:member(Index, Path) of
+        true -> error({circular_path, UpdatedPath});
+        _ ->
+            consume_data_section_chunk(DataSection, UpdatedPath, Chunk)
+    end.
+
+consume_data_section_chunk(DataSection, Path, Chunk) ->
     case Chunk of
         <<?pointer:3, 0:2, Pointer:11, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, Pointer),
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer),
             {Value, Remaining};
-        <<?pointer:3, 1:2, BasePointer:19, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, BasePointer+2048),
+        <<?pointer:3, 1:2, Pointer:19, Remaining/bytes>> ->
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer + 2048),
             {Value, Remaining};
-        <<?pointer:3, 2:2, BasePointer:27, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, BasePointer+526336),
+        <<?pointer:3, 2:2, Pointer:27, Remaining/bytes>> ->
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer + 526336),
             {Value, Remaining};
         <<?pointer:3, _:5, Pointer:32, Remaining/bytes>> ->
-            {Value, _} = consume_data_section_on_index(DataSection, Pointer),
+            {Value, _} = consume_data_section_on_index(DataSection, Path, Pointer),
             {Value, Remaining};
-
+        %
         <<?utf8_string:3, Size:5, Remaining/bytes>> when Size < 29 ->
-            consume_bytes(Size, Remaining);
+            consume_utf8_string(Size, Remaining);
         <<?utf8_string:3, 29:5, BaseSize, Remaining/bytes>> ->
-            consume_bytes(BaseSize+29, Remaining);
+            consume_utf8_string(29 + BaseSize, Remaining);
         <<?utf8_string:3, 30:5, BaseSize:16, Remaining/bytes>> ->
-            consume_bytes(BaseSize+285, Remaining);
+            consume_utf8_string(285 + BaseSize, Remaining);
         <<?utf8_string:3, _:5, BaseSize:24, Remaining/bytes>> ->
-            consume_bytes(BaseSize+65821, Remaining);
-
+            consume_utf8_string(65821 + BaseSize, Remaining);
+        %
         <<?double:3, 8:5, Double:64/float, Remaining/bytes>> ->
             {Double, Remaining};
-
+        %
         <<?bytes:3, Size:5, Remaining/bytes>> when Size < 29 ->
             consume_bytes(Size, Remaining);
         <<?bytes:3, 29:5, BaseSize, Remaining/bytes>> ->
-            consume_bytes(BaseSize+29, Remaining);
+            consume_bytes(29 + BaseSize, Remaining);
         <<?bytes:3, 30:5, BaseSize:16, Remaining/bytes>> ->
-            consume_bytes(BaseSize+285, Remaining);
+            consume_bytes(285 + BaseSize, Remaining);
         <<?bytes:3, _:5, BaseSize:24, Remaining/bytes>> ->
-            consume_bytes(BaseSize+65821, Remaining);
-
+            consume_bytes(65821 + BaseSize, Remaining);
+        %
         <<?uint16:3, Size:5, Integer:Size/integer-unit:8, Remaining/bytes>>
           when Size =< 2 ->
             {Integer, Remaining};
         <<?uint32:3, Size:5, Integer:Size/integer-unit:8, Remaining/bytes>>
           when Size =< 4 ->
             {Integer, Remaining};
-
+        %
         <<?map:3, Size:5, Remaining/bytes>> when Size < 29 ->
-            consume_map(DataSection, Size, Remaining);
+            consume_map(DataSection, Path, Size, Remaining);
         <<?map:3, 29:5, BaseSize, Remaining/bytes>> ->
-            consume_map(DataSection, 29 + BaseSize, Remaining);
+            consume_map(DataSection, Path, 29 + BaseSize, Remaining);
         <<?map:3, 30:5, BaseSize:16, Remaining/bytes>> ->
-            consume_map(DataSection, 285 + BaseSize, Remaining);
+            consume_map(DataSection, Path, 285 + BaseSize, Remaining);
         <<?map:3, _:5, BaseSize:24, Remaining/bytes>> ->
-            consume_map(DataSection, 65821 + BaseSize, Remaining);
-
+            consume_map(DataSection, Path, 65821 + BaseSize, Remaining);
+        %
         <<0:3, Size:5, ?extended_int32, Integer:Size/signed-integer-unit:8, Remaining/bytes>>
           when Size =< 4 ->
             {Integer, Remaining};
@@ -351,89 +359,120 @@ consume_data_section_chunk(DataSection, Chunk) ->
         <<0:3, Size:5, ?extended_uint128, Integer:Size/integer-unit:8, Remaining/bytes>>
           when Size =< 16 ->
             {Integer, Remaining};
-
+        %
         <<0:3, Size:5, ?extended_array, Remaining/bytes>> when Size < 29 ->
-            consume_array(DataSection, Size, Remaining);
+            consume_array(DataSection, Path, Size, Remaining);
         <<0:3, 29:5, ?extended_array, BaseSize, Remaining/bytes>> ->
-            consume_array(DataSection, BaseSize+29, Remaining);
+            consume_array(DataSection, Path, 29 + BaseSize, Remaining);
         <<0:3, 30:5, ?extended_array, BaseSize:16, Remaining/bytes>> ->
-            consume_array(DataSection, BaseSize+285, Remaining);
+            consume_array(DataSection, Path, 285 + BaseSize, Remaining);
         <<0:3, _:5, ?extended_array, BaseSize:24, Remaining/bytes>> ->
-            consume_array(DataSection, BaseSize+65821, Remaining);
-
+            consume_array(DataSection, Path, 65821 + BaseSize, Remaining);
+        %
         <<0:3, 0:5, ?extended_data_cache_container, _/bytes>> ->
             error({unexpected_marker, data_cache_container});
         <<0:3, 0:5, ?extended_end_marker, _/bytes>> ->
             error({unexpected_marker, 'end'});
-
+        %
         <<0:3, 0:5, ?extended_boolean, Remaining/bytes>> ->
             {false, Remaining};
         <<0:3, 1:5, ?extended_boolean, Remaining/bytes>> ->
             {true, Remaining};
-
+        %
         <<0:3, 4:5, ?extended_float, Float:32/float, Remaining/bytes>> ->
             {Float, Remaining}
     end.
+
+consume_utf8_string(Size, Chunk) ->
+    <<Bytes:Size/bytes, Remaining/bytes>> = Chunk,
+    case is_utf8_binary(Bytes) of
+        true ->
+            CopiedBytes = binary:copy(Bytes),
+            {CopiedBytes, Remaining};
+        _ ->
+            error(not_utf8_text)
+    end.
+
+is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<>>) ->
+    true;
+is_utf8_binary(<<_/bytes>>) ->
+    false.
 
 consume_bytes(Size, Chunk) ->
     <<Bytes:Size/bytes, Remaining/bytes>> = Chunk,
     CopiedBytes = binary:copy(Bytes),
     {CopiedBytes, Remaining}.
 
-consume_map(DataSection, Size, Chunk) ->
-    consume_map_recur(DataSection, Size, Chunk, []).
+consume_map(DataSection, Path, Size, Chunk) ->
+    consume_map_recur(DataSection, Path, Size, Chunk, []).
 
-consume_map_recur(_DataSection, 0, Remaining, KvAcc) ->
-    Map = maps:from_list(KvAcc),
-    {Map, Remaining};
-consume_map_recur(DataSection, Size, Chunk, KvAcc) ->
+consume_map_recur(_DataSection, _Path, 0, Remaining, KvAcc) ->
+    case lists:ukeysort(1, KvAcc) of
+        SortedKvAcc when length(SortedKvAcc) =:= length(KvAcc) ->
+            Map = maps:from_list(SortedKvAcc),
+            {Map, Remaining}
+    end;
+consume_map_recur(DataSection, Path, Size, Chunk, KvAcc) ->
     {Key, Chunk2} = consume_map_key(DataSection, Chunk),
-    {Value, Chunk3} = consume_data_section_chunk(DataSection, Chunk2),
+    {Value, Chunk3} = consume_data_section_chunk(DataSection, Path, Chunk2),
     UpdatedKvAcc = [{Key,Value} | KvAcc],
-    consume_map_recur(DataSection, Size - 1, Chunk3, UpdatedKvAcc).
+    consume_map_recur(DataSection, Path, Size - 1, Chunk3, UpdatedKvAcc).
 
 consume_map_key(DataSection, Chunk) ->
-    case Chunk of
-        <<?pointer:3, 0:2, Pointer:11, _/bytes>> ->
-            <<_:Pointer/bytes, NewChunk/bytes>> = DataSection,
-            consume_direct_map_key(NewChunk);
-        <<?pointer:3, 1:2, BasePointer:19, _/bytes>> ->
-            Pointer = BasePointer + 2048,
-            <<_:Pointer/bytes, NewChunk/bytes>> = DataSection,
-            consume_direct_map_key(NewChunk);
-        <<?pointer:3, 2:2, BasePointer:27, _/bytes>> ->
-            Pointer = BasePointer + 526336,
-            <<_:Pointer/bytes, NewChunk/bytes>> = DataSection,
-            consume_direct_map_key(NewChunk);
-        <<?pointer:3, _:5, Pointer:32, _/bytes>> ->
-            <<_:Pointer/bytes, NewChunk/bytes>> = DataSection,
-            consume_direct_map_key(NewChunk);
-        _ ->
-            consume_direct_map_key(Chunk)
-    end.
+    consume_map_key(DataSection, [], Chunk).
 
-consume_direct_map_key(Chunk) ->
+consume_map_key(DataSection, Path, Chunk) ->
     case Chunk of
+        <<?pointer:3, 0:2, Pointer:11, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer),
+            {Value, Remaining};
+        <<?pointer:3, 1:2, Pointer:19, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer + 2048),
+            {Value, Remaining};
+        <<?pointer:3, 2:2, Pointer:27, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer + 526336),
+            {Value, Remaining};
+        <<?pointer:3, _:5, Pointer:32, Remaining/bytes>> ->
+            {Value, _} = consume_map_key_on_index(DataSection, Path, Pointer),
+            {Value, Remaining};
+        %
         <<?utf8_string:3, Size:5, Remaining/bytes>> when Size < 29 ->
-            consume_bytes(Size, Remaining);
+            consume_utf8_string(Size, Remaining);
         <<?utf8_string:3, 29:5, BaseSize, Remaining/bytes>> ->
-            consume_bytes(BaseSize+29, Remaining);
+            consume_utf8_string(29 + BaseSize, Remaining);
         <<?utf8_string:3, 30:5, BaseSize:16, Remaining/bytes>> ->
-            consume_bytes(BaseSize+285, Remaining);
+            consume_utf8_string(285 + BaseSize, Remaining);
         <<?utf8_string:3, _:5, BaseSize:24, Remaining/bytes>> ->
-            consume_bytes(BaseSize+65821, Remaining)
+            consume_utf8_string(65821 + BaseSize, Remaining)
     end.
 
-consume_array(DataSection, Size, Chunk) ->
-    consume_array_recur(DataSection, Size, Chunk, []).
+consume_map_key_on_index(DataSection, Path, Index) ->
+    UpdatedPath = [Index | Path],
+    case lists:member(Index, Path) of
+        true -> error({circular_path, UpdatedPath});
+        _ ->
+            <<_:Index/bytes, Chunk/bytes>> = DataSection,
+            consume_map_key(DataSection, UpdatedPath, Chunk)
+    end.
 
-consume_array_recur(_DataSection, 0, Remaining, RevAcc) ->
+consume_array(DataSection, Path, Size, Chunk) ->
+    consume_array_recur(DataSection, Path, Size, Chunk, []).
+
+consume_array_recur(_DataSection, _Path, 0, Remaining, RevAcc) ->
     List = lists:reverse(RevAcc),
     {List, Remaining};
-consume_array_recur(DataSection, Size, Chunk, RevAcc) ->
-    {Value, Remaining} = consume_data_section_chunk(DataSection, Chunk),
+consume_array_recur(DataSection, Path, Size, Chunk, RevAcc) ->
+    {Value, Remaining} = consume_data_section_chunk(DataSection, Path, Chunk),
     UpdatedRevAcc = [Value | RevAcc],
-    consume_array_recur(DataSection, Size - 1, Remaining, UpdatedRevAcc).
+    consume_array_recur(DataSection, Path, Size - 1, Remaining, UpdatedRevAcc).
 
 find_ipv4_root_index(_Tree, #{ <<"ip_version">> := 4 } = _Metadata) ->
     0;
@@ -557,320 +596,37 @@ analyze_(false) ->
 analyze_([]) ->
     {error, database_not_loaded};
 analyze_([{database, DatabaseParts}]) ->
-    DataSectionIndices = ets:new(data_section_indices, []),
+    ParentPid = self(),
+    PrevTrapExit = process_flag(trap_exit, true),
+    CoordinatorSpawnOpts = [link, {priority,low}],
     try
-        analyze_data_section(DatabaseParts, DataSectionIndices),
-        analyze_tree(DatabaseParts, DataSectionIndices)
+        CoordinatorPid =
+            spawn_opt(
+              fun () -> run_analysis_coordinator(ParentPid, DatabaseParts) end,
+              CoordinatorSpawnOpts),
+
+        receive
+            {CoordinatorPid, {analysis_result, TreeFlaws, DataRecordFlaws}} ->
+                process_flag(trap_exit, PrevTrapExit),
+                receive {'EXIT', CoordinatorPid, _} -> ok after 0 -> ok end,
+                case {TreeFlaws,DataRecordFlaws} of
+                    {[],[]} ->
+                        ok;
+                    _ ->
+                        {error, {flawed, TreeFlaws ++ DataRecordFlaws}}
+                end;
+            {'EXIT', CoordinatorPid, Reason} ->
+                process_flag(trap_exit, PrevTrapExit),
+                {error, {coordinator_stopped, CoordinatorPid, Reason}}
+        end
     catch
-        error:{data_section, Chunk, Reason} ->
-            #{data_section := DataSection} = DatabaseParts,
-            ErrorIndex = byte_size(DataSection) - byte_size(Chunk),
-            {error, {flawed, {data_section,ErrorIndex,Reason}}}
-    after
-        ets:delete(DataSectionIndices)
+        ExcClass:ExcReason ->
+            true = process_flag(trap_exit, PrevTrapExit),
+            erlang:raise(ExcClass, ExcReason, erlang:get_stacktrace())
     end.
 
-analyze_data_section(DatabaseParts, Indices) ->
-    #{data_section := DataSection} = DatabaseParts,
-    analyze_data_section_recur(DataSection, DataSection, Indices).
-
-analyze_data_section_recur(DataSection, Chunk, Indices) ->
-    ParseChunkResult = parse_data_section_chunk_for_analysis(DataSection, Chunk),
-    save_analysis_data_section_chunk_index(DataSection, Chunk, Indices),
-    analyze_data_section_recur(DataSection, Chunk, Indices, ParseChunkResult).
-
-analyze_data_section_recur(DataSection, CurChunk, Indices, {map,Size,MapChunk}) ->
-    try analyze_data_section_map(DataSection, Size, MapChunk, Indices, #{}) of
-        ChunkAfterMap ->
-            analyze_data_section_recur(DataSection, ChunkAfterMap, Indices)
-    catch
-        error:Reason ->
-            error({data_section, CurChunk, {bad_map, Reason}})
-    end;
-analyze_data_section_recur(DataSection, CurChunk, Indices, {array,Size,ArrayChunk}) ->
-    try analyze_data_section_array(DataSection, Size, ArrayChunk, Indices, #{}) of
-        ChunkAfterArray ->
-            analyze_data_section_recur(DataSection, ChunkAfterArray, Indices)
-    catch
-        error:Reason ->
-            error({data_section, CurChunk, {bad_map, Reason}})
-    end;
-analyze_data_section_recur(DataSection, CurChunk, Indices, {pointer, Pointer, NextChunk}) ->
-    <<_:Pointer/bytes, PointerChunk/bytes>> = DataSection,
-    case parse_data_section_chunk_for_analysis(DataSection, PointerChunk) of
-        {pointer,_,_} ->
-            error({data_section, CurChunk, {bad_pointer_value, another_pointer}});
-        finished ->
-            error({data_section, CurChunk, {bad_pointer_value, end_marker}});
-        _ ->
-            save_analysis_data_section_chunk_index(DataSection, PointerChunk, Indices),
-            analyze_data_section_recur(DataSection, NextChunk, Indices)
-    end;
-analyze_data_section_recur(DataSection, _, Indices, ImplicitSuccess) ->
-    case ImplicitSuccess of
-        {utf8, _, NextChunk} ->
-            analyze_data_section_recur(DataSection, NextChunk, Indices);
-        {float, _, NextChunk} ->
-            analyze_data_section_recur(DataSection, NextChunk, Indices);
-        {integer, _, NextChunk} ->
-            analyze_data_section_recur(DataSection, NextChunk, Indices);
-        {bytes, _, NextChunk} ->
-            analyze_data_section_recur(DataSection, NextChunk, Indices);
-        {boolean, _, NextChunk} ->
-            analyze_data_section_recur(DataSection, NextChunk, Indices);
-        finished ->
-            ok
-    end.
-
-analyze_data_section_map(DataSection, Size, MapChunk, Indices, RecordsAbove) ->
-    UpdatedRecordsAbove = check_for_data_section_loop(DataSection, MapChunk, RecordsAbove),
-    analyze_data_section_map_recur(DataSection, Size, MapChunk, Indices, UpdatedRecordsAbove, maps:new()).
-
-analyze_data_section_map_recur(_, 0, ChunkAfterMap, _, _, _) ->
-    ChunkAfterMap;
-analyze_data_section_map_recur(DataSection, Size, KeyChunk, Indices, RecordsAbove, KeyValuesAcc) ->
-    {KeyValue, ChunkAfterKey} = analyze_data_section_map_key(DataSection, KeyChunk, Indices),
-    case maps:put(KeyValue, defined, KeyValuesAcc) of
-        UpdatedKeyValuesAcc when map_size(UpdatedKeyValuesAcc) =:= map_size(KeyValuesAcc) ->
-            error({data_section, KeyChunk, {repeated_map_key, KeyValue}});
-        UpdatedKeyValuesAcc ->
-            ChunkAfterValue = analyze_data_section_map_value(DataSection, ChunkAfterKey,
-                                                             Indices, RecordsAbove),
-            analyze_data_section_map_recur(DataSection, Size - 1, ChunkAfterValue,
-                                           Indices, RecordsAbove, UpdatedKeyValuesAcc)
-    end.
-
-analyze_data_section_map_key(DataSection, KeyChunk, Indices) ->
-    ParseChunkResult = parse_data_section_chunk_for_analysis(DataSection, KeyChunk),
-    save_analysis_data_section_chunk_index(DataSection, KeyChunk, Indices),
-    analyze_data_section_map_key(DataSection, KeyChunk, Indices, ParseChunkResult).
-
-analyze_data_section_map_key(DataSection, KeyChunk, Indices, {pointer,Pointer,ChunkAfterKey}) ->
-    <<_:Pointer/bytes, PointerChunk/bytes>> = DataSection,
-    case parse_data_section_chunk_for_analysis(DataSection, PointerChunk) of
-        {utf8, KeyValue, _} ->
-            save_analysis_data_section_chunk_index(DataSection, PointerChunk, Indices),
-            {KeyValue, ChunkAfterKey};
-        Other ->
-            error({data_section, KeyChunk, {bad_map_key, {pointer,Pointer}, Other}})
-    end;
-analyze_data_section_map_key(_, _, _, {utf8, KeyValue, ChunkAfterKey}) ->
-    {KeyValue, ChunkAfterKey};
-analyze_data_section_map_key(_, KeyChunk, _, Other) ->
-    error({data_section, KeyChunk, {bad_map_key, Other}}).
-
-analyze_data_section_map_value(DataSection, ValueChunk, Indices, RecordsAbove) ->
-    ParseChunkResult = parse_data_section_chunk_for_analysis(DataSection, ValueChunk),
-    save_analysis_data_section_chunk_index(DataSection, ValueChunk, Indices),
-    analyze_data_section_map_value(DataSection, ValueChunk, Indices, RecordsAbove, ParseChunkResult).
-
-analyze_data_section_map_value(DataSection, ValueChunk, Indices, RecordsAbove, {map,Size,SubMapChunk}) ->
-    try analyze_data_section_map(DataSection, Size, SubMapChunk, Indices, RecordsAbove) of
-        ChunkAfterValue ->
-            ChunkAfterValue
-    catch
-        error:Reason ->
-            error({data_section, ValueChunk, {bad_map, Reason}})
-    end;
-analyze_data_section_map_value(DataSection, ValueChunk, Indices, RecordsAbove, {array,Size,SubArrayChunk}) ->
-    try analyze_data_section_array(DataSection, Size, SubArrayChunk, Indices, RecordsAbove) of
-        ChunkAfterValue ->
-            ChunkAfterValue
-    catch
-        error:Reason ->
-            error({data_section, ValueChunk, {bad_array, Reason}})
-    end;
-analyze_data_section_map_value(_, _, _, _, {_,_,ChunkAfterValue}) ->
-    ChunkAfterValue;
-analyze_data_section_map_value(_, ValueChunk, _, _, finished) ->
-    error({data_section, ValueChunk, {bad_map_value, finished}}).
-
-analyze_data_section_array(DataSection, Size, ArrayChunk, Indices, RecordsAbove) ->
-    UpdatedRecordsAbove = check_for_data_section_loop(DataSection, ArrayChunk, RecordsAbove),
-    analyze_data_section_array_recur(DataSection, Size, ArrayChunk, Indices, UpdatedRecordsAbove).
-
-analyze_data_section_array_recur(_, 0, ChunkAfterArray, _, _) ->
-    ChunkAfterArray;
-analyze_data_section_array_recur(DataSection, Size, ArrayChunk, Indices, RecordsAbove) ->
-    ChunkAfterValue = analyze_data_section_array_value(DataSection, ArrayChunk, Indices, RecordsAbove),
-    analyze_data_section_array_recur(DataSection, Size - 1, ChunkAfterValue, Indices, RecordsAbove).
-
-analyze_data_section_array_value(DataSection, ValueChunk, Indices, RecordsAbove) ->
-    ParseChunkResult = parse_data_section_chunk_for_analysis(DataSection, ValueChunk),
-    save_analysis_data_section_chunk_index(DataSection, ValueChunk, Indices),
-    analyze_data_section_array_value(DataSection, ValueChunk, Indices, RecordsAbove, ParseChunkResult).
-
-analyze_data_section_array_value(DataSection, ValueChunk, Indices, RecordsAbove, {map,Size,SubMapChunk}) ->
-    try analyze_data_section_map(DataSection, Size, SubMapChunk, Indices, RecordsAbove) of
-        ChunkAfterValue ->
-            ChunkAfterValue
-    catch
-        error:Reason ->
-            error({data_section, ValueChunk, {bad_map, Reason}})
-    end;
-analyze_data_section_array_value(DataSection, ValueChunk, Indices, RecordsAbove, {array,Size,SubArrayChunk}) ->
-    try analyze_data_section_array(DataSection, Size, SubArrayChunk, Indices, RecordsAbove) of
-        ChunkAfterValue ->
-            ChunkAfterValue
-    catch
-        error:Reason ->
-            error({data_section, ValueChunk, {bad_array, Reason}})
-    end;
-analyze_data_section_array_value(_, _, _, _, {_,_,ChunkAfterValue}) ->
-    ChunkAfterValue;
-analyze_data_section_array_value(_, ValueChunk, _, _, finished) ->
-    error({data_section, ValueChunk, {bad_array_value, finished}}).
-
-parse_data_section_chunk_for_analysis(DataSection, Chunk) ->
-    case Chunk of
-        <<?pointer:3, 0:2, Pointer:11, Remaining/bytes>>
-          when Pointer < byte_size(DataSection) ->
-            {pointer, Pointer, Remaining};
-        <<?pointer:3, 1:2, BasePointer:19, Remaining/bytes>>
-          when BasePointer+2048 < byte_size(DataSection) ->
-            {pointer, BasePointer+2048, Remaining};
-        <<?pointer:3, 2:2, BasePointer:27, Remaining/bytes>>
-          when BasePointer+526336 < byte_size(DataSection) ->
-            {pointer, BasePointer+526336, Remaining};
-        <<?pointer:3, _:5, Pointer:32, Remaining/bytes>>
-          when Pointer < byte_size(DataSection) ->
-            {pointer, Pointer, Remaining};
-
-        <<?utf8_string:3, Size:5, Text:Size/bytes, Remaining/bytes>>
-          when Size < 29 ->
-            _ = (is_utf8_binary(Text) 
-                 orelse error({data_section, Chunk, {not_utf8, binary:copy(Text)}})),
-            {utf8, Text, Remaining};
-        <<?utf8_string:3, 29:5, BaseSize, BaseRemaining/bytes>>
-          when byte_size(BaseRemaining) >= BaseSize + 29 ->
-            Size = BaseSize + 29,
-            <<Text:Size/bytes, Remaining/bytes>> = BaseRemaining,
-            _ = (is_utf8_binary(Text) 
-                 orelse error({data_section, Chunk, {not_utf8, binary:copy(Text)}})),
-            {utf8, Text, Remaining};
-        <<?utf8_string:3, 30:5, BaseSize:16, BaseRemaining/bytes>>
-          when byte_size(BaseRemaining) >= BaseSize + 285 ->
-            Size = BaseSize + 285,
-            <<Text:Size/bytes, Remaining/bytes>> = BaseRemaining,
-            _ = (is_utf8_binary(Text) 
-                 orelse error({data_section, Chunk, {not_utf8, binary:copy(Text)}})),
-            {utf8, Text, Remaining};
-        <<?utf8_string:3, _:5, BaseSize:24, BaseRemaining/bytes>>
-          when byte_size(BaseRemaining) >= BaseSize + 65821 ->
-            Size = BaseSize + 65821,
-            <<Text:Size/bytes, Remaining/bytes>> = BaseRemaining,
-            _ = (is_utf8_binary(Text) 
-                 orelse error({data_section, Chunk, {not_utf8, binary:copy(Text)}})),
-            {utf8, Text, Remaining};
-
-        <<?double:3, 8:5, Float:64/float, Remaining/bytes>> ->
-            {float, Float, Remaining};
-
-        <<?bytes:3, Size:5, Blob:Size/bytes, Remaining/bytes>>
-          when Size < 29 ->
-            {bytes, Blob, Remaining};
-        <<?bytes:3, 29:5, BaseSize, BaseRemaining/bytes>>
-          when byte_size(BaseRemaining) >= BaseSize + 29 ->
-            Size = BaseSize + 29,
-            <<Blob:Size/bytes, Remaining/bytes>> = BaseRemaining,
-            {bytes, Blob, Remaining};
-        <<?bytes:3, 30:5, BaseSize:16, BaseRemaining/bytes>>
-          when byte_size(BaseRemaining) >= BaseSize + 285 ->
-            Size = BaseSize + 285,
-            <<Blob:Size/bytes, Remaining/bytes>> = BaseRemaining,
-            {bytes, Blob, Remaining};
-        <<?bytes:3, _:5, BaseSize:24, BaseRemaining/bytes>>
-          when byte_size(BaseRemaining) >= BaseSize + 65821 ->
-            Size = BaseSize + 65821,
-            <<Blob:Size/bytes, Remaining/bytes>> = BaseRemaining,
-            {bytes, Blob, Remaining};
-
-        <<?uint16:3, Size:5, Integer:Size/integer-unit:8, Remaining/bytes>>
-          when Size =< 2 ->
-            {integer, Integer, Remaining};
-        <<?uint32:3, Size:5, Integer:Size/integer-unit:8, Remaining/bytes>>
-          when Size =< 4 ->
-            {integer, Integer, Remaining};
-
-        <<?map:3, Size:5, Remaining/bytes>> when Size < 29 ->
-            {map, Size, Remaining};
-        <<?map:3, 29:5, BaseSize, Remaining/bytes>> ->
-            {map, BaseSize+29, Remaining};
-        <<?map:3, 30:5, BaseSize:16, Remaining/bytes>> ->
-            {map, BaseSize+285, Remaining};
-        <<?map:3, _:5, BaseSize:24, Remaining/bytes>> ->
-            {map, BaseSize+65821, Remaining};
-
-        <<0:3, Size:5, ?extended_int32, Integer:Size/signed-integer-unit:8, Remaining/bytes>>
-          when Size =< 4 ->
-            {integer, Integer, Remaining};
-        <<0:3, Size:5, ?extended_uint64, Integer:Size/integer-unit:8, Remaining/bytes>>
-          when Size =< 8 ->
-            {integer, Integer, Remaining};
-        <<0:3, Size:5, ?extended_uint128, Integer:Size/integer-unit:8, Remaining/bytes>>
-          when Size =< 16 ->
-            {integer, Integer, Remaining};
-
-        <<0:3, Size:5, ?extended_array, Remaining/bytes>> when Size < 29 ->
-            {array, Size, Remaining};
-        <<0:3, 29:5, ?extended_array, BaseSize, Remaining/bytes>> ->
-            {array, BaseSize+29, Remaining};
-        <<0:3, 30:5, ?extended_array, BaseSize:16, Remaining/bytes>> ->
-            {array, BaseSize+285, Remaining};
-        <<0:3, _:5, ?extended_array, BaseSize:24, Remaining/bytes>> ->
-            {array, BaseSize+65821, Remaining};
-
-        <<0:3, 0:5, ?extended_data_cache_container, _/bytes>> ->
-            error({data_section, Chunk, {unexpected_marker, data_cache_container}});
-        <<0:3, 0:5, ?extended_end_marker>> ->
-            finished;
-        %
-        <<0:3, 0:5, ?extended_boolean, Remaining/bytes>> ->
-            {boolean, false, Remaining};
-        <<0:3, 1:5, ?extended_boolean, Remaining/bytes>> ->
-            {boolean, true, Remaining};
-        %
-        <<0:3, 4:5, ?extended_float, Float:32/float, Remaining/bytes>> ->
-            {float, Float, Remaining};
-
-        <<>> ->
-            finished;
-
-        <<Unparseable/bytes>> ->
-            error({data_section, Chunk, {unparseable, Unparseable}})
-    end.
-
-save_analysis_data_section_chunk_index(DataSection, CurChunk, Indices) ->
-    Index = byte_size(DataSection) - byte_size(CurChunk),
-    %ets:insert(Indices, {Index}).
-    ok.
-
-check_for_data_section_loop(DataSection, CurChunk, RecordsAbove) ->
-    CurIndex = byte_size(DataSection) - byte_size(CurChunk),
-    case maps:put(CurIndex, visited, RecordsAbove) of
-        UpdatedRecordsAbove
-          when map_size(UpdatedRecordsAbove) =:= map_size(RecordsAbove) ->
-            error({data_section, CurChunk, {loop,RecordsAbove}});
-        UpdatedRecordsAbove ->
-            UpdatedRecordsAbove
-    end.
-
-is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<>>) ->
-    true;
-is_utf8_binary(<<_/bytes>>) ->
-    false.
-
-
-analyze_tree(DatabaseParts, DataSectionIndices) ->
-    #{tree := Tree} = DatabaseParts,
+run_analysis_coordinator(ParentPid, DatabaseParts) ->
+    #{ tree := Tree, data_section := DataSection } = DatabaseParts,
     NodeCount = metadata_get(<<"node_count">>, DatabaseParts),
     RecordSize = metadata_get(<<"record_size">>, DatabaseParts),
     NodeSize = (RecordSize * 2) div 8,
@@ -880,44 +636,96 @@ analyze_tree(DatabaseParts, DataSectionIndices) ->
             6 -> 128
         end,
 
+    CoordinatorPid = self(),
+    DataAnalyzerSpawnOpts = [link, {priority,normal}],
+    DataAnalysisConcurrency = erlang:system_info(schedulers_online),
+    DataAnalyzers =
+        lists:foldl(
+          fun (DataAnalyzerNr, Acc) ->
+                  Pid = spawn_opt(
+                          fun () -> run_data_analyzer(CoordinatorPid, DataSection) end,
+                          DataAnalyzerSpawnOpts),
+                  maps:put(DataAnalyzerNr - 1, Pid, Acc)
+          end,
+          #{}, lists:seq(1, DataAnalysisConcurrency)),
+
     Params =
         #{ tree => Tree,
            node_size => NodeSize,
            record_size => RecordSize,
            node_count => NodeCount,
            max_depth => MaxDepth,
-           data_section_indices => DataSectionIndices
+           data_analyzers => DataAnalyzers
          },
-    analyze_tree_recur(Params, 0, 0, 0).
+    RevTreeFlaws = analyze_tree_recur(Params, 0, 0, 0, []),
+    TreeFlaws = lists:reverse(RevTreeFlaws),
 
-analyze_tree_recur(#{max_depth := MaxDepth}, NodeIndex, Depth, Prefix)
+    BadDataRecordResults =
+        maps:fold(
+          fun (_, DataAnalyzerPid, Acc) ->
+                  _ = DataAnalyzerPid ! {self(), collect_bad_results},
+                  receive
+                      {DataAnalyzerPid, {bad_results, Bad}} ->
+                          maps:merge(Acc, Bad)
+                  end
+          end,
+          #{}, DataAnalyzers),
+
+    DataRecordFlaws =
+        maps:fold(
+          fun (DataIndex, {{bad_record_data_type,NotAMap}, TreeRefs}, Acc) ->
+                  [{bad_record_data_type,
+                    #{ data_index => DataIndex,
+                       data_record => NotAMap,
+                       tree_prefixes => data_analysis_bad_tree_prefixes(MaxDepth, TreeRefs)
+                     }} | Acc];
+              (DataIndex, {{data_record_decoding_failed,Class,Reason}, TreeRefs}, Acc) ->
+                  [{data_record_decoding_failed,
+                    #{ data_index => DataIndex,
+                       class => Class,
+                       reason => Reason,
+                       tree_prefixes => data_analysis_bad_tree_prefixes(MaxDepth, TreeRefs)
+                     }} | Acc]
+          end,
+          [], BadDataRecordResults),
+
+    _ = ParentPid ! {self(), {analysis_result, TreeFlaws, DataRecordFlaws}},
+    ok.
+
+analyze_tree_recur(#{max_depth := MaxDepth}, NodeIndex, Depth, Prefix, FlawsAcc)
   when Depth > MaxDepth ->
-    error({tree, {NodeIndex,Depth,Prefix}, max_depth_exceeded});
-analyze_tree_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Prefix)
+    [{max_depth_exceeded, #{ tree_prefix => analysis_flaw_prefix(MaxDepth, Depth, Prefix),
+                             node_index => NodeIndex }}
+     | FlawsAcc];
+analyze_tree_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Prefix, FlawsAcc)
   when NodeIndex < NodeCount ->
     % regular node
-    #{tree := Tree, node_size := NodeSize, record_size := RecordSize} = Params,
+    #{tree := Tree, node_size := NodeSize, record_size := RecordSize, max_depth := MaxDepth} = Params,
     try binary:part(Tree, {NodeIndex * NodeSize, NodeSize}) of
         Node ->
             {LeftNodeIndex, RightNodeIndex} = extrace_node_records(Node, RecordSize),
-            analyze_tree_recur(Params, LeftNodeIndex, Depth + 1, Prefix bsl 1),
-            analyze_tree_recur(Params, RightNodeIndex, Depth + 1, (Prefix bsl 1) bor 1)
+            FlawsAcc2 = analyze_tree_recur(Params, LeftNodeIndex, Depth + 1, Prefix bsl 1, FlawsAcc),
+            analyze_tree_recur(Params, RightNodeIndex, Depth + 1, (Prefix bsl 1) bor 1, FlawsAcc2)
     catch
         Class:Reason ->
-            error({tree, {NodeIndex,Depth,Prefix}, {node_dereference_failed,Class,Reason}})
+            [{node_dereference_failed, #{ tree_prefix => analysis_flaw_prefix(MaxDepth, Depth, Prefix),
+                                          node_index => NodeIndex,
+                                          class => Class,
+                                          reason => Reason }}
+             | FlawsAcc]
     end;
-analyze_tree_recur(#{node_count := NodeCount}, NodeIndex, _Depth, _Prefix)
+analyze_tree_recur(#{node_count := NodeCount}, NodeIndex, _Depth, _Prefix, FlawsAcc)
   when NodeIndex =:= NodeCount ->
     % leaf node
-    ok;
-analyze_tree_recur(#{node_count := NodeCount, data_section_indices := DataSectionIndices},
-                   NodeIndex, _Depth, _Prefix) ->
+    FlawsAcc;
+analyze_tree_recur(#{node_count := NodeCount} = Params, NodeIndex, Depth, Prefix, FlawsAcc) ->
     % pointer to the data section
+    #{data_analyzers := DataAnalyzers} = Params,
     DataIndex = (NodeIndex - NodeCount) - 16,
-    case true orelse ets:member(DataSectionIndices, DataIndex) of
-        true -> ok;
-        false -> error(todo)
-    end.
+    DataAnalyzerNr = erlang:phash2(DataIndex, map_size(DataAnalyzers)),
+    DataAnalyzerPid = maps:get(DataAnalyzerNr, DataAnalyzers),
+    _ = DataAnalyzerPid ! {self(), {analyze, DataIndex, Depth, Prefix}},
+    FlawsAcc.
 
 extrace_node_records(Node, RecordSize) when byte_size(Node) band 1 =:= 0 ->
     <<Left:RecordSize, Right:RecordSize>> = Node,
@@ -935,3 +743,71 @@ analysis_flaw_prefix(MaxDepth, Depth, Prefix) ->
     BitAddress = <<ShiftedPrefix:MaxDepth>>,
     ip_address_prefix(BitAddress, ShiftAmount).
 
+run_data_analyzer(CoordinatorPid, DataSection) ->
+    State = #{ coordinator_pid => CoordinatorPid,
+               data_section => DataSection,
+               good => gb_sets:empty(),
+               bad => #{}
+             },
+    run_data_analyzer_loop(State).
+
+run_data_analyzer_loop(State) ->
+    receive
+        Msg ->
+            UpdatedState = handle_data_analyzer_msg(Msg, State),
+            run_data_analyzer_loop(UpdatedState)
+    end.
+
+handle_data_analyzer_msg({CoordinatorPid, {analyze, DataIndex, Depth, Prefix}},
+                         #{coordinator_pid := CoordinatorPid} = State) ->
+    #{good := Good} = State,
+    case gb_sets:is_element(DataIndex, Good) of
+        true ->
+            % already analyzed and classified as good data record
+            run_data_analyzer_loop(State);
+        false ->
+            #{bad := Bad} = State,
+            case maps:find(DataIndex, Bad) of
+                {ok, {FlawInfo, BadReferences}} ->
+                    % already analyzed and classified as flawed data record
+                    UpdatedBadRefereces = [{Depth,Prefix} | BadReferences],
+                    UpdatedBad = maps:update(DataIndex, {FlawInfo, UpdatedBadRefereces}, Bad),
+                    UpdatedState = maps:update(bad, UpdatedBad, State),
+                    run_data_analyzer_loop(UpdatedState);
+                error ->
+                    % analyzing for the first time
+                    handle_data_record_analysis(DataIndex, Depth, Prefix, State)
+            end
+    end;
+handle_data_analyzer_msg({CoordinatorPid, collect_bad_results},
+                         #{coordinator_pid := CoordinatorPid} = State) ->
+    #{bad := Bad} = State,
+    _ = CoordinatorPid ! {self(), {bad_results,Bad}},
+    State.
+
+handle_data_record_analysis(DataIndex, Depth, Prefix, State) ->
+    #{data_section := DataSection} = State,
+    try consume_data_section_on_index(DataSection, DataIndex) of
+        {#{}, _} ->
+            #{good := Good} = State,
+            UpdatedGood = gb_sets:insert(DataIndex, Good),
+            maps:update(good, UpdatedGood, State);
+        {NotAMap, _} ->
+            #{bad := Bad} = State,
+            FlawInfo = {bad_record_data_type, NotAMap},
+            UpdatedBad = maps:put(DataIndex, {FlawInfo,[{Depth,Prefix}]}, Bad),
+            maps:update(bad, UpdatedBad, State)
+    catch
+        Class:Reason ->
+            #{bad := Bad} = State,
+            FlawInfo = {data_record_decoding_failed, Class, Reason},
+            UpdatedBad = maps:put(DataIndex, {FlawInfo,[{Depth,Prefix}]}, Bad),
+            maps:update(bad, UpdatedBad, State)
+    end.
+
+data_analysis_bad_tree_prefixes(MaxDepth, BadReferences) ->
+    lists:map(
+      fun ({Depth, Prefix}) ->
+              analysis_flaw_prefix(MaxDepth, Depth, Prefix)
+      end,
+      BadReferences).
