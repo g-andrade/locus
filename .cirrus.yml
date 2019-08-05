@@ -20,5 +20,5 @@ test_task:
       - image: erlang:18.1
       - image: erlang:18.0
   test_script: |
-      git submodule update --init --recursive
+      LC_ALL=C git submodule update --init --recursive
       make test
