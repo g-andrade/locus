@@ -514,9 +514,12 @@ has_mmdb_extension({Filename, _Type, _Size, _MTime, _Mode, _Uid, _Gid}) ->
     % can be returned, only the above tuple, which in fact is only returned
     % if the 'verbose' option is picked, something that we are definitely
     % not doing.
-    filename:extension(Filename) =:= ".mmdb" andalso {true, Filename};
+    filename_extension(Filename) =:= ".mmdb" andalso {true, Filename};
 has_mmdb_extension(Filename) ->
-    filename:extension(Filename) =:= ".mmdb".
+    filename_extension(Filename) =:= ".mmdb".
+
+filename_extension(Filename) ->
+    string:to_lower( filename:extension(Filename) ).
 
 -spec fetched_database_blob(source(), fetcher_success()) -> binary().
 fetched_database_blob({remote,_}, #{body := Body}) ->

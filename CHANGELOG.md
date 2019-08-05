@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     - `ssl_verify_fun` [1.1.4 => 1.1.5]
 ### Removed
 - OTP 17.4 and 17.5 support
+### Fixed
+- case-sensitive search of `.mmdb` file within tarball
 
 ## [1.6.2] - 2019-03-16
 ### Fixed
