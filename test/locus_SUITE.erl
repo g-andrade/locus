@@ -66,7 +66,7 @@ groups() ->
             ]
     end.
 
--ifdef(RUNNING_ON_TRAVIS).
+-ifdef(RUNNING_ON_CI).
 should_run_remote_http_tests() ->
     false.
 -else.

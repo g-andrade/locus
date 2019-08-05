@@ -43,7 +43,7 @@
 all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
--ifdef(RUNNING_ON_TRAVIS).
+-ifdef(RUNNING_ON_CI).
 groups() ->
     % This suite is too heavy for Travis. It runs ok but screws up
     % locus_SUITE which runs right after, e.g. with unexpected timeouts.

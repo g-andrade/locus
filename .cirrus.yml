@@ -21,4 +21,4 @@ test_task:
       - image: erlang:18.0
   test_script: |
       LC_ALL=C git submodule update --init --recursive
-      make test
+      DEBUG=1 make cirrus_test
