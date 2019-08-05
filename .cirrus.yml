@@ -18,7 +18,7 @@ test_task:
       #- image: erlang:18.3
       #- image: erlang:18.2
       #- image: erlang:18.1
-      - image: erlang:18.0
+      - image: erlang:18.0-slim
   test_script: |
       LC_ALL=C git submodule update --init --recursive
       DEBUG=1 make cirrus_test
