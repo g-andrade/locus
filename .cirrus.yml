@@ -1,9 +1,22 @@
-run_tests:
+test_task:
   container:
-    image: erlang:latest
-  rebar3_cache:
-    folder: _build
-    fingerprint_script: cat rebar.lock
-    populate_script: rebar3 compile --deps_only
-  compile_script: make
-  test_script: make test
+    matrix:
+      - image: erlang:22.0
+      - image: erlang:21.3
+      - image: erlang:21.2
+      - image: erlang:21.1
+      - image: erlang:21.0
+      - image: erlang:20.3
+      - image: erlang:20.2
+      - image: erlang:20.1
+      - image: erlang:20.0
+      - image: erlang:19.3
+      - image: erlang:19.2
+      - image: erlang:19.1
+      - image: erlang:19.0
+      - image: erlang:18.3
+      - image: erlang:18.2
+      - image: erlang:18.1
+      - image: erlang:18.0
+  test_script: |
+	make test
