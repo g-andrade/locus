@@ -528,8 +528,7 @@ fetched_database_blob({filesystem,_}, #{content := Content}) ->
 
 -spec fetched_database_modification_datetime(source(), fetcher_success()) -> calendar:datetime().
 fetched_database_modification_datetime({remote,_}, #{headers := Headers}) ->
-    CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
-    case lists:keyfind("last-modified", 1, CiHeaders) of
+    case lists:keyfind("last-modified", 1, Headers) of
         {"last-modified", LastModified} ->
             ({_,_} = ModificationDate) = httpd_util:convert_request_date(LastModified),
             ModificationDate;

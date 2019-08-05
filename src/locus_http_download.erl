@@ -133,6 +133,7 @@
 -type response_status() :: {100..999, binary()}.
 -export_type([response_status/0]).
 
+% case insensitive
 -type headers() :: [{string(), string()}].
 -export_type([headers/0]).
 
@@ -203,10 +204,11 @@ start_link(URL, Headers, Opts) ->
 init([OwnerPid, URL, Headers, Opts]) ->
     _ = process_flag(trap_exit, true),
     self() ! send_request,
+    CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
     {ok, #state{
             owner_pid = OwnerPid,
             url = URL,
-            headers = Headers,
+            headers = CiHeaders,
             opts = Opts,
             timeouts = #{}
            }}.
@@ -293,17 +295,20 @@ handle_httpc_message(Msg, State)
   when State#state.response_headers =:= undefined ->
     case Msg of
         {_, stream_start, Headers} ->
+            CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
             State2 = cancel_download_start_timeout(State),
             State3 = schedule_idle_download_timeout(State2),
-            State4 = State3#state{ response_headers = Headers, response_body = <<>> },
-            report_event({download_started, Headers}, State4),
+            State4 = State3#state{ response_headers = CiHeaders, response_body = <<>> },
+            report_event({download_started, CiHeaders}, State4),
             {noreply, State4};
         {_, {{_,StatusCode,StatusDesc}, Headers, Body}} when StatusCode =:= 304 ->
-            report_event({download_dismissed, {http, {StatusCode, StatusDesc}, Headers, Body}}, State),
+            CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
+            report_event({download_dismissed, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
             notify_owner({finished, dismissed}, State),
             {stop, normal, State};
         {_, {{_,StatusCode,StatusDesc}, Headers, Body}} ->
-            report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, Headers, Body}}, State),
+            CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
+            report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
             notify_owner({finished, {error, {http,StatusCode,StatusDesc}}}, State),
             {stop, normal, State};
         {_, {error, Reason}} ->
@@ -322,10 +327,11 @@ handle_httpc_message(Msg, State)
             {noreply, State3};
         {_, stream_end, TrailingHeaders} -> % no chunked encoding
             #state{response_headers = HeadersAcc, response_body = BodyAcc} = State,
-            Headers = lists:usort(HeadersAcc ++ TrailingHeaders),
+            CiTrailingHeaders = lists:keymap(fun string:to_lower/1, 1, TrailingHeaders),
+            Headers = lists:usort(HeadersAcc ++ CiTrailingHeaders),
             Body = iolist_to_binary(BodyAcc),
             BodySize = byte_size(Body),
-            report_event({download_finished, BodySize, {ok,TrailingHeaders}}, State),
+            report_event({download_finished, BodySize, {ok,CiTrailingHeaders}}, State),
             Success = #{headers => Headers, body => Body},
             notify_owner({finished, {success, Success}}, State),
             {stop, normal, State};
