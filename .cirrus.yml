@@ -21,4 +21,4 @@ test_task:
       - image: erlang:18.0-slim
   test_script: |
       LC_ALL=C git submodule update --init --recursive
-      DEBUG=1 make ci_test
+      make ci_test
