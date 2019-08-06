@@ -17,8 +17,7 @@ towards MaxMind.
 
 #### Usage
 
-Clone the repository and run `make console` to bring up a
-shell.
+Clone the repository and run `make console` to bring up a shell.
 
 ##### 1\. Start the database loader
 
@@ -26,7 +25,7 @@ shell.
 URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
 ok = locus:start_loader(country, URL).
 
-% URL can also be a local path, e.g. "/opt/MaxMind/GeoLite2-Country.tar.gz"
+% URL can also be a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
 ```
 
 ##### 2\. Wait for the database to load (optional)
@@ -102,9 +101,12 @@ ok = locus:start_loader(country, URL).
 
 ##### File Formats
 
-  - Only gzip-compressed tarballs are supported as of this moment
-  - The first file to be found, within the tarball, with an .mmdb
-    extension, is the one that's chosen for loading
+  - gzip-compressed tarballs (`.tar.gz`, `.tgz`)
+  - tarballs (`.tar`)
+  - MMDB files (`.mmdb`)
+  - gzip-compressed MMDB files (`.mmdb.gz`)
+  - For tarballs, the first file to be found with an `.mmdb` extension
+    is the one that's chosen for loading
   - The implementation of [MaxMind DB
     format](https://maxmind.github.io/MaxMind-DB/) is mostly complete
 
@@ -135,8 +137,7 @@ the `locus` CLI utility:
 1.  Run `make cli` to build the script, named `locus`, which will be
     deployed to the current directory.
 
-2.  Run
-    analysis:
+2.  Run analysis:
     
     ``` shell
     ./locus analyze https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz
@@ -223,7 +224,7 @@ The API reference can be found on [HexDocs](https://hexdocs.pm/locus/).
 
 ##### Tested setup
 
-  - Erlang/OTP 17.4 or newer
+  - Erlang/OTP 18.0 or newer
   - rebar3
 
 ##### License
@@ -266,8 +267,7 @@ released under the Apache License 2.0.
   - [geoip](https://github.com/manifest/geoip): Returns the location of
     an IP address; based on the ipinfodb.com web service
   - [geolite2data](https://hex.pm/packages/geolite2data): Periodically
-    fetches the free MaxMind GeoLite2
-    databases
+    fetches the free MaxMind GeoLite2 databases
   - [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
     Uses IP2Location geolocation database
 
@@ -286,8 +286,7 @@ released under the Apache License 2.0.
     location to a Plug connection based upon the client IP address by
     using MaxMind's GeoIP2 database
   - [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
-    from a location efficiently using PostGIS and
-Ecto
+    from a location efficiently using PostGIS and Ecto
 
 -----
 

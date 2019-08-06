@@ -43,7 +43,7 @@
    ]).
 
 -ifdef(TEST).
--export([cached_tarball_path_for_url/1]).
+-export([cached_database_path_for_url/1]).
 -endif.
 
 %% ------------------------------------------------------------------
@@ -70,6 +70,9 @@
 -define(DEFAULT_FS_READY_UPDATE_PERIOD, (timer:seconds(30))).
 
 -define(is_pos_integer(V), ((is_integer((V)) andalso ((V) >= 1)))).
+
+% https://en.wikipedia.org/wiki/Gzip
+-define(GZIP_MAGIC_BYTES, 16#1f,16#8b).
 
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
@@ -116,6 +119,8 @@
           use_cache :: boolean()
          }).
 -type settings() :: #settings{}.
+
+-type blob_format() :: tgz | tarball | gzip | gzipped_mmdb | mmdb | unknown.
 
 -type origin() ::
         {http, locus_http_download:url()} |
@@ -298,8 +303,8 @@ customized_settings(Settings, LoaderOpts) ->
 -spec finish_initialization(state()) -> state().
 finish_initialization(State)
   when (State#state.settings)#settings.use_cache ->
-    CachedTarballPath = cached_tarball_path(State),
-    Source = {cache,CachedTarballPath},
+    CachedDatabasePath = cached_database_path(State),
+    Source = {cache,CachedDatabasePath},
     {ok, FetcherPid} = locus_filesystem_load:start_link(Source, undefined),
     State#state{ fetcher_pid = FetcherPid, fetcher_source = Source };
 finish_initialization(State) ->
@@ -311,18 +316,18 @@ schedule_update(Interval, State)
     NewTimer = erlang:send_after(Interval, self(), begin_update),
     State#state{ update_timer = NewTimer }.
 
--spec cached_tarball_path(state()) -> nonempty_string().
-cached_tarball_path(State) ->
+-spec cached_database_path(state()) -> nonempty_string().
+cached_database_path(State) ->
     #state{origin = Origin} = State,
     {http, URL} = Origin,
-    cached_tarball_path_for_url(URL).
+    cached_database_path_for_url(URL).
 
--spec cached_tarball_path_for_url(string()) -> nonempty_string().
+-spec cached_database_path_for_url(string()) -> nonempty_string().
 %% @private
-cached_tarball_path_for_url(URL) ->
+cached_database_path_for_url(URL) ->
     Hash = crypto:hash(sha256, URL),
     HexHash = locus_util:bin_to_hex_str(Hash),
-    Filename = HexHash ++ ".tgz",
+    Filename = HexHash ++ ".mmdb.gz",
     UserCachePath = ?filename_basedir(user_cache, "locus_erlang"),
     filename:join(UserCachePath, Filename).
 
@@ -359,8 +364,10 @@ http_base_request_headers() ->
                   ["application/gzip",
                    "application/x-gzip",
                    "application/x-gtar",
-                   "application/x-tgz"])},
-     {"content-encoding", "identity"},
+                   "application/x-tgz",
+                   "application/x-tar",
+                   "application/octet-stream"
+                  ])},
      {"connection", "close"}].
 
 join_http_header_values(Values) ->
@@ -414,27 +421,29 @@ handle_database_fetch_dismissal(Source, State)
 
 -spec handle_database_fetch_success(source(), fetcher_success(), state()) -> {noreply, state()}.
 handle_database_fetch_success(Source, Success, State) ->
-    Blob = fetched_database_blob(Source, Success),
-    case decode_database_from_tarball_blob(Source, Blob) of
-        {ok, Version, Parts} ->
+    {BlobFormat, Blob} = fetched_database_format_and_blob(Source, Success),
+    case decode_database_from_blob(Source, BlobFormat, Blob) of
+        {ok, Version, Parts, BinDatabase} ->
             LastModified = fetched_database_modification_datetime(Source, Success),
-            handle_database_decode_success(Source, Version, Parts, Blob, LastModified, State);
+            handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified, State);
         {error, Reason} ->
             handle_database_decode_error(Source, Reason, State)
     end.
 
 -spec handle_database_decode_success(source(), calendar:datetime(), locus_mmdb:parts(),
                                      binary(), calendar:datetime(), state()) -> {noreply, state()}.
-handle_database_decode_success(Source, Version, Parts, Blob, LastModified, State) ->
+handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified, State) ->
     State2 = State#state{ last_modified = LastModified },
     notify_owner({update_success, Source, Version, Parts}, State2),
 
     case Source of
         {remote,_} when (State2#state.settings)#settings.use_cache ->
-            CachedTarballPath = cached_tarball_path(State2),
-            {ok, CacherPid} = locus_filesystem_store:start_link(CachedTarballPath, Blob, LastModified),
+            CachedDatabasePath = cached_database_path(State2),
+            CachedDatabaseBlob = make_cached_database_blob(CachedDatabasePath, BinDatabase),
+            {ok, CacherPid} = locus_filesystem_store:start_link(CachedDatabasePath, CachedDatabaseBlob,
+                                                                LastModified),
             State3 = State2#state{ cacher_pid = CacherPid,
-                                   cacher_path = CachedTarballPath,
+                                   cacher_path = CachedDatabasePath,
                                    cacher_source = Source },
             {noreply, State3};
         _ ->
@@ -472,8 +481,81 @@ time_to_next_update(LastFetchSource, State) ->
             UnreadyPeriod
     end.
 
+-spec decode_database_from_blob(source(), blob_format(), binary())
+        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
+           {error, {decode_database_from_tgz_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+decode_database_from_blob(Source, tgz, Blob) ->
+    decode_database_from_tgz_blob(Source, Blob);
+decode_database_from_blob(Source, tarball, Blob) ->
+    decode_database_from_tarball_blob(Source, Blob);
+decode_database_from_blob(Source, gzip, Blob) ->
+    decode_database_from_gzip_blob(Source, Blob);
+decode_database_from_blob(Source, gzipped_mmdb, Blob) ->
+    decode_database_from_gzipped_mmdb_blob(Source, Blob);
+decode_database_from_blob(Source, mmdb, Blob) ->
+    decode_database_from_mmdb_blob(Source, Blob);
+decode_database_from_blob(Source, unknown, Blob) ->
+    decode_database_from_unknown_blob(Source, Blob).
+
+-spec decode_database_from_tgz_blob(source(), binary())
+        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
+           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+decode_database_from_tgz_blob(Source, Blob) ->
+    try zlib:gunzip(Blob) of
+        Tarball ->
+            decode_database_from_tarball_blob(Source, Tarball)
+    catch
+        Class:Reason ->
+            Stacktrace = erlang:get_stacktrace(),
+            {error, {decode_database_from_tgz_blob, {Class, Reason, Stacktrace}}}
+    end.
+
+-spec decode_database_from_gzip_blob(source(), binary())
+        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
+           {error, {decode_database_from_gzip_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+decode_database_from_gzip_blob(Source, Blob) ->
+    try zlib:gunzip(Blob) of
+        Uncompressed ->
+            decode_database_from_unknown_blob(Source, Uncompressed)
+    catch
+        Class:Reason ->
+            Stacktrace = erlang:get_stacktrace(),
+            {error, {decode_database_from_gzip_blob, {Class, Reason, Stacktrace}}}
+    end.
+
+-spec decode_database_from_gzipped_mmdb_blob(source(), binary())
+        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
+           {error, {decode_database_from_gzipped_mmdb_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+decode_database_from_gzipped_mmdb_blob(Source, Blob) ->
+    try zlib:gunzip(Blob) of
+        Uncompressed ->
+            decode_database_from_mmdb_blob(Source, Uncompressed)
+    catch
+        Class:Reason ->
+            Stacktrace = erlang:get_stacktrace(),
+            {error, {decode_database_from_gzipped_mmdb_blob, {Class, Reason, Stacktrace}}}
+    end.
+
+-spec decode_database_from_unknown_blob(source(), binary())
+        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
+           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+decode_database_from_unknown_blob(Source, Blob) ->
+    case decode_database_from_tarball_blob(Source, Blob) of
+        {ok, _, _, _} = Success ->
+            Success;
+        _ ->
+            decode_database_from_mmdb_blob(Source, Blob)
+    end.
+
 -spec decode_database_from_tarball_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts()} |
+        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
            {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
            {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_tarball_blob(Source, Tarball) ->
@@ -487,12 +569,12 @@ decode_database_from_tarball_blob(Source, Tarball) ->
     end.
 
 -spec decode_database_from_mmdb_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts()} |
+        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
            {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_mmdb_blob(Source, BinDatabase) ->
     try locus_mmdb:decode_database_parts(Source, BinDatabase) of
         {Version, Parts} ->
-            {ok, Version, Parts}
+            {ok, Version, Parts, BinDatabase}
     catch
         Class:Reason ->
             Stacktrace = erlang:get_stacktrace(),
@@ -501,10 +583,10 @@ decode_database_from_mmdb_blob(Source, BinDatabase) ->
 
 -spec extract_mmdb_from_tarball_blob(binary()) -> binary().
 extract_mmdb_from_tarball_blob(Tarball) ->
-    {ok, ContainedPaths} = erl_tar:table({binary, Tarball}, [compressed]),
+    {ok, ContainedPaths} = erl_tar:table({binary,Tarball}),
     {true, DatabasePath} = locus_util:lists_anymap(fun has_mmdb_extension/1, ContainedPaths),
     {ok, [{DatabasePath, BinDatabase}]} =
-        erl_tar:extract({binary, Tarball}, [{files, [DatabasePath]}, memory, compressed]),
+        erl_tar:extract({binary,Tarball}, [{files, [DatabasePath]}, memory]),
     BinDatabase.
 
 %-spec has_mmdb_extension(nonempty_string()) -> boolean().
@@ -514,20 +596,67 @@ has_mmdb_extension({Filename, _Type, _Size, _MTime, _Mode, _Uid, _Gid}) ->
     % can be returned, only the above tuple, which in fact is only returned
     % if the 'verbose' option is picked, something that we are definitely
     % not doing.
-    filename_extension(Filename) =:= ".mmdb" andalso {true, Filename};
+    case filename_extension_parts(Filename) of
+        ["mmdb"|_] -> {true, Filename};
+        _ -> false
+    end;
 has_mmdb_extension(Filename) ->
-    filename_extension(Filename) =:= ".mmdb".
+    case filename_extension_parts(Filename) of
+        ["mmdb"|_] -> true;
+        _ -> false
+    end.
 
-filename_extension(Filename) ->
-    string:to_lower( filename:extension(Filename) ).
+filename_extension_parts(Filename) ->
+    filename_extension_parts_recur(Filename, []).
 
--spec fetched_database_blob(source(), fetcher_success()) -> binary().
-fetched_database_blob({remote,_}, #{body := Body}) ->
-    Body;
-fetched_database_blob({cache,_}, #{content := Content}) ->
-    Content;
-fetched_database_blob({filesystem,_}, #{content := Content}) ->
-    Content.
+filename_extension_parts_recur(Filename, Acc) ->
+    case filename:extension(Filename) of
+        "." ++ RawExtension ->
+            Extension = string:to_lower(RawExtension),
+            UpdatedFilename = lists:sublist(Filename, length(Filename) - length(Extension) - 1),
+            UpdatedAcc = [Extension | Acc],
+            filename_extension_parts_recur(UpdatedFilename, UpdatedAcc);
+        _ ->
+            lists:reverse(Acc)
+    end.
+
+-spec fetched_database_format_and_blob(source(), fetcher_success()) -> {blob_format(), binary()}.
+fetched_database_format_and_blob({remote,_}, #{headers := Headers, body := Body}) ->
+    case {lists:keyfind("content-type", 1, Headers), Body} of
+        {{_,"application/gzip"}, _} ->
+            {gzip, Body};
+        {{_,"application/x-gzip"}, _} ->
+            {gzip, Body};
+        {{_,"application/x-gtar"}, <<?GZIP_MAGIC_BYTES,_/bytes>>} ->
+            {tgz, Body};
+        {{_,"application/x-tgz"}, _} ->
+            {tgz, Body};
+        {{_,"application/x-tar"}, _} ->
+            {tarball, Body};
+        {_, <<?GZIP_MAGIC_BYTES,_/bytes>>} ->
+            {gzip, Body};
+        _ ->
+            {unknown, Body}
+    end;
+fetched_database_format_and_blob({SourceType,Path}, #{content := Content})
+  when SourceType =:= cache;
+       SourceType =:= filesystem ->
+    case {filename_extension_parts(Path), Content} of
+        {["tgz"|_], _} ->
+            {tgz, Content};
+        {["gz","tar"|_], _} ->
+            {tgz, Content};
+        {["tar"|_], _} ->
+            {tarball, Content};
+        {["mmdb"|_], _} ->
+            {mmdb, Content};
+        {["gz","mmdb"|_], _} ->
+            {gzipped_mmdb, Content};
+        {_, <<?GZIP_MAGIC_BYTES,_/bytes>>} ->
+            {gzip, Content};
+        _ ->
+            {unknown, Content}
+    end.
 
 -spec fetched_database_modification_datetime(source(), fetcher_success()) -> calendar:datetime().
 fetched_database_modification_datetime({remote,_}, #{headers := Headers}) ->
@@ -550,6 +679,12 @@ expect_linked_process_termination(Pid) ->
         false ->
             exit(Pid, kill),
             locus_util:flush_link_exit(Pid, 1000)
+    end.
+
+%-spec make_cached_database_blob(nonempty_string(), binary()) -> binary().
+make_cached_database_blob(CachedTarballPath, BinDatabase) ->
+    case filename_extension_parts(CachedTarballPath) of
+        ["gz","mmdb"|_] -> zlib:gzip(BinDatabase)
     end.
 
 %% ------------------------------------------------------------------

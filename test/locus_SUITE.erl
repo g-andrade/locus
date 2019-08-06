@@ -142,7 +142,7 @@ end_per_group(filesystem_tests, Config) ->
     Config;
 end_per_group(local_http_tests, Config) ->
     URL = proplists:get_value(url, Config),
-    CacheFilename = locus_loader:cached_tarball_path_for_url(URL),
+    CacheFilename = locus_loader:cached_database_path_for_url(URL),
     HttpdPid = proplists:get_value(httpd_pid, Config),
 
     ok = application:stop(locus),
@@ -151,7 +151,7 @@ end_per_group(local_http_tests, Config) ->
     Config;
 end_per_group(remote_http_tests, Config) ->
     URL = proplists:get_value(url, Config),
-    CacheFilename = locus_loader:cached_tarball_path_for_url(URL),
+    CacheFilename = locus_loader:cached_database_path_for_url(URL),
 
     ok = application:stop(locus),
     _ = file:delete(CacheFilename),
@@ -212,7 +212,7 @@ warm_remote_loading_httptest(Config) ->
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    CacheFilename = locus_loader:cached_tarball_path_for_url(URL),
+    CacheFilename = locus_loader:cached_database_path_for_url(URL),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {ok,LoadedVersion}}}),
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
