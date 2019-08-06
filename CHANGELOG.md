@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - HTTP loader and filesystem loader into a single loader codebase
 - supervision structure as to launch database loaders as transient processes
   under a new `simple_one_for_one` supervisor
+- caching of HTTP databases as to load and store compressed `.mmdb` files
+  rather than tarballs
 - Dependency versions:
     - `certifi` [2.4.2 => 2.5.1]
     - `ssl_verify_fun` [1.1.4 => 1.1.5]

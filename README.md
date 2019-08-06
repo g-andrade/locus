@@ -153,11 +153,12 @@ arguments.
 
 ##### HTTP URLs: Downloading and Updating
 
-  - The downloaded tarballs are uncompressed in memory
+  - The downloaded database files, when compressed, are inflated in
+    memory
   - The `last-modified` response header, if present, is used to
     condition subsequent download attempts (using `if-modified-since`
     request headers) in order to save bandwidth
-  - The downloaded tarballs are cached on the filesystem in order to
+  - The downloaded databases are cached on the filesystem in order to
     more quickly achieve readiness on future launches of the database
     loader
   - Until a HTTP database loader achieves readiness, download attempts
@@ -180,8 +181,8 @@ arguments.
   - A caching directory named `locus_erlang` is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
-  - Cached tarballs are named after the SHA256 hash of their source URL
-  - Modification time of the tarballs is extracted from `last-modified`
+  - Cached databases are named after the SHA256 hash of their source URL
+  - Modification time of the databases is extracted from `last-modified`
     response header (when present) and used to condition downloads on
     subsequent boots and save bandwidth
   - Caching can be disabled by specifying the `no_cache` option when
@@ -189,11 +190,11 @@ arguments.
 
 ##### Filesystem URLs: Loading and Updating
 
-  - The loaded tarballs are uncompressed in memory
+  - The loaded databases, when compressed, are inflated in memory
   - Until a filesystem database loader achieves readiness, load attempts
     are made every 5 seconds; once readiness is achieved, this interval
     increases to every 30 seconds and load attempts are dismissed as
-    long as the tarball modification timestamp keeps unchanged
+    long as the database file modification timestamp keeps unchanged
 
 ##### Logging
 
