@@ -50,7 +50,7 @@ start(DatabaseIds, Timeout) ->
 %% ------------------------------------------------------------------
 
 run_waiter(OwnerPid, DatabaseIds, Timeout) ->
-    _ = (Timeout =/= infinity andalso erlang:send_after(Timeout, self(), timeout)),
+    _ = maybe_schedule_timeout(Timeout),
     OwnerMon = monitor(process, OwnerPid),
     WaitRefs = lists:map(fun locus_database:enqueue_waiter/1, DatabaseIds),
     WaitList = lists:zip(WaitRefs, DatabaseIds),
@@ -67,19 +67,19 @@ run_waiter_loop(OwnerPid, OwnerMon, WaitList, Successes) ->
 
 handle_msg(Msg, OwnerPid, OwnerMon, WaitList, Successes) ->
     case Msg of
+        timeout ->
+            _ = OwnerPid ! {self(), {error, timeout}},
+            exit(normal);
         {'DOWN', OwnerMon, _, _, _} ->
             exit(normal);
         {'DOWN', Ref, _, _, Reason} ->
             {_,DatabaseId} = lists:keyfind(Ref, 1, WaitList),
-            _ = OwnerPid ! {self(), {down, DatabaseId, Reason}},
-            exit(normal);
-        timeout ->
-            _ = OwnerPid ! {self(), timeout},
+            _ = OwnerPid ! {self(), {error, {stopped, DatabaseId, Reason}}},
             exit(normal);
         {Ref, {error,Reason}}
           when is_reference(Ref) ->
             {_,DatabaseId} = lists:keyfind(Ref, 1, WaitList),
-            _ = OwnerPid ! {self(), {error, DatabaseId, Reason}},
+            _ = OwnerPid ! {self(), {error, {DatabaseId, Reason}}},
             exit(normal);
         {Ref, {ok,Version}}
           when is_reference(Ref) ->
@@ -88,3 +88,11 @@ handle_msg(Msg, OwnerPid, OwnerMon, WaitList, Successes) ->
             UpdatedSuccesses = Successes#{ DatabaseId => Version },
             run_waiter_loop(OwnerPid, OwnerMon, UpdatedWaitList, UpdatedSuccesses)
     end.
+
+maybe_schedule_timeout(infinity) ->
+    no;
+maybe_schedule_timeout(0) ->
+    _ = self() ! timeout,
+    now;
+maybe_schedule_timeout(Timeout) ->
+    erlang:send_after(Timeout, self(), timeout).

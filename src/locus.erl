@@ -278,12 +278,11 @@ wait_for_loader(DatabaseId) ->
 %% </ul>
 %% @see wait_for_loader/1
 %% @see start_loader/2
--spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Error}
+-spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
             when DatabaseId :: atom(),
                  Timeout :: timeout(),
                  LoadedVersion :: database_version(),
-                 Error :: database_unknown | timeout | {loading, LoadingError},
-                 LoadingError :: term().
+                 Reason :: database_unknown | {loading,term()} | timeout.
 wait_for_loader(DatabaseId, Timeout) ->
     case wait_for_loaders([DatabaseId], Timeout) of
         {ok, #{DatabaseId := LoadedVersion}} ->
@@ -315,8 +314,8 @@ wait_for_loader(DatabaseId, Timeout) ->
                  Timeout :: timeout(),
                  LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
                  LoadedVersion :: database_version(),
-                 Reason :: {DatabaseId, DatabaseErrorReason} | timeout,
-                 DatabaseErrorReason :: {loading, term()}.
+                 Reason ::{DatabaseId,LoaderFailure} | timeout,
+                 LoaderFailure :: database_unknown | {loading,term()}.
 wait_for_loaders(DatabaseIds, Timeout) ->
     {WaiterPid, WaiterMon} = locus_waiter:start(DatabaseIds, Timeout),
     case perform_wait(WaiterPid, WaiterMon) of
@@ -519,9 +518,9 @@ perform_wait(WaiterPid, WaiterMon) ->
 
 handle_waiter_result({ok, LoadedVersionPerDatabase}) ->
     {ok, LoadedVersionPerDatabase};
-handle_waiter_result({error, DatabaseId, Reason}) ->
+handle_waiter_result({error, {DatabaseId, Reason}}) ->
     {error, {DatabaseId, Reason}};
-handle_waiter_result({down, DatabaseId, Reason}) ->
+handle_waiter_result({error, {stopped, DatabaseId, Reason}}) ->
     case Reason of
         noproc ->
             {error, {DatabaseId, database_unknown}};
@@ -534,5 +533,5 @@ handle_waiter_result({down, DatabaseId, Reason}) ->
         _ ->
             exit(Reason)
     end;
-handle_waiter_result(timeout) ->
+handle_waiter_result({error, timeout}) ->
     {error, timeout}.
