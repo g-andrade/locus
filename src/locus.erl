@@ -273,8 +273,8 @@ wait_for_loader(DatabaseId) ->
 %% <ul>
 %% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% </ul>
 %% @see wait_for_loader/1
 %% @see start_loader/2
@@ -304,8 +304,8 @@ wait_for_loader(DatabaseId, Timeout) ->
 %% <ul>
 %% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
 %% <li>`{error, {DatabaseId, database_unknown}}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% <li>`{error, {DatabaseId, {loading, term()}}}' if loading `DatabaseId' failed for some reason.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% </ul>
 %% @see wait_for_loader/1
 %% @see start_loader/2
