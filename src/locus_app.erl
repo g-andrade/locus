@@ -40,9 +40,15 @@
 %% application Function Definitions
 %% ------------------------------------------------------------------
 
--spec start(term(), list()) -> {ok, pid()}.
+-spec start(term(), list()) -> {ok, pid()} | {error, term()}.
 start(_StartType, _StartArgs) ->
-    locus_sup:start_link().
+    case locus_sup:start_link() of
+        {ok, Pid} ->
+            locus_logger:on_app_start(),
+            {ok, Pid};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 -spec stop(term()) -> ok.
 stop(_State) ->

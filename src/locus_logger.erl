@@ -31,6 +31,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
+-export([on_app_start/0]).
 -export([set_loglevel/1]).              -ignore_xref({set_loglevel,1}).
 
 %% ------------------------------------------------------------------
@@ -55,6 +56,13 @@
 -define(warning, 2).
 -define(error, 3).
 
+-define(is_loglevel(V),
+        ((V) =:= debug orelse
+         (V) =:= info orelse
+         (V) =:= warning orelse
+         (V) =:= error orelse
+         (V) =:= none)).
+
 -define(case_match(Value, Pattern, Then, OrElse),
         (case (Value) of (Pattern) -> (Then); _ -> (OrElse) end)).
 
@@ -62,16 +70,30 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
+-spec on_app_start() -> ok.
+%% @private
+-ifdef(NO_LOGGER).
+on_app_start() -> ok.
+-else.
+on_app_start() ->
+    CurrentLevel = application:get_env(locus, log_level, undefined),
+    _ = logger:set_application_level(locus, CurrentLevel),
+    ok.
+-endif.
+
 %% @doc Changes the logging verbosity in runtime
 %%
 %% `Level' must be either `debug', `info', `warning', `error' or `none'.
 -spec set_loglevel(debug | info | warning | error | none) -> ok.
-set_loglevel(Level) when Level =:= debug;
-                         Level =:= info;
-                         Level =:= warning;
-                         Level =:= error;
-                         Level =:= none ->
+-ifdef(NO_LOGGER).
+set_loglevel(Level) when ?is_loglevel(Level) ->
     application:set_env(locus, log_level, Level).
+-else.
+set_loglevel(Level) when ?is_loglevel(Level) ->
+    application:set_env(locus, log_level, Level),
+    _ = logger:set_application_level(locus, Level),
+    ok.
+-endif.
 
 %% ------------------------------------------------------------------
 %% locus_event_subscriber Function Definitions
@@ -159,11 +181,11 @@ report(MinWeight, DatabaseId, {load_attempt_finished, Source, {ok, Version}}) ->
            ok
     end;
 report(MinWeight, DatabaseId, {load_attempt_finished, Source, {error, Error}}) ->
-    LogFun = ?case_match(Source, {cache,_}, warning_msg, error_msg),
+    LogFun = ?case_match(Source, {cache,_}, fun log_warning/2, fun log_error/2),
     if MinWeight =< ?debug ->
-           log(LogFun, "~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
+           LogFun("~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
        MinWeight =< ?error ->
-           log(LogFun, "~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
+           LogFun("~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
        true ->
            ok
     end;
@@ -184,16 +206,58 @@ report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Error}}
            ok
     end.
 
+-ifdef(NO_LOGGER).
 log_info(Fmt, Args) ->
-    log(info_msg, Fmt, Args).
+    log_to_error_logger(info_msg, Fmt, Args).
 
-%log_warning(Fmt, Args) ->
-%    log(warning_msg, Fmt, Args).
+log_warning(Fmt, Args) ->
+    log_to_error_logger(warning_msg, Fmt, Args).
 
 log_error(Fmt, Args) ->
-    log(error_msg, Fmt, Args).
+    log_to_error_logger(error_msg, Fmt, Args).
 
-log(Fun, Fmt, Args) ->
+-else.
+log_info(Fmt, Args) ->
+    case use_error_logger() of
+        true -> log_to_error_logger(info_msg, Fmt, Args);
+        false -> log_to_logger(info, Fmt, Args)
+    end.
+
+log_warning(Fmt, Args) ->
+    case use_error_logger() of
+        true -> log_to_error_logger(warning_msg, Fmt, Args);
+        false -> log_to_logger(warning, Fmt, Args)
+    end.
+
+log_error(Fmt, Args) ->
+    case use_error_logger() of
+        true -> log_to_error_logger(error_msg, Fmt, Args);
+        false -> log_to_logger(error, Fmt, Args)
+    end.
+
+log_to_logger(Fun, Fmt, Args) ->
+    FullFmt = "[locus] " ++ Fmt,
+    logger:Fun(FullFmt, Args).
+
+% `lager' and `logger' don`t play nice with each other (as of Jun 2019)
+% * https://github.com/erlang-lager/lager/issues/492
+% * https://github.com/erlang-lager/lager/pull/488
+use_error_logger() ->
+    has_lager() andalso not has_usable_logger().
+
+% Taken from: https://github.com/ferd/cth_readable/pull/23
+has_lager() ->
+    % Module is present
+    erlang:function_exported(logger, module_info, 0).
+
+% Taken from: https://github.com/ferd/cth_readable/pull/23
+has_usable_logger() ->
+    %% The config is set (lager didn't remove it)
+    erlang:function_exported(logger, get_handler_config, 1) andalso
+    logger:get_handler_config(default) =/= {error, {not_found, default}}.
+-endif.
+
+log_to_error_logger(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt ++ "~n",
     error_logger:(Fun)(FullFmt, Args).
 

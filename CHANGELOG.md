@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - half-baked and unwarranted support for `file://`-prefixed URLs
 ### Fixed
 - case-sensitive search of `.mmdb` file within tarball
+- overly verbose `logger` messages on OTP 21+
 
 ## [1.6.2] - 2019-03-16
 ### Fixed
