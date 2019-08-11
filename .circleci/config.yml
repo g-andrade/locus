@@ -39,17 +39,5 @@ workflows:
   run_all:
     jobs:
       - build_and_test:
-          name: "otp-22"
-          tag: "22.0"
-      - build_and_test:
-          name: "otp-21"
-          tag: "21.3"
-      - build_and_test:
-          name: "otp-20"
-          tag: "20.3"
-      - build_and_test:
-          name: "otp-19"
-          tag: "19.3"
-      - build_and_test:
           name: "otp-18"
           tag: "18.3"
