@@ -103,7 +103,7 @@ ok = locus:start_loader(country, URL).
 ##### File Formats
 
   - gzip-compressed tarballs (`.tar.gz`, `.tgz`)
-  - tarballs (`.tar`)
+  - plain tarballs (`.tar`)
   - MMDB files (`.mmdb`)
   - gzip-compressed MMDB files (`.mmdb.gz`)
   - For tarballs, the first file to be found with an `.mmdb` extension
