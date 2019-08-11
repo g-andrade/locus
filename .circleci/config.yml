@@ -22,12 +22,7 @@ jobs:
       - rebar3/with_deps_cache:
           cache_key_postfix: -<<parameters.tag>>
           steps:
-            - rebar3/compile
-            - rebar3/eunit
-            - rebar3/ct
-            #- rebar3/dialyzer
-            #- run: rebar3 as test xref
-            # TODO `analyze`
+            - run: RUNNING_ON_CI make ci_test
 
             - store_test_results:
                 path: ~/project/_build/test/logs/
