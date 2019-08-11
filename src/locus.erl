@@ -489,8 +489,6 @@ parse_http_url(String) ->
 
 parse_filesystem_url(DatabaseURL) ->
     try unicode:characters_to_list(DatabaseURL) of
-        "file://" ++ Path ->
-            {filesystem, filename:absname(Path)};
         Path when is_list(Path) ->
             {filesystem, filename:absname(Path)};
         {error, _Parsed, _RestData} ->
