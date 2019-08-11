@@ -10,9 +10,6 @@ jobs:
       tag:
         description: The Erlang/OTP docker image tag to use
         type: string
-      codecov_flag:
-        description: String the coverage reports are grouped by
-        type: string
     executor:
       name: rebar3/erlang
       tag: <<parameters.tag>>
