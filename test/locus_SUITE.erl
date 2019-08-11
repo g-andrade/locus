@@ -180,6 +180,7 @@ cacheless_loading_httptest(Config) ->
     LoaderOpts = [no_cache, {event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     % check events
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
@@ -200,6 +201,7 @@ cold_remote_loading_httptest(Config) ->
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {error,_}}}),
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
@@ -221,6 +223,7 @@ warm_remote_loading_httptest(Config) ->
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     CacheFilename = locus_loader:cached_database_path_for_url(URL),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {ok,LoadedVersion}}}),
@@ -276,7 +279,8 @@ ipv4_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv4_country_lookup_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV4_STR_ADDR),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
@@ -287,7 +291,8 @@ ipv4_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv4_invalid_addr_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
 
@@ -295,7 +300,8 @@ ipv6_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv6_country_lookup_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV6_STR_ADDR),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
@@ -306,7 +312,8 @@ ipv6_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv6_invalid_addr_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
 
@@ -498,7 +505,8 @@ loader_child_spec_test(Config) ->
     Loader = loader_child_spec_test,
 
     {ok, Supervisor} = custom_loader_sup:start_link(Loader, URL),
-    {ok, _} = locus:wait_for_loader(Loader, 10000),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, 10000),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
 
     % it conflicts with supervisor-spawned loaders under the same name
     ?assertMatch({error, {shutdown, {failed_to_start_child,_,{already_started,_}}}},

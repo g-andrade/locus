@@ -318,7 +318,6 @@ wait_for_loader(DatabaseId, Timeout) ->
                  Reason :: {DatabaseId, DatabaseErrorReason} | timeout,
                  DatabaseErrorReason :: {loading, term()}.
 wait_for_loaders(DatabaseIds, Timeout) ->
-    % TODO test cases
     {WaiterPid, WaiterMon} = locus_waiter:start(DatabaseIds, Timeout),
     case perform_wait(WaiterPid, WaiterMon) of
         {ok, LoadedVersionPerDatabase} ->
