@@ -1,0 +1,44 @@
+# Based on: https://github.com/census-instrumentation/opencensus-erlang/blob/5e697cd/.circleci/config.yml
+version: 2.1
+
+orbs:
+  rebar3: tsloughter/rebar3@0.7.0
+
+jobs:
+  build_and_test:
+    parameters:
+      tag:
+        description: The Erlang/OTP docker image tag to use
+        type: string
+      codecov_flag:
+        description: String the coverage reports are grouped by
+        type: string
+    executor:
+      name: rebar3/erlang
+      tag: <<parameters.tag>>
+    steps:
+      - checkout
+      - rebar3/with_deps_cache:
+          cache_key_postfix: -<<parameters.tag>>
+          steps:
+            - rebar3/compile
+            - rebar3/dialyzer
+            - run: rebar3 as test xref
+            - rebar3/ct
+            # TODO `analyze`
+
+            - store_test_results:
+                path: ~/project/_build/test/logs/
+            - store_artifacts:
+                path: ~/project/_build/test/logs
+                destination: common_test
+
+workflows:
+  run_all:
+    jobs:
+      - build_and_test:
+          name: "otp-21"
+          tag: "21.3"
+      - build_and_test:
+          name: "otp-20"
+          tag: "20.3"
