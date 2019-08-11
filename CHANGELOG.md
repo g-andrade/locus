@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [UNRELEASED]
 ### Added
-- stacktrace of caught exceptions to event reporting (including logger)
+- stacktrace of caught exceptions to event reporting (including custom logger)
 - ability of launching database loaders under library consumers' own supervisors
 - `wait_for_loaders/2` method for waiting on multiple databases concurrently
 ### Changed
