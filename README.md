@@ -203,9 +203,14 @@ arguments.
 
   - Five logging levels are supported: `debug`, `info`, `warning`,
     `error` and `none`
-  - The backend is
-    [error\_logger](http://erlang.org/doc/man/error_logger.html); this
-    usually plays nicely with `lager`
+  - The chosen backend ON OTP 21.1+ is
+    [logger](http://erlang.org/doc/man/logger.html) **if**
+    [lager](https://github.com/erlang-lager/lager/) is either missing or
+    it hasn't
+    [removed](https://github.com/erlang-lager/lager/issues/492)
+    `logger`'s default handler; for all other scenarios,
+    [error\_logger](http://erlang.org/doc/man/error_logger.html) is
+    picked instead
   - The default log level is `error`; it can be changed in the
     application's `env` config
   - To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
