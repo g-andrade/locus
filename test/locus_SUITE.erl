@@ -54,16 +54,19 @@ all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
 groups() ->
+    LocalTests =
+        [{filesystem_tests, [], test_cases("_fstest")},
+         {'local_http_tests_tar.gz', [], test_cases("_httptest")},
+         {local_http_tests_tgz, [], test_cases("_httptest")},
+         {local_http_tests_tar, [], test_cases("_httptest")},
+         {local_http_tests_mmdb, [], test_cases("_httptest")},
+         {'local_http_tests_mmdb.gz', [], test_cases("_httptest")}
+        ],
+
     case should_run_remote_http_tests() of
-        false ->
-            [{filesystem_tests, [], test_cases("_fstest")},
-             {local_http_tests, [], test_cases("_httptest")}
-            ];
+        false -> LocalTests;
         true ->
-            [{filesystem_tests, [], test_cases("_fstest")},
-             {local_http_tests, [], test_cases("_httptest")},
-             {remote_http_tests, [], test_cases("_httptest")}
-            ]
+            LocalTests ++ [{remote_http_tests, [], test_cases("_httptest")}]
     end.
 
 -ifdef(RUNNING_ON_CI).
@@ -94,68 +97,74 @@ exported_functions() ->
     Exports.
 
 %%%%%%%%%%%%%%%
-init_per_group(filesystem_tests, Config) ->
-    {ok, _} = application:ensure_all_started(locus),
-    ok = locus_logger:set_loglevel(debug),
-    BaseURL = ?PATH_WITH_TEST_TARBALLS,
-    DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
-    CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption.tar.gz"),
-    [{is_http, false},
-     {url, DatabasePath},
-     {path, DatabasePath},
-     {corrupt_url, CorruptPath},
-     {base_url, BaseURL}
-     | Config];
-init_per_group(local_http_tests, Config) ->
-    {ok, _} = application:ensure_all_started(locus),
-    ok = locus_logger:set_loglevel(debug),
-    {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
-    DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
-    RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
-    DatabaseURL = BaseURL ++ "/GeoLite2-Country.tar.gz" ++ "#" ++ RandomAnchor,
-    CorruptURL = BaseURL ++ "/corruption.tar.gz",
-    ok = set_file_mtime(DatabasePath, ?VERSION1_TIMESTAMP),
-    [{is_http, true},
-     {is_remote, false},
-     {httpd_pid, HttpdPid},
-     {url, DatabaseURL},
-     {path, DatabasePath},
-     {corrupt_url, CorruptURL},
-     {base_url, BaseURL}
-     | Config];
-init_per_group(remote_http_tests, Config) ->
-    {ok, _} = application:ensure_all_started(locus),
-    ok = locus_logger:set_loglevel(debug),
-    RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
-    URL = ?REMOTE_COUNTRY_URL ++ "#" ++ RandomAnchor,
-    CorruptURL = ?REMOTE_COUNTRY_CORRUPT_URL,
-    BaseURL = ?REMOTE_COUNTRY_BASE_URL,
-    [{is_http, true},
-     {is_remote, true},
-     {url, URL},
-     {base_url, BaseURL},
-     {corrupt_url, CorruptURL}
-     | Config].
+init_per_group(GroupName, Config) ->
+    case atom_to_list(GroupName) of
+        "filesystem_tests" ->
+            {ok, _} = application:ensure_all_started(locus),
+            ok = locus_logger:set_loglevel(debug),
+            BaseURL = ?PATH_WITH_TEST_TARBALLS,
+            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
+            CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption.tar.gz"),
+            [{is_http, false},
+             {url, DatabasePath},
+             {path, DatabasePath},
+             {corrupt_url, CorruptPath},
+             {base_url, BaseURL}
+             | Config];
+        "local_http_tests_" ++ FileExtension ->
+            {ok, _} = application:ensure_all_started(locus),
+            ok = locus_logger:set_loglevel(debug),
+            {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
+            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country." ++ FileExtension),
+            RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
+            DatabaseURL = BaseURL ++ "/GeoLite2-Country." ++ FileExtension ++ "#" ++ RandomAnchor,
+            CorruptURL = BaseURL ++ "/corruption." ++ FileExtension,
+            ok = set_file_mtime(DatabasePath, ?VERSION1_TIMESTAMP),
+            [{is_http, true},
+             {is_remote, false},
+             {httpd_pid, HttpdPid},
+             {url, DatabaseURL},
+             {path, DatabasePath},
+             {corrupt_url, CorruptURL},
+             {base_url, BaseURL}
+             | Config];
+        "remote_http_tests" ->
+            {ok, _} = application:ensure_all_started(locus),
+            ok = locus_logger:set_loglevel(debug),
+            RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
+            URL = ?REMOTE_COUNTRY_URL ++ "#" ++ RandomAnchor,
+            CorruptURL = ?REMOTE_COUNTRY_CORRUPT_URL,
+            BaseURL = ?REMOTE_COUNTRY_BASE_URL,
+            [{is_http, true},
+             {is_remote, true},
+             {url, URL},
+             {base_url, BaseURL},
+             {corrupt_url, CorruptURL}
+             | Config]
+    end.
 
-end_per_group(filesystem_tests, Config) ->
-    ok = application:stop(locus),
-    Config;
-end_per_group(local_http_tests, Config) ->
-    URL = proplists:get_value(url, Config),
-    CacheFilename = locus_loader:cached_database_path_for_url(URL),
-    HttpdPid = proplists:get_value(httpd_pid, Config),
+end_per_group(GroupName, Config) ->
+    case atom_to_list(GroupName) of
+        "filesystem_tests" ->
+            ok = application:stop(locus),
+            Config;
+        "local_http_tests_" ++ _FileExtension ->
+            URL = proplists:get_value(url, Config),
+            CacheFilename = locus_loader:cached_database_path_for_url(URL),
+            HttpdPid = proplists:get_value(httpd_pid, Config),
 
-    ok = application:stop(locus),
-    ok = locus_httpd:stop(HttpdPid),
-    _ = file:delete(CacheFilename),
-    Config;
-end_per_group(remote_http_tests, Config) ->
-    URL = proplists:get_value(url, Config),
-    CacheFilename = locus_loader:cached_database_path_for_url(URL),
+            ok = application:stop(locus),
+            ok = locus_httpd:stop(HttpdPid),
+            _ = file:delete(CacheFilename),
+            Config;
+        "remote_http_tests" ->
+            URL = proplists:get_value(url, Config),
+            CacheFilename = locus_loader:cached_database_path_for_url(URL),
 
-    ok = application:stop(locus),
-    _ = file:delete(CacheFilename),
-    Config.
+            ok = application:stop(locus),
+            _ = file:delete(CacheFilename),
+            Config
+    end.
 
 %% ------------------------------------------------------------------
 %% Filesystem Test Cases
