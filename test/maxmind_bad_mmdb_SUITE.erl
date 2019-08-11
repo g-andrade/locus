@@ -24,7 +24,7 @@
 %% locus includes code extracted from OTP source code, by Ericsson AB,
 %% released under the Apache License 2.0.
 
--module(bad_mmdb_SUITE).
+-module(maxmind_bad_mmdb_SUITE).
 -compile(export_all).
 
 -include_lib("eunit/include/eunit.hrl").
