@@ -19,9 +19,9 @@ jobs:
           cache_key_postfix: -<<parameters.tag>>
           steps:
             - rebar3/compile
+            - rebar3/ct
             - rebar3/dialyzer
             - run: rebar3 as test xref
-            - rebar3/ct
             # TODO `analyze`
 
             - store_test_results:
