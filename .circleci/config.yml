@@ -22,7 +22,7 @@ jobs:
       - rebar3/with_deps_cache:
           cache_key_postfix: -<<parameters.tag>>
           steps:
-            - run: RUNNING_ON_CI make ci_test
+            - run: RUNNING_ON_CI=yes make ci_test
 
             - store_test_results:
                 path: ~/project/_build/test/logs/
