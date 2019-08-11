@@ -536,6 +536,23 @@ loader_child_spec_test(Config) ->
 
     ok.
 
+wait_for_loader_failures_test(_Config) ->
+    Loader = wait_for_loader_failures_test,
+
+    ?assertEqual({error, database_unknown},
+                 locus:wait_for_loader(Loader)),
+
+    ?assertEqual({error, timeout},
+                 locus:wait_for_loader(Loader, 0)),
+    ?assertEqual({error, database_unknown},
+                 locus:wait_for_loader(Loader, 500)),
+
+    ?assertMatch({error, timeout},
+                 locus:wait_for_loaders([Loader], 0)),
+    ?assertMatch({error, {Loader, database_unknown}},
+                 locus:wait_for_loaders([Loader], 500)),
+    ok.
+
 %%%
 
 address_forms(StrAddr) ->
