@@ -21,8 +21,8 @@ jobs:
             - rebar3/compile
             - rebar3/eunit
             - rebar3/ct
-            - rebar3/dialyzer
-            - run: rebar3 as test xref
+            #- rebar3/dialyzer
+            #- run: rebar3 as test xref
             # TODO `analyze`
 
             - store_test_results:
