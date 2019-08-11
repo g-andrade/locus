@@ -54,19 +54,19 @@ all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
 groups() ->
-    LocalTests =
-        [{filesystem_tests, [], test_cases("_fstest")},
-         {'local_http_tests_tar.gz', [], test_cases("_httptest")},
-         {local_http_tests_tgz, [], test_cases("_httptest")},
-         {local_http_tests_tar, [], test_cases("_httptest")},
-         {local_http_tests_mmdb, [], test_cases("_httptest")},
-         {'local_http_tests_mmdb.gz', [], test_cases("_httptest")}
-        ],
+    LocalExtensions = ["tar.gz", "tgz", "tar", "mmdb", "mmdb.gz"],
+    FilesystemTests =
+        [{list_to_atom("filesystem_tests_" ++ FileExtension), [], test_cases("_fstest")}
+         || FileExtension <- LocalExtensions],
+    LocalHttpTests =
+        [{list_to_atom("local_http_tests_" ++ FileExtension), [], test_cases("_httptest")}
+         || FileExtension <- LocalExtensions],
 
     case should_run_remote_http_tests() of
-        false -> LocalTests;
+        false -> FilesystemTests ++ LocalHttpTests;
         true ->
-            LocalTests ++ [{remote_http_tests, [], test_cases("_httptest")}]
+            FilesystemTests ++ LocalHttpTests
+            ++ [{remote_http_tests, [], test_cases("_httptest")}]
     end.
 
 -ifdef(RUNNING_ON_CI).
@@ -99,12 +99,12 @@ exported_functions() ->
 %%%%%%%%%%%%%%%
 init_per_group(GroupName, Config) ->
     case atom_to_list(GroupName) of
-        "filesystem_tests" ->
+        "filesystem_tests_" ++ FileExtension ->
             {ok, _} = application:ensure_all_started(locus),
             ok = locus_logger:set_loglevel(debug),
             BaseURL = ?PATH_WITH_TEST_TARBALLS,
-            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
-            CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption.tar.gz"),
+            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country." ++ FileExtension),
+            CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption." ++ FileExtension),
             [{is_http, false},
              {url, DatabasePath},
              {path, DatabasePath},
@@ -145,7 +145,7 @@ init_per_group(GroupName, Config) ->
 
 end_per_group(GroupName, Config) ->
     case atom_to_list(GroupName) of
-        "filesystem_tests" ->
+        "filesystem_tests_" ++ _FileExtension ->
             ok = application:stop(locus),
             Config;
         "local_http_tests_" ++ _FileExtension ->
