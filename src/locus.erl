@@ -64,7 +64,7 @@
 
 -type database_entry() ::
         #{ prefix => ip_address_prefix(),
-           binary() => term()
+           unicode:unicode_binary() => locus_mmdb:mmdb_value()
          }.
 -export_type([database_entry/0]).
 
@@ -80,7 +80,7 @@
          }.
 -export_type([database_info/0]).
 
--type database_metadata() :: #{ binary() => term() }.
+-type database_metadata() :: locus_mmdb:metadata().
 -export_type([database_metadata/0]).
 
 -type database_source() :: locus_loader:source().

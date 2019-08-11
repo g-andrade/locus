@@ -102,9 +102,29 @@
 -endif.
 -export_type([parts/0]).
 
--type metadata() ::
-        #{ binary() => term() }.
+-type metadata() :: mmdb_map().
 -export_type([metadata/0]).
+
+-type mmdb_value() :: mmdb_composite_value() | mmdb_simple_value().
+-export_type([mmdb_value/0]).
+
+-type mmdb_composite_value() :: mmdb_map() | mmdb_array().
+-export_type([mmdb_composite_value/0]).
+
+-type mmdb_map() :: #{unicode:unicode_binary() => mmdb_value()}.
+-export_type([mmdb_map/0]).
+
+-type mmdb_array() :: [mmdb_value()].
+-export_type([mmdb_array/0]).
+
+-type mmdb_simple_value() ::
+        unicode:unicode_binary() |
+        float() |
+        binary() |
+        -(1 bsl 32)..((1 bsl 32) - 1) |
+        0..((1 bsl 128) - 1) |
+        boolean().
+-export_type([mmdb_simple_value/0]).
 
 -type analysis_flaw() ::
         max_depth_exceeded() |
@@ -224,7 +244,7 @@ update(Id, DatabaseParts) ->
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
         -> {ok, #{ prefix => {inet:ip_address(), 0..128},
-                   binary() => term() }} |
+                   unicode:unicode_binary() => mmdb_value() }} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
 %% @private
