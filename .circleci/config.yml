@@ -15,6 +15,10 @@ jobs:
       tag: <<parameters.tag>>
     steps:
       - checkout
+      - run:
+          name: "Clone submodules"
+          command: |
+            git submodule update --init --recursive
       - rebar3/with_deps_cache:
           cache_key_postfix: -<<parameters.tag>>
           steps:
