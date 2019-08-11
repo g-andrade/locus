@@ -244,7 +244,7 @@ update_works_httptest(_IsRemote, Config) ->
     URL = proplists:get_value(url, Config),
     Path = proplists:get_value(path, Config),
     Loader = update_works_httptest,
-    PostReadinessUpdatePeriod = 100,
+    PostReadinessUpdatePeriod = 200,
     LoaderOpts = [no_cache, {post_readiness_update_period, PostReadinessUpdatePeriod},
                   {event_subscriber, self()}],
     %%
