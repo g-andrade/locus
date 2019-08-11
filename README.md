@@ -2,6 +2,7 @@
 
 [![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 [![](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)
+[![](https://circleci.com/gh/g-andrade/locus/tree/master.svg?style=svg)](https://circleci.com/gh/g-andrade/locus/tree/master)
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
 the country, city or ASN of IP addresses using MaxMind GeoIP2.
