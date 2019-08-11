@@ -121,10 +121,16 @@
         unicode:unicode_binary() |
         float() |
         binary() |
-        -(1 bsl 32)..((1 bsl 32) - 1) |
-        0..((1 bsl 128) - 1) |
+        int32() |
+        uint128() |
         boolean().
 -export_type([mmdb_simple_value/0]).
+
+-type int32() :: -(1 bsl 32)..((1 bsl 32) - 1).
+-export_type([int32/0]).
+
+-type uint128() :: 0..((1 bsl 128) - 1).
+-export_type([uint128/0]).
 
 -type analysis_flaw() ::
         max_depth_exceeded() |
