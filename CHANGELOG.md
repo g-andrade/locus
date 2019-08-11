@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     - `ssl_verify_fun` [1.1.4 => 1.1.5]
 ### Removed
 - support for OTP 17.4 and 17.5
+- undocumented support for rebar 2
 - half-baked and unwarranted support for `file://`-prefixed URLs
 ### Fixed
 - case-sensitive search of `.mmdb` file within tarball
