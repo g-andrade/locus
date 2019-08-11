@@ -111,7 +111,7 @@ ok = locus:start_loader(country, URL).
 <li>gzip-compressed MMDB files (`.mmdb.gz')</li>
 </ul>
 
-For tarballs, the first file to be found with an `.mmdb' extension is the one that's chosen for loading.
+For tarball files, the first file to be found within it with an `.mmdb' extension is the one that's chosen for loading.
 
 The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a>
 is mostly complete.
