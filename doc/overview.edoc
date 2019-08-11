@@ -87,7 +87,7 @@ ok = locus:start_loader(country, URL).
 <h4>Documentation</h4>
 
 <ol>
-<li><a href="#file-formats">File Formats</a></li>
+<li><a href="#supported-file-formats">Supported File Formats</a></li>
 <li><a href="#database-types-and-loading">Database Types and Loading</a></li>
 <li><a href="#database-validation">Database Validation</a></li>
 <li><a href="#http-urls-downloading-and-updating">HTTP URLs: Downloading and Updating</a></li>
@@ -102,17 +102,19 @@ ok = locus:start_loader(country, URL).
 <li><a href="#alternative-libraries-elixir">Alternative Libraries (Elixir)</a></li>
 </ol>
 
-<h5 id="file-formats">File Formats</h5>
+<h5 id="supported-file-formats">Supported File Formats</h5>
 
 <ul>
 <li>gzip-compressed tarballs (`.tar.gz', `.tgz')</li>
 <li>plain tarballs (`.tar')</li>
 <li>MMDB files (`.mmdb')</li>
 <li>gzip-compressed MMDB files (`.mmdb.gz')</li>
-<li>For tarballs, the first file to be found with an `.mmdb' extension is the one that's chosen for loading</li>
-<li>The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a>
-is mostly complete</li>
 </ul>
+
+For tarballs, the first file to be found with an `.mmdb' extension is the one that's chosen for loading.
+
+The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a>
+is mostly complete.
 
 <h5 id="database-types-and-loading">Database Types and Loading</h5>
 

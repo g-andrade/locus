@@ -84,7 +84,7 @@ ok = locus:start_loader(country, URL).
 
 #### Documentation
 
-1.  [File Formats](#file-formats)
+1.  [Supported File Formats](#supported-file-formats)
 2.  [Database Types and Loading](#database-types-and-loading)
 3.  [Database Validation](#database-validation)
 4.  [HTTP URLs: Downloading and
@@ -100,16 +100,18 @@ ok = locus:start_loader(country, URL).
 12. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
 13. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
 
-##### File Formats
+##### Supported File Formats
 
   - gzip-compressed tarballs (`.tar.gz`, `.tgz`)
   - plain tarballs (`.tar`)
   - MMDB files (`.mmdb`)
   - gzip-compressed MMDB files (`.mmdb.gz`)
-  - For tarballs, the first file to be found with an `.mmdb` extension
-    is the one that's chosen for loading
-  - The implementation of [MaxMind DB
-    format](https://maxmind.github.io/MaxMind-DB/) is mostly complete
+
+For tarballs, the first file to be found with an `.mmdb` extension is
+the one that's chosen for loading.
+
+The implementation of [MaxMind DB
+format](https://maxmind.github.io/MaxMind-DB/) is mostly complete.
 
 ##### Database Types and Loading
 
