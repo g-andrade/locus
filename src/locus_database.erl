@@ -135,7 +135,6 @@
 
 -type event_load_attempt_finished() ::
         {load_attempt_finished, locus_loader:source(), {ok, Version :: calendar:datetime()}} |
-        %{load_attempt_finished, locus_loader:source(), {dismissed, Version :: calendar:datetime()}} |
         {load_attempt_finished, locus_loader:source(), {error, term()}}.
 -export_type([event_load_attempt_finished/0]).
 
