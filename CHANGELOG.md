@@ -6,16 +6,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [1.7.0] - 2019-08-12
 ### Added
-- ability of loading databases from uncompressed tarballs (`.tar`)
-- ability of loading databases directly (`.mmdb` and `.mmdb.gz`)
+- ability of loading databases from uncompressed tarballs (`.tar` files)
+- ability of loading unpacked databases (`.mmdb` and `.mmdb.gz` files)
 - stacktrace of caught exceptions to event reporting (including custom logger)
 - ability of launching database loaders under library consumers' own supervisors
-- `wait_for_loaders/2` API method for waiting on multiple databases concurrently
+- `wait_for_loaders/2` API method for concurrently awaiting multiple database loaders
 ### Changed
 - log level of HTTP and filesystem database loading failures from warning to error
-- HTTP and filesystem loaders into a single loader codebase
-- supervision structure as to launch database loaders as transient processes under a new `simple_one_for_one` supervisor
+- HTTP and filesystem loaders into a common loader codebase
 - caching of HTTP databases as to store and load compressed `.mmdb` files rather than tarballs
+- supervision structure as to launch database loaders as transient processes under a new `simple_one_for_one` supervisor
 - dependency versions:
     - `certifi` [2.4.2 => 2.5.1]
     - `ssl_verify_fun` [1.1.4 => 1.1.5]
@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - undocumented support for rebar 2
 - half-baked and unwarranted support for `file://`-prefixed URLs
 ### Fixed
-- case-sensitive search of `.mmdb` file within tarball
+- case-sensitive patterning of `.mmdb` file extensions within tarballs
 - overly verbose `logger` messages on OTP 21.1+
 - HTTPS certificate validation test cases on OTP 22
 
