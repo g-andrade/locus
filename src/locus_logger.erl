@@ -77,7 +77,7 @@ on_app_start() -> ok.
 -else.
 on_app_start() ->
     CurrentLevel = application:get_env(locus, log_level, undefined),
-    _ = logger:set_application_level(locus, CurrentLevel),
+    ok = logger:set_application_level(locus, CurrentLevel),
     ok.
 -endif.
 
@@ -181,10 +181,10 @@ report(MinWeight, DatabaseId, {load_attempt_finished, Source, {ok, Version}}) ->
            ok
     end;
 report(MinWeight, DatabaseId, {load_attempt_finished, Source, {error, Error}}) ->
-    LogFun = ?case_match(Source, {cache,_}, fun log_warning/2, fun log_error/2),
+    {Weight,LogFun}= ?case_match(Source, {cache,_}, {?warning,fun log_warning/2}, {?error,fun log_error/2}),
     if MinWeight =< ?debug ->
            LogFun("~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
-       MinWeight =< ?error ->
+       MinWeight =< Weight ->
            LogFun("~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
        true ->
            ok
