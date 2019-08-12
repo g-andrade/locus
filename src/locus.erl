@@ -33,8 +33,12 @@
 -export([start_loader/2]).                -ignore_xref({start_loader,2}).
 -export([start_loader/3]).                -ignore_xref({start_loader,3}).
 -export([stop_loader/1]).                 -ignore_xref({stop_loader,1}).
+-export([loader_child_spec/2]).           -ignore_xref({loader_child_spec,2}).
+-export([loader_child_spec/3]).           -ignore_xref({loader_child_spec,3}).
+-export([loader_child_spec/4]).           -ignore_xref({loader_child_spec,4}).
 -export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
 -export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
+-export([wait_for_loaders/2]).            -ignore_xref({wait_for_loaders,2}).
 -export([lookup/2]).                      -ignore_xref({lookup,2}).
 -export([get_version/1]).                 -ignore_xref({get_version,1}).
 -export([get_info/1]).                    -ignore_xref({get_info,1}).
@@ -60,7 +64,7 @@
 
 -type database_entry() ::
         #{ prefix => ip_address_prefix(),
-           binary() => term()
+           unicode:unicode_binary() => locus_mmdb:mmdb_value()
          }.
 -export_type([database_entry/0]).
 
@@ -76,13 +80,10 @@
          }.
 -export_type([database_info/0]).
 
--type database_metadata() :: #{ binary() => term() }.
+-type database_metadata() :: locus_mmdb:metadata().
 -export_type([database_metadata/0]).
 
--type database_source() ::
-        {cache, string()} |
-        {remote, string()} |
-        {filesystem, string()}.
+-type database_source() :: locus_loader:source().
 -export_type([database_source/0]).
 
 -type database_version() :: calendar:datetime().
@@ -111,7 +112,8 @@
 -spec start_loader(DatabaseId, DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseURL :: string() | binary(),
-                 Error :: invalid_url | already_started.
+                 Error :: (invalid_url | already_started |
+                           {invalid_opt,term()} | application_not_running).
 start_loader(DatabaseId, DatabaseURL) ->
     start_loader(DatabaseId, DatabaseURL, []).
 
@@ -120,7 +122,7 @@ start_loader(DatabaseId, DatabaseURL) ->
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
 %% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
-%% <li>`Opts' must be either a list of `locus_http_loader:opt()' or a list of `locus_filesystem_loader:opt()' values</li>
+%% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
 %%
 %% Returns:
@@ -135,13 +137,16 @@ start_loader(DatabaseId, DatabaseURL) ->
 -spec start_loader(DatabaseId, DatabaseURL, Opts) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseURL :: string() | binary(),
-                 Opts :: [locus_http_loader:opt()] | [locus_filesystem_loader:opt()],
-                 Error :: invalid_url | already_started.
+                 Opts :: [locus_database:opt()],
+                 Error :: (invalid_url | already_started |
+                           {invalid_opt,term()} | application_not_running).
 start_loader(DatabaseId, DatabaseURL, Opts) ->
-    OptsWithDefaults = opts_with_defaults(Opts),
     case parse_url(DatabaseURL) of
-        {URLType, ParsedURL} -> locus_sup:start_child(DatabaseId, URLType, ParsedURL, OptsWithDefaults);
-        false -> {error, invalid_url}
+        false ->
+            {error, invalid_url};
+        Origin ->
+            OptsWithDefaults = opts_with_defaults(Opts),
+            locus_database:start(DatabaseId, Origin, OptsWithDefaults)
     end.
 
 %% @doc Stops the database loader under id `DatabaseId'.
@@ -155,7 +160,84 @@ start_loader(DatabaseId, DatabaseURL, Opts) ->
             when DatabaseId :: atom(),
                  Error :: not_found.
 stop_loader(DatabaseId) ->
-    locus_sup:stop_child(DatabaseId).
+    locus_database:stop(DatabaseId).
+
+%% @doc Like `:loader_child_spec/2' but with default options
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>A `supervisor:child_spec()'.</li>
+%% </ul>
+%% @see loader_child_spec/3
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/2
+-spec loader_child_spec(DatabaseId, DatabaseURL) -> ChildSpec | no_return()
+            when DatabaseId :: atom(),
+                 DatabaseURL :: string() | binary(),
+                 ChildSpec :: locus_database:static_child_spec().
+loader_child_spec(DatabaseId, DatabaseURL) ->
+    loader_child_spec(DatabaseId, DatabaseURL, []).
+
+%% @doc Like `:loader_child_spec/3' but with default child id
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`Opts' must be a list of `locus_database:opt()' values</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>A `supervisor:child_spec()'.</li>
+%% </ul>
+%% @see loader_child_spec/4
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/3
+-spec loader_child_spec(DatabaseId, DatabaseURL, Opts) -> ChildSpec | no_return()
+            when DatabaseId :: atom(),
+                 DatabaseURL :: string() | binary(),
+                 Opts :: [locus_database:opt()],
+                 ChildSpec :: locus_database:static_child_spec().
+loader_child_spec(DatabaseId, DatabaseURL, Opts) ->
+    loader_child_spec({locus_database,DatabaseId}, DatabaseId, DatabaseURL, Opts).
+
+%% @doc Returns a supervisor child spec for a database loader under id `DatabaseId' with options `Opts'.
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`Opts' must be a list of `locus_database:opt()' values</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>A `supervisor:child_spec()'.</li>
+%% </ul>
+%% @see loader_child_spec/3
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/3
+-spec loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts) -> ChildSpec | no_return()
+            when ChildId :: term(),
+                 DatabaseId :: atom(),
+                 DatabaseURL :: string() | binary(),
+                 Opts :: [locus_database:opt()],
+                 ChildSpec :: locus_database:static_child_spec().
+loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts) ->
+    OptsWithDefaults = opts_with_defaults(Opts),
+    case parse_url(DatabaseURL) of
+        false ->
+            error(invalid_url);
+        Origin ->
+            locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults)
+    end.
 
 %% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails.
 %%
@@ -191,23 +273,56 @@ wait_for_loader(DatabaseId) ->
 %% <ul>
 %% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% </ul>
 %% @see wait_for_loader/1
 %% @see start_loader/2
--spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Error}
+-spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
             when DatabaseId :: atom(),
                  Timeout :: timeout(),
                  LoadedVersion :: database_version(),
-                 Error :: database_unknown | timeout | {loading, LoadingError},
-                 LoadingError :: term().
+                 Reason :: database_unknown | {loading,term()} | timeout.
 wait_for_loader(DatabaseId, Timeout) ->
-    case locus_http_loader:wait(DatabaseId, Timeout) of
-        {error, Error} when Error =:= database_unknown ->
-            locus_filesystem_loader:wait(DatabaseId, Timeout);
-        Other ->
-            Other
+    case wait_for_loaders([DatabaseId], Timeout) of
+        {ok, #{DatabaseId := LoadedVersion}} ->
+            {ok, LoadedVersion};
+        {error, {DatabaseId, Reason}} ->
+            {error, Reason};
+        {error, timeout} ->
+            {error, timeout}
+    end.
+
+%% @doc Like `wait_for_loader/2' but it can concurrently await status from more than one database.
+%%
+%% <ul>
+%% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
+%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
+%% <li>`{error, {DatabaseId, database_unknown}}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, {DatabaseId, {loading, term()}}}' if loading `DatabaseId' failed for some reason.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
+%% </ul>
+%% @see wait_for_loader/1
+%% @see start_loader/2
+-spec wait_for_loaders(DatabaseIds, Timeout) -> {ok, LoadedVersionPerDatabase} | {error, Reason}
+            when DatabaseIds :: [DatabaseId],
+                 Timeout :: timeout(),
+                 LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
+                 LoadedVersion :: database_version(),
+                 Reason ::{DatabaseId,LoaderFailure} | timeout,
+                 LoaderFailure :: database_unknown | {loading,term()}.
+wait_for_loaders(DatabaseIds, Timeout) ->
+    {WaiterPid, WaiterMon} = locus_waiter:start(DatabaseIds, Timeout),
+    case perform_wait(WaiterPid, WaiterMon) of
+        {ok, LoadedVersionPerDatabase} ->
+            {ok, LoadedVersionPerDatabase};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses.
@@ -341,6 +456,7 @@ analyze(DatabaseId) ->
 
 -ifdef(ESCRIPTIZING).
 -spec main([string()]) -> no_return().
+%% @private
 main(Args) ->
     locus_cli:main(Args).
 -endif.
@@ -373,8 +489,6 @@ parse_http_url(String) ->
 
 parse_filesystem_url(DatabaseURL) ->
     try unicode:characters_to_list(DatabaseURL) of
-        "file://" ++ Path ->
-            {filesystem, filename:absname(Path)};
         Path when is_list(Path) ->
             {filesystem, filename:absname(Path)};
         {error, _Parsed, _RestData} ->
@@ -390,3 +504,32 @@ info_from_db_parts(Parts) ->
 
 opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
+
+perform_wait(WaiterPid, WaiterMon) ->
+    receive
+        {WaiterPid, Result} ->
+            demonitor(WaiterMon, [flush]),
+            handle_waiter_result(Result);
+        {'DOWN', WaiterMon, _, _, Reason} ->
+            error({waiter_stopped, WaiterPid, Reason})
+    end.
+
+handle_waiter_result({ok, LoadedVersionPerDatabase}) ->
+    {ok, LoadedVersionPerDatabase};
+handle_waiter_result({error, {DatabaseId, Reason}}) ->
+    {error, {DatabaseId, Reason}};
+handle_waiter_result({error, {stopped, DatabaseId, Reason}}) ->
+    case Reason of
+        noproc ->
+            {error, {DatabaseId, database_unknown}};
+        normal ->
+            {error, {DatabaseId, database_unknown}};
+        shutdown ->
+            {error, {DatabaseId, database_unknown}};
+        {shutdown,_} ->
+            {error, {DatabaseId, database_unknown}};
+        _ ->
+            exit(Reason)
+    end;
+handle_waiter_result({error, timeout}) ->
+    {error, timeout}.

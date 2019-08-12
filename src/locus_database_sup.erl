@@ -24,32 +24,61 @@
 %% locus includes code extracted from OTP source code, by Ericsson AB,
 %% released under the Apache License 2.0.
 
-
 %% @private
--module(locus_app).
--behaviour(application).
+-module(locus_database_sup).
+-behaviour(supervisor).
 
 %% ------------------------------------------------------------------
-%% application Function Exports
+%% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start/2]).
--export([stop/1]).
+-export([start_link/0]).                      -ignore_xref({start_link,0}).
+-export([start_child/1]).
 
 %% ------------------------------------------------------------------
-%% application Function Definitions
+%% supervisor Function Exports
 %% ------------------------------------------------------------------
 
--spec start(term(), list()) -> {ok, pid()} | {error, term()}.
-start(_StartType, _StartArgs) ->
-    case locus_sup:start_link() of
-        {ok, Pid} ->
-            locus_logger:on_app_start(),
-            {ok, Pid};
-        {error, Reason} ->
-            {error, Reason}
+-export([init/1]).
+
+%% ------------------------------------------------------------------
+%% Macro Definitions
+%% ------------------------------------------------------------------
+
+-define(SERVER, ?MODULE).
+
+%% ------------------------------------------------------------------
+%% API Function Definitions
+%% ------------------------------------------------------------------
+
+-spec start_link() -> {ok, pid()}.
+start_link() ->
+    supervisor:start_link({local,?SERVER}, ?MODULE, []).
+
+-spec start_child([term()]) -> {ok,pid()} | {error,term()}.
+start_child(Args) ->
+    try supervisor:start_child(?SERVER, Args) of
+        Result -> Result
+    catch
+        exit:{Reason,{gen_server,call,[?SERVER|_]}}
+          when Reason =:= noproc;
+               Reason =:= normal;
+               Reason =:= shutdown;
+               (tuple_size(Reason) =:= 2 andalso element(1, Reason) =:= shutdown) ->
+            {error, application_not_running}
     end.
 
--spec stop(term()) -> ok.
-stop(_State) ->
-    ok.
+%% ------------------------------------------------------------------
+%% supervisor Function Definitions
+%% ------------------------------------------------------------------
+
+-spec init([])
+    -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
+init([]) ->
+    SupFlags =
+        #{strategy => simple_one_for_one,
+          intensity => 10,
+          period => 5
+         },
+    ChildSpec = locus_database:dynamic_child_spec(database),
+    {ok, {SupFlags, [ChildSpec]}}.

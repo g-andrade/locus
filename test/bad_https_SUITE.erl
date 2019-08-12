@@ -35,6 +35,40 @@
 
 -define(OTP_21_3__INITIAL_SSL_VERSION, [9,2]).
 
+
+-define(do_https_test(Loader, Host, ExpectedTlsAlert, Config),
+        (begin
+             Noise = crypto:strong_rand_bytes(32),
+             HashedNoise = crypto:hash(sha512, Noise),
+             Path = base64:encode(HashedNoise),
+             URL = "https://" ++ Host ++ "/" ++ binary_to_list(Path),
+             case lists:keyfind(secure, 1, Config) of
+                 {secure, true} ->
+                     LoaderOpts = [no_cache, {event_subscriber, self()}],
+                     ok = locus:start_loader(Loader, URL, LoaderOpts),
+                     try
+                         ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+                         ?assertRecv({locus, Loader, {download_failed_to_start,
+                                                      {error,
+                                                       {failed_connect,
+                                                        [{to_address,{Host,443}},
+                                                         {inet, [inet], {tls_alert,ExpectedTlsAlert}}]}}}})
+                     after
+                         ok = locus:stop_loader(Loader)
+                     end;
+                 {secure, false} ->
+                     LoaderOpts = [insecure, no_cache, {event_subscriber, self()}],
+                     ok = locus:start_loader(Loader, URL, LoaderOpts),
+                     try
+                         ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+                         ?assertRecv({locus, Loader, {download_failed_to_start,
+                                                      {http, {404 = _StatusCode, _StatusDesc},
+                                                       _Headers, _Body}}})
+                     after
+                         ok = locus:stop_loader(Loader)
+                     end
+             end
+         end)).
 %% ------------------------------------------------------------------
 %% Setup
 %% ------------------------------------------------------------------
@@ -66,51 +100,49 @@ end_per_group(_GroupName, Config) ->
 expired_https_test(Config) ->
     case ssl_app_version() of
         SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
-            do_https_test(expired_https_test, "expired.badssl.com",
-                          "certificate expired",
-                          Config);
+            ?do_https_test(expired_https_test, "expired.badssl.com",
+                           "certificate expired",
+                           Config);
         _SslVersion ->
-            do_https_test(expired_https_test, "expired.badssl.com",
-                          {certificate_expired, "received CLIENT ALERT: Fatal - Certificate Expired"},
-                          Config)
+            ?do_https_test(expired_https_test, "expired.badssl.com",
+                           {certificate_expired, _},
+                           Config)
     end.
 
 wronghost_https_test(Config) ->
     case ssl_app_version() of
         SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
-            do_https_test(wronghost_https_test, "wrong.host.badssl.com",
-                          "handshake failure",
-                          Config);
+            ?do_https_test(wronghost_https_test, "wrong.host.badssl.com",
+                           "handshake failure",
+                           Config);
         _SslVersion ->
-            do_https_test(wronghost_https_test, "wrong.host.badssl.com",
-                          {handshake_failure,
-                           "received CLIENT ALERT: Fatal - Handshake Failure"
-                           " - {bad_cert,unable_to_match_altnames}"},
-                          Config)
+            ?do_https_test(wronghost_https_test, "wrong.host.badssl.com",
+                           {handshake_failure, _},
+                           Config)
     end.
 
 selfsigned_https_test(Config) ->
     case ssl_app_version() of
         SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
-            do_https_test(selfsigned_https_test, "self-signed.badssl.com",
-                          "bad certificate",
-                          Config);
+            ?do_https_test(selfsigned_https_test, "self-signed.badssl.com",
+                           "bad certificate",
+                           Config);
         _SslVersion ->
-            do_https_test(selfsigned_https_test, "self-signed.badssl.com",
-                          {bad_certificate,"received CLIENT ALERT: Fatal - Bad Certificate"},
-                          Config)
+            ?do_https_test(selfsigned_https_test, "self-signed.badssl.com",
+                           {bad_certificate, _},
+                           Config)
     end.
 
 untrusted_https_test(Config) ->
     case ssl_app_version() of
         SslVersion when SslVersion < ?OTP_21_3__INITIAL_SSL_VERSION ->
-            do_https_test(untrusted_https_test, "untrusted-root.badssl.com",
-                          "unknown ca",
-                          Config);
+            ?do_https_test(untrusted_https_test, "untrusted-root.badssl.com",
+                           "unknown ca",
+                           Config);
         _SslVersion ->
-            do_https_test(untrusted_https_test, "untrusted-root.badssl.com",
-                          {unknown_ca, "received CLIENT ALERT: Fatal - Unknown CA"},
-                          Config)
+            ?do_https_test(untrusted_https_test, "untrusted-root.badssl.com",
+                           {unknown_ca, _},
+                           Config)
     end.
 
 %% ------------------------------------------------------------------
@@ -123,34 +155,3 @@ ssl_app_version() ->
     VersionBin = list_to_binary(VersionStr),
     Parts = binary:split(VersionBin, <<".">>, [global]),
     lists:map(fun binary_to_integer/1, Parts).
-
-do_https_test(Loader, Host, ExpectedTlsAlert, Config) ->
-    Noise = crypto:strong_rand_bytes(32),
-    HashedNoise = crypto:hash(sha512, Noise),
-    Path = base64:encode(HashedNoise),
-    URL = "https://" ++ Host ++ "/" ++ binary_to_list(Path),
-    case lists:keyfind(secure, 1, Config) of
-        {secure, true} ->
-            LoaderOpts = [no_cache, {event_subscriber, self()}],
-            ok = locus:start_loader(Loader, URL, LoaderOpts),
-            try
-                ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
-                ?assertRecv({locus, Loader, {download_failed_to_start,
-                                             {error,
-                                              {failed_connect,
-                                               [{to_address,{Host,443}},
-                                                {inet, [inet], {tls_alert,ExpectedTlsAlert}}]}}}})
-            after
-                ok = locus:stop_loader(Loader)
-            end;
-        {secure, false} ->
-            LoaderOpts = [insecure, no_cache, {event_subscriber, self()}],
-            ok = locus:start_loader(Loader, URL, LoaderOpts),
-            try
-                ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
-                ?assertRecv({locus, Loader, {download_failed_to_start,
-                                             {http, {404 = _StatusCode, _StatusDesc}, _Headers, _Body}}})
-            after
-                ok = locus:stop_loader(Loader)
-            end
-    end.

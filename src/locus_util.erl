@@ -1,4 +1,4 @@
-%% Copyright (c) 2018 Guilherme Andrade
+%% Copyright (c) 2017-2019 Guilherme Andrade
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -34,10 +34,12 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [read_file_and_its_modification_date/1,
-    maybe_read_file_and_its_modification_date/2,
-    load_database_from_tarball/3,
-    parse_ip_address/1
+   [parse_ip_address/1,
+    lists_anymap/2,
+    lists_take/2,
+    maps_take/2,
+    bin_to_hex_str/1,
+    flush_link_exit/2
    ]).
 
 %% ------------------------------------------------------------------
@@ -50,46 +52,6 @@
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
-
--spec read_file_and_its_modification_date(nonempty_string())
-        -> {ok, binary(), calendar:datetime()} |
-           {error, {read_file | read_file_info, term()}}.
-read_file_and_its_modification_date(Filename) ->
-    maybe_read_file_and_its_modification_date(Filename, undefined).
-
--spec maybe_read_file_and_its_modification_date(nonempty_string(),
-                                                calendar:datetime() | undefined)
-        -> {ok, unchanged} |
-           {ok, binary(), calendar:datetime()} |
-           {error, {read_file | read_file_info, term()}}.
-maybe_read_file_and_its_modification_date(Filename, PrevModificationDate) ->
-    case file:read_file_info(Filename, [{time,universal}]) of
-        {ok, #file_info{ mtime = ModificationDate }}
-          when ModificationDate =:= PrevModificationDate ->
-            {ok, unchanged};
-        {ok, #file_info{ mtime = ModificationDate }} ->
-            case file:read_file(Filename) of
-                {ok, Content} ->
-                    {ok, Content, ModificationDate};
-                {error, Error} ->
-                    {error, {read_file, Error}}
-            end;
-        {error, Error} ->
-            {error, {read_file_info, Error}}
-    end.
-
--spec load_database_from_tarball(atom(), binary(), locus_mmdb:source())
-        -> {ok, calendar:datetime()} |
-           {error, {exception, atom(), term()}}.
-load_database_from_tarball(Id, Tarball, Source) ->
-    try
-        BinDatabase = extract_database_from_tarball(Tarball),
-        Version = locus_mmdb:decode_and_update(Id, BinDatabase, Source),
-        {ok, Version}
-    catch
-        Class:Reason ->
-            {error, {exception, Class, Reason}}
-    end.
 
 -spec parse_ip_address(binary() | string() | inet:ip_address())
         -> {ok, inet:ip_address()} | {error, einval}.
@@ -115,18 +77,7 @@ parse_ip_address(String) when length(String) >= 0 ->
 parse_ip_address(_Invalid) ->
     {error, einval}.
 
-%% ------------------------------------------------------------------
-%% Internal Function Definitions
-%% ------------------------------------------------------------------
-
--spec extract_database_from_tarball(binary()) -> binary().
-extract_database_from_tarball(Tarball) ->
-    {ok, ContainedPaths} = erl_tar:table({binary, Tarball}, [compressed]),
-    {true, DatabasePath} = lists_anymap(fun has_mmdb_extension/1, ContainedPaths),
-    {ok, [{DatabasePath, BinDatabase}]} =
-        erl_tar:extract({binary, Tarball}, [{files, [DatabasePath]}, memory, compressed]),
-    BinDatabase.
-
+-spec lists_anymap(fun ((term()) -> boolean() | {true,term()}), list()) -> {true,term()} | false.
 lists_anymap(Fun, [H|T]) ->
     case Fun(H) of
         {true, Mapped} -> {true, Mapped};
@@ -136,13 +87,53 @@ lists_anymap(Fun, [H|T]) ->
 lists_anymap(_Fun, []) ->
     false.
 
-%-spec has_mmdb_extension(nonempty_string()) -> boolean().
-has_mmdb_extension({Filename, _Type, _Size, _MTime, _Mode, _Uid, _Gid}) ->
-    % FIXME: this a placeholder for OTP 20; due to the incomplete spec
-    % of erl_tar:table/2, Dialyzer comes to believe that no strings
-    % can be returned, only the above tuple, which in fact is only returned
-    % if the 'verbose' option is picked, something that we are definitely
-    % not doing.
-    filename:extension(Filename) =:= ".mmdb" andalso {true, Filename};
-has_mmdb_extension(Filename) ->
-    filename:extension(Filename) =:= ".mmdb".
+-spec lists_take(term(), list()) -> {ok, list()} | error.
+lists_take(Elem, List) ->
+    lists_take_recur(Elem, List, []).
+
+-spec maps_take(term(), map()) -> {term(), map()} | error.
+-ifdef(POST_OTP_18).
+maps_take(Key, Map) ->
+    maps:take(Key, Map).
+-else.
+maps_take(Key, Map) ->
+    try maps:get(Key, Map) of
+        Value ->
+            {Value, maps:remove(Key, Map)}
+    catch
+        error:{badkey,Key} ->
+            error
+    end.
+-endif.
+
+-spec bin_to_hex_str(binary()) -> [48..57 | 97..102].
+bin_to_hex_str(Bin) ->
+    bin_to_hex_str_recur(Bin, []).
+
+-spec bin_to_hex_str_recur(bitstring(), [48..57 | 97..102]) -> [48..57 | 97..102].
+bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) when Nibble < 10 ->
+    bin_to_hex_str_recur(Rest, [$0 + Nibble | Acc]);
+bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
+    bin_to_hex_str_recur(Rest, [$a + Nibble | Acc]);
+bin_to_hex_str_recur(<<>>, Acc) ->
+    lists:reverse(Acc).
+
+-spec flush_link_exit(pid(), timeout()) -> boolean().
+flush_link_exit(Pid, Timeout) ->
+    receive
+        {'EXIT', Pid, _} -> true
+    after
+        Timeout -> false
+    end.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+-spec lists_take_recur(term(), list(), list()) -> {ok, list()} | error.
+lists_take_recur(Elem, [H|T], Acc) when Elem =:= H ->
+    {ok, lists:reverse(Acc, T)};
+lists_take_recur(Elem, [H|T], Acc) ->
+    lists_take_recur(Elem, T, [H|Acc]);
+lists_take_recur(_, [], _) ->
+    error.

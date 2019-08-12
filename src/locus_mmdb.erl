@@ -33,13 +33,13 @@
 %% ------------------------------------------------------------------
 
 -export([create_table/1]).
--export([decode_and_update/3]).
+-export([decode_database_parts/2]).
+-export([update/2]).
 -export([lookup/2]).
 -export([get_parts/1]).
 -export([analyze/1]).
 
 -ifdef(TEST).
--export([decode_database_parts/2]).
 -export([lookup_/2]).
 -export([analyze_/1]).
 -endif.
@@ -78,19 +78,8 @@
 -type bin_database() :: <<_:64,_:_*8>>.
 -export_type([bin_database/0]).
 
--type source() ::
-        http_loader_source() |
-        filesystem_loader_source().
+-type source() :: locus_loader:source().
 -export_type([source/0]).
-
--type http_loader_source() ::
-        {cache, Path :: string()} |
-        {remote, URL :: string()}.
--export_type([http_loader_source/0]).
-
--type filesystem_loader_source() ::
-        {filesystem, Path :: string()}.
--export_type([filesystem_loader_source/0]).
 
 -ifdef(POST_OTP_18).
 -type parts() ::
@@ -98,7 +87,7 @@
            data_section := binary(),
            metadata := metadata(),
            ipv4_root_index := non_neg_integer(),
-           source := string(),
+           source := source(),
            version := calendar:datetime()
          }.
 -else.
@@ -107,15 +96,41 @@
            data_section => binary(),
            metadata => metadata(),
            ipv4_root_index => non_neg_integer(),
-           source => string(),
+           source => source(),
            version => calendar:datetime()
          }.
 -endif.
 -export_type([parts/0]).
 
--type metadata() ::
-        #{ binary() => term() }.
+-type metadata() :: mmdb_map().
 -export_type([metadata/0]).
+
+-type mmdb_value() :: mmdb_composite_value() | mmdb_simple_value().
+-export_type([mmdb_value/0]).
+
+-type mmdb_composite_value() :: mmdb_map() | mmdb_array().
+-export_type([mmdb_composite_value/0]).
+
+-type mmdb_map() :: #{unicode:unicode_binary() => mmdb_value()}.
+-export_type([mmdb_map/0]).
+
+-type mmdb_array() :: [mmdb_value()].
+-export_type([mmdb_array/0]).
+
+-type mmdb_simple_value() ::
+        unicode:unicode_binary() |
+        float() |
+        binary() |
+        int32() |
+        uint128() |
+        boolean().
+-export_type([mmdb_simple_value/0]).
+
+-type int32() :: -(1 bsl 32)..((1 bsl 32) - 1).
+-export_type([int32/0]).
+
+-type uint128() :: 0..((1 bsl 128) - 1).
+-export_type([uint128/0]).
 
 -type analysis_flaw() ::
         max_depth_exceeded() |
@@ -203,17 +218,39 @@ create_table(Id) ->
     _ = ets:new(Table, [named_table, protected, {read_concurrency,true}]),
     ok.
 
--spec decode_and_update(atom(), bin_database(), source()) -> calendar:datetime().
+-spec decode_database_parts(source(), bin_database()) -> {calendar:datetime(), parts()}.
 %% @private
-decode_and_update(Id, BinDatabase, Source) ->
+decode_database_parts(Source, BinDatabase) ->
+    BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
+    {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
+    <<TreeAndDataSection:BinMetadataStart/bytes, ?METADATA_MARKER, BinMetadata/bytes>>
+        = BinDatabase,
+    Metadata = decode_metadata(BinMetadata),
+    RecordSize = maps:get(<<"record_size">>, Metadata),
+    NodeCount = maps:get(<<"node_count">>, Metadata),
+    BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
+    FmtMajorVersion = maps:get(<<"binary_format_major_version">>, Metadata),
+    FmtMinorVersion = maps:get(<<"binary_format_minor_version">>, Metadata),
+    ?assert(is_known_database_format(FmtMajorVersion),
+            {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
+    TreeSize = ((RecordSize * 2) div 8) * NodeCount,
+    <<Tree:TreeSize/bytes, 0:128, DataSection/bytes>> = TreeAndDataSection,
+    IPv4RootIndex = find_ipv4_root_index(Tree, Metadata),
+    Version = epoch_to_datetime(BuildEpoch),
+    DatabaseParts = #{ tree => Tree, data_section => DataSection,
+                       metadata => Metadata, ipv4_root_index => IPv4RootIndex,
+                       source => Source, version => Version },
+    {Version, DatabaseParts}.
+
+-spec update(atom(), parts()) -> true.
+%% @private
+update(Id, DatabaseParts) ->
     Table = table_name(Id),
-    {DatabaseParts, Version} = decode_database_parts(BinDatabase, Source),
-    ets:insert(Table, {database, DatabaseParts}),
-    Version.
+    ets:insert(Table, {database,DatabaseParts}).
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
         -> {ok, #{ prefix => {inet:ip_address(), 0..128},
-                   binary() => term() }} |
+                   unicode:unicode_binary() => mmdb_value() }} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
 %% @private
@@ -261,30 +298,6 @@ analyze(Id) ->
 -spec table_name(atom()) -> atom().
 table_name(Id) ->
     list_to_atom("locus_mmdb_" ++ atom_to_list(Id)).
-
--spec decode_database_parts(bin_database(), source()) -> {parts(), calendar:datetime()}.
-%% @private
-decode_database_parts(BinDatabase, Source) ->
-    BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
-    {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
-    <<TreeAndDataSection:BinMetadataStart/bytes, ?METADATA_MARKER, BinMetadata/bytes>>
-        = BinDatabase,
-    Metadata = decode_metadata(BinMetadata),
-    RecordSize = maps:get(<<"record_size">>, Metadata),
-    NodeCount = maps:get(<<"node_count">>, Metadata),
-    BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
-    FmtMajorVersion = maps:get(<<"binary_format_major_version">>, Metadata),
-    FmtMinorVersion = maps:get(<<"binary_format_minor_version">>, Metadata),
-    ?assert(is_known_database_format(FmtMajorVersion),
-            {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
-    TreeSize = ((RecordSize * 2) div 8) * NodeCount,
-    <<Tree:TreeSize/bytes, 0:128, DataSection/bytes>> = TreeAndDataSection,
-    IPv4RootIndex = find_ipv4_root_index(Tree, Metadata),
-    Version = epoch_to_datetime(BuildEpoch),
-    DatabaseParts = #{ tree => Tree, data_section => DataSection,
-                       metadata => Metadata, ipv4_root_index => IPv4RootIndex,
-                       source => Source, version => Version },
-    {DatabaseParts, Version}.
 
 -spec decode_metadata(binary()) -> metadata().
 decode_metadata(BinMetadata) ->
@@ -397,13 +410,27 @@ consume_data_section_chunk(DataSection, Path, Chunk) ->
     end.
 
 consume_utf8_string(Size, Chunk) ->
-    {Text, Remaining} = consume_bytes(Size, Chunk),
-    case unicode:characters_to_binary(Text, utf8) of
-        <<ValidatedText/bytes>> ->
-            {ValidatedText, Remaining};
-        Failure ->
-            error({not_utf8_text, Failure})
+    <<Bytes:Size/bytes, Remaining/bytes>> = Chunk,
+    case is_utf8_binary(Bytes) of
+        true ->
+            CopiedBytes = binary:copy(Bytes),
+            {CopiedBytes, Remaining};
+        _ ->
+            error(not_utf8_text)
     end.
+
+is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<>>) ->
+    true;
+is_utf8_binary(<<_/bytes>>) ->
+    false.
 
 consume_bytes(Size, Chunk) ->
     <<Bytes:Size/bytes, Remaining/bytes>> = Chunk,

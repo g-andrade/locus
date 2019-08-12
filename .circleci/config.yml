@@ -10,22 +10,19 @@ jobs:
       tag:
         description: The Erlang/OTP docker image tag to use
         type: string
-      codecov_flag:
-        description: String the coverage reports are grouped by
-        type: string
     executor:
       name: rebar3/erlang
       tag: <<parameters.tag>>
     steps:
       - checkout
+      - run:
+          name: "Clone submodules"
+          command: |
+            git submodule update --init --recursive
       - rebar3/with_deps_cache:
           cache_key_postfix: -<<parameters.tag>>
           steps:
-            - rebar3/compile
-            - rebar3/dialyzer
-            - run: rebar3 as test xref
-            - rebar3/ct
-            # TODO `analyze`
+            - run: RUNNING_ON_CI=yes make ci_test
 
             - store_test_results:
                 path: ~/project/_build/test/logs/
@@ -37,8 +34,5 @@ workflows:
   run_all:
     jobs:
       - build_and_test:
-          name: "otp-21"
-          tag: "21.3"
-      - build_and_test:
-          name: "otp-20"
-          tag: "20.3"
+          name: "otp-18"
+          tag: "18.3"

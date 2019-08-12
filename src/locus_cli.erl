@@ -87,7 +87,7 @@ handle_analysis_command(CmdArgs) ->
 prepare_analysis(DatabaseURL, LoadTimeout) ->
     DatabaseId = cli_analysis,
     WaitRef = make_ref(),
-    BaseOpts = [{internal, {async_waiter, {self(),WaitRef}}}],
+    BaseOpts = [{internal, {async_waiter, WaitRef, self()}}],
     ExtraOpts =
         case http_uri:parse(DatabaseURL) of
             {ok, _} -> [no_cache];

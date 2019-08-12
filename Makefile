@@ -4,7 +4,7 @@ ifeq ($(wildcard rebar3),rebar3)
 	REBAR3 = $(CURDIR)/rebar3
 endif
 
-ifdef RUNNING_ON_TRAVIS
+ifdef RUNNING_ON_CI
 REBAR3 = ./rebar3
 else
 REBAR3 ?= $(shell test -e `which rebar3` 2>/dev/null && which rebar3 || echo "./rebar3")
@@ -17,10 +17,10 @@ endif
 CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
 
 .PHONY: all build clean check dialyzer xref
-.PHONY: test travis_test cover
+.PHONY: test ci_test cover
 .PHONY: console doc publish cli
 
-.NOTPARALLEL: check cover test travis_test
+.NOTPARALLEL: check cover test ci_test
 
 all: build
 
@@ -46,8 +46,8 @@ test: $(REBAR3) cli
 	@$(REBAR3) ct
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
-travis_test: $(REBAR3) cli
-	@$(REBAR3) as travis_test ct
+ci_test: $(REBAR3) cli
+	@$(REBAR3) as ci_test ct
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 cover: $(REBAR3) test
@@ -73,6 +73,6 @@ publish: $(REBAR3)
 	@$(REBAR3) as publish hex publish
 	@$(REBAR3) as publish hex docs
 
-cli:
+cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./

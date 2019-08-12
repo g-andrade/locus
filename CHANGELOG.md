@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2019-08-12
+### Added
+- stacktrace of caught exceptions to event reporting (including custom logger)
+- ability of launching database loaders under library consumers' own supervisors
+- `wait_for_loaders/2` API method for waiting on multiple databases concurrently
+### Changed
+- log level of HTTP and filesystem database loading failures from warning to error
+- HTTP and filesystem loaders into a single loader codebase
+- supervision structure as to launch database loaders as transient processes under a new `simple_one_for_one` supervisor
+- caching of HTTP databases as to store and load compressed `.mmdb` files rather than tarballs
+- dependency versions:
+    - `certifi` [2.4.2 => 2.5.1]
+    - `ssl_verify_fun` [1.1.4 => 1.1.5]
+### Removed
+- support for OTP 17.4 and 17.5
+- undocumented support for rebar 2
+- half-baked and unwarranted support for `file://`-prefixed URLs
+### Fixed
+- case-sensitive search of `.mmdb` file within tarball
+- overly verbose `logger` messages on OTP 21.1+
+- HTTPS certificate validation test cases on OTP 22
+
 ## [1.6.2] - 2019-03-16
 ### Fixed
 - Dialyzer warning on OTP 21.3

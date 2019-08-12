@@ -1,4 +1,4 @@
-%% Copyright (c) 2017-2019 Guilherme Andrade
+%% Copyright (c) 2019 Guilherme Andrade
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -24,27 +24,59 @@
 %% locus includes code extracted from OTP source code, by Ericsson AB,
 %% released under the Apache License 2.0.
 
-%% @doc
-%% Callbacks:
-%% <ul>
-%% <li>`report(DatabaseId :: atom(), Event :: event()) -> ok'</li>
-%% </ul>
-
--module(locus_event_subscriber).
+-module(custom_loader_sup).
+-behaviour(supervisor).
 
 %% ------------------------------------------------------------------
-%% Callback Definitions
+%% API Function Exports
 %% ------------------------------------------------------------------
 
--callback report(DatabaseId, Event) -> ok
-        when DatabaseId :: atom(),
-             Event :: event().
-
--ignore_xref({behaviour_info,1}).
+-export(
+   [start_link/2,
+    start_link/3,
+    stop/1
+   ]).
 
 %% ------------------------------------------------------------------
-%% Type Definitions
+%% supervisor Function Exports
 %% ------------------------------------------------------------------
 
--type event() :: locus_database:event().
--export_type([event/0]).
+-export([init/1]).
+
+%% ------------------------------------------------------------------
+%% API Function Definitions
+%% ------------------------------------------------------------------
+
+-spec start_link(atom(), string()) -> {ok, pid()}.
+start_link(DatabaseId, DatabaseURL) ->
+    supervisor:start_link(?MODULE, [DatabaseId, DatabaseURL]).
+
+-spec start_link(atom(), string(), [term()]) -> {ok, pid()}.
+start_link(DatabaseId, DatabaseURL, Opts) ->
+    supervisor:start_link(?MODULE, [DatabaseId, DatabaseURL, Opts]).
+
+-spec stop(pid()) -> ok.
+stop(Pid) ->
+    gen:stop(Pid, normal, 5000).
+
+%% ------------------------------------------------------------------
+%% supervisor Function Definitions
+%% ------------------------------------------------------------------
+
+-spec init([InitArg, ...])
+         -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}
+        when InitArg :: DatabaseId | DatabaseURL,
+             DatabaseId :: atom(),
+             DatabaseURL :: string().
+init([DatabaseId, DatabaseURL | TailArgs])
+  when length(TailArgs) =:= 0;
+       length(TailArgs) =:= 1 ->
+    SupFlags =
+        #{ strategy => one_for_one,
+           intensity => 5,
+           period => 1
+         },
+    ChildSpecs =
+        [apply(locus, loader_child_spec, [DatabaseId, DatabaseURL | TailArgs])
+        ],
+    {ok, {SupFlags, ChildSpecs}}.

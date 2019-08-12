@@ -54,19 +54,22 @@ all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
 groups() ->
+    LocalExtensions = ["tar.gz", "tgz", "tar", "mmdb", "mmdb.gz"],
+    FilesystemTests =
+        [{list_to_atom("filesystem_tests_" ++ FileExtension), [], test_cases("_fstest")}
+         || FileExtension <- LocalExtensions],
+    LocalHttpTests =
+        [{list_to_atom("local_http_tests_" ++ FileExtension), [], test_cases("_httptest")}
+         || FileExtension <- LocalExtensions],
+
     case should_run_remote_http_tests() of
-        false ->
-            [{filesystem_tests, [], test_cases("_fstest")},
-             {local_http_tests, [], test_cases("_httptest")}
-            ];
+        false -> FilesystemTests ++ LocalHttpTests;
         true ->
-            [{filesystem_tests, [], test_cases("_fstest")},
-             {local_http_tests, [], test_cases("_httptest")},
-             {remote_http_tests, [], test_cases("_httptest")}
-            ]
+            FilesystemTests ++ LocalHttpTests
+            ++ [{remote_http_tests, [], test_cases("_httptest")}]
     end.
 
--ifdef(RUNNING_ON_TRAVIS).
+-ifdef(RUNNING_ON_CI).
 should_run_remote_http_tests() ->
     false.
 -else.
@@ -94,70 +97,74 @@ exported_functions() ->
     Exports.
 
 %%%%%%%%%%%%%%%
-init_per_group(filesystem_tests, Config) ->
-    {ok, _} = application:ensure_all_started(locus),
-    ok = locus_logger:set_loglevel(debug),
-    BaseURL = ?PATH_WITH_TEST_TARBALLS,
-    DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
-    CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption.tar.gz"),
-    [{is_http, false},
-     {url, DatabasePath},
-     {path, DatabasePath},
-     {corrupt_url, CorruptPath},
-     {base_url, BaseURL}
-     | Config];
-init_per_group(local_http_tests, Config) ->
-    {ok, _} = application:ensure_all_started(locus),
-    ok = locus_logger:set_loglevel(debug),
-    {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
-    locus_rand_compat:seed(),
-    DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country.tar.gz"),
-    RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
-    DatabaseURL = BaseURL ++ "/GeoLite2-Country.tar.gz" ++ "#" ++ RandomAnchor,
-    CorruptURL = BaseURL ++ "/corruption.tar.gz",
-    ok = set_file_mtime(DatabasePath, ?VERSION1_TIMESTAMP),
-    [{is_http, true},
-     {is_remote, false},
-     {httpd_pid, HttpdPid},
-     {url, DatabaseURL},
-     {path, DatabasePath},
-     {corrupt_url, CorruptURL},
-     {base_url, BaseURL}
-     | Config];
-init_per_group(remote_http_tests, Config) ->
-    {ok, _} = application:ensure_all_started(locus),
-    ok = locus_logger:set_loglevel(debug),
-    locus_rand_compat:seed(),
-    RandomAnchor = integer_to_list(locus_rand_compat:uniform(1 bsl 64), 36),
-    URL = ?REMOTE_COUNTRY_URL ++ "#" ++ RandomAnchor,
-    CorruptURL = ?REMOTE_COUNTRY_CORRUPT_URL,
-    BaseURL = ?REMOTE_COUNTRY_BASE_URL,
-    [{is_http, true},
-     {is_remote, true},
-     {url, URL},
-     {base_url, BaseURL},
-     {corrupt_url, CorruptURL}
-     | Config].
+init_per_group(GroupName, Config) ->
+    case atom_to_list(GroupName) of
+        "filesystem_tests_" ++ FileExtension ->
+            {ok, _} = application:ensure_all_started(locus),
+            ok = locus_logger:set_loglevel(debug),
+            BaseURL = ?PATH_WITH_TEST_TARBALLS,
+            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country." ++ FileExtension),
+            CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption." ++ FileExtension),
+            [{is_http, false},
+             {url, DatabasePath},
+             {path, DatabasePath},
+             {corrupt_url, CorruptPath},
+             {base_url, BaseURL}
+             | Config];
+        "local_http_tests_" ++ FileExtension ->
+            {ok, _} = application:ensure_all_started(locus),
+            ok = locus_logger:set_loglevel(debug),
+            {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
+            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country." ++ FileExtension),
+            RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
+            DatabaseURL = BaseURL ++ "/GeoLite2-Country." ++ FileExtension ++ "#" ++ RandomAnchor,
+            CorruptURL = BaseURL ++ "/corruption." ++ FileExtension,
+            ok = set_file_mtime(DatabasePath, ?VERSION1_TIMESTAMP),
+            [{is_http, true},
+             {is_remote, false},
+             {httpd_pid, HttpdPid},
+             {url, DatabaseURL},
+             {path, DatabasePath},
+             {corrupt_url, CorruptURL},
+             {base_url, BaseURL}
+             | Config];
+        "remote_http_tests" ->
+            {ok, _} = application:ensure_all_started(locus),
+            ok = locus_logger:set_loglevel(debug),
+            RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
+            URL = ?REMOTE_COUNTRY_URL ++ "#" ++ RandomAnchor,
+            CorruptURL = ?REMOTE_COUNTRY_CORRUPT_URL,
+            BaseURL = ?REMOTE_COUNTRY_BASE_URL,
+            [{is_http, true},
+             {is_remote, true},
+             {url, URL},
+             {base_url, BaseURL},
+             {corrupt_url, CorruptURL}
+             | Config]
+    end.
 
-end_per_group(filesystem_tests, Config) ->
-    ok = application:stop(locus),
-    Config;
-end_per_group(local_http_tests, Config) ->
-    URL = proplists:get_value(url, Config),
-    CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
-    HttpdPid = proplists:get_value(httpd_pid, Config),
+end_per_group(GroupName, Config) ->
+    case atom_to_list(GroupName) of
+        "filesystem_tests_" ++ _FileExtension ->
+            ok = application:stop(locus),
+            Config;
+        "local_http_tests_" ++ _FileExtension ->
+            URL = proplists:get_value(url, Config),
+            CacheFilename = locus_loader:cached_database_path_for_url(URL),
+            HttpdPid = proplists:get_value(httpd_pid, Config),
 
-    ok = application:stop(locus),
-    ok = locus_httpd:stop(HttpdPid),
-    _ = file:delete(CacheFilename),
-    Config;
-end_per_group(remote_http_tests, Config) ->
-    URL = proplists:get_value(url, Config),
-    CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
+            ok = application:stop(locus),
+            ok = locus_httpd:stop(HttpdPid),
+            _ = file:delete(CacheFilename),
+            Config;
+        "remote_http_tests" ->
+            URL = proplists:get_value(url, Config),
+            CacheFilename = locus_loader:cached_database_path_for_url(URL),
 
-    ok = application:stop(locus),
-    _ = file:delete(CacheFilename),
-    Config.
+            ok = application:stop(locus),
+            _ = file:delete(CacheFilename),
+            Config
+    end.
 
 %% ------------------------------------------------------------------
 %% Filesystem Test Cases
@@ -167,16 +174,13 @@ end_per_group(remote_http_tests, Config) ->
 %% Test Cases
 %% ------------------------------------------------------------------
 
--ifdef(BAD_HTTPC).
-cacheless_loading_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 cacheless_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = cacheless_loading_httptest,
     LoaderOpts = [no_cache, {event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     % check events
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
@@ -189,19 +193,15 @@ cacheless_loading_httptest(Config) ->
     ?assertEqual({ok, {remote,URL}}, locus:get_info(Loader, source)),
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
--endif.
 
 
--ifdef(BAD_HTTPC).
-cold_remote_loading_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 cold_remote_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = cold_regular_loading_httptest,
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {error,_}}}),
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
@@ -216,19 +216,15 @@ cold_remote_loading_httptest(Config) ->
     ?assertEqual({ok, {remote,URL}}, locus:get_info(Loader, source)),
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-warm_remote_loading_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 warm_remote_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = warm_regular_loading_httptest,
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    CacheFilename = locus_http_loader:cached_tarball_name_for_url(URL),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    CacheFilename = locus_loader:cached_database_path_for_url(URL),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {ok,LoadedVersion}}}),
     ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
@@ -240,12 +236,7 @@ warm_remote_loading_httptest(Config) ->
     ?assertEqual({ok, {cache,CacheFilename}}, locus:get_info(Loader, source)),
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-update_works_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 update_works_httptest(Config) ->
     IsRemote = proplists:get_value(is_remote, Config),
     update_works_httptest(IsRemote, Config).
@@ -256,7 +247,7 @@ update_works_httptest(_IsRemote, Config) ->
     URL = proplists:get_value(url, Config),
     Path = proplists:get_value(path, Config),
     Loader = update_works_httptest,
-    PostReadinessUpdatePeriod = 100,
+    PostReadinessUpdatePeriod = 200,
     LoaderOpts = [no_cache, {post_readiness_update_period, PostReadinessUpdatePeriod},
                   {event_subscriber, self()}],
     %%
@@ -283,70 +274,49 @@ update_works_httptest(_IsRemote, Config) ->
     ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod >= 0.90),
     %%
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv4_country_lookup_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv4_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv4_country_lookup_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV4_STR_ADDR),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv4_invalid_addr_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv4_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv4_invalid_addr_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv6_country_lookup_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv6_country_lookup_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv6_country_lookup_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV6_STR_ADDR),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifdef(BAD_HTTPC).
-ipv6_invalid_addr_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 ipv6_invalid_addr_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = ipv6_invalid_addr_test,
     ok = locus:start_loader(Loader, URL),
-    {ok, _LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
--endif.
 
--ifndef(POST_OTP_17).
-connect_timeout_httptest(_Config) ->
-    {skip, "Not working properly on OTP 17"}.
--else.
 connect_timeout_httptest(Config) ->
     % Undeterministic test case
     URL = proplists:get_value(url, Config),
@@ -367,7 +337,6 @@ connect_timeout_httptest(Config) ->
                      F(AttemptsLeft - 1)
              end
      end(MaxAttempts)).
--endif.
 
 download_start_timeout_httptest(Config) ->
     %% Undeterministic test case
@@ -390,10 +359,6 @@ download_start_timeout_httptest(Config) ->
              end
      end)(MaxAttempts).
 
--ifdef(BAD_HTTPC).
-idle_download_timeout_httptest(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 idle_download_timeout_httptest(Config) ->
     % Undeterministic test case
     URL = proplists:get_value(url, Config),
@@ -415,7 +380,6 @@ idle_download_timeout_httptest(Config) ->
                      F(AttemptsLeft - 1)
              end
      end(MaxAttempts)).
--endif.
 
 wrong_url_fstest(Config) ->
     BaseURL = proplists:get_value(base_url, Config),
@@ -485,55 +449,109 @@ database_still_loading_httptest(Config) ->
     ok = locus:stop_loader(Loader).
 
 invalid_args_test(Config) ->
+    _ = process_flag(trap_exit, true),
     URL = proplists:get_value(url, Config),
     NotAnURL = not_an_url,
     Loader = invalid_args_test,
+    NotAnOpt = not_an_opt,
+    InvalidOpts = [NotAnOpt],
+
+    % regular loaders
     ?assertEqual({error, invalid_url}, locus:start_loader(Loader, NotAnURL)),
-    InvalidOpts = [not_an_opt],
-    ?assertEqual({error, {invalid_opt, not_an_opt}}, locus:start_loader(Loader, URL, InvalidOpts)).
+    ?assertEqual({error, {invalid_opt, NotAnOpt}}, locus:start_loader(Loader, URL, InvalidOpts)),
+
+    % child spec'd loaders
+    ?assertMatch({error, {invalid_url,_}},
+                 custom_loader_sup:start_link(Loader, NotAnURL)),
+    ?assertMatch({error, {shutdown, {failed_to_start_child,_,{invalid_opt,NotAnOpt}}}},
+                 custom_loader_sup:start_link(Loader, URL, InvalidOpts)).
 
 subscriber_death_test(Config) ->
-    LoaderModule =
-        case proplists:get_value(is_http, Config) of
-            false -> locus_filesystem_loader;
-            true -> locus_http_loader
-        end,
     URL = proplists:get_value(url, Config),
     Loader = subscriber_death_test,
     Subscribers = [spawn(fun () -> timer:sleep(X*100) end) || X <- [2,3,4,5]],
     LoaderOpts = [{event_subscriber, Pid} || Pid <- Subscribers],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
-    OriginalPid = LoaderModule:whereis(Loader),
+    OriginalPid = locus_database:whereis(Loader),
     ?assertEqual(lists:sort([locus_logger | Subscribers]),
-                 lists:sort(LoaderModule:list_subscribers(Loader))),
+                 lists:sort(locus_database:list_subscribers(Loader))),
     timer:sleep(750),
-    ?assertEqual([locus_logger], LoaderModule:list_subscribers(Loader)),
-    ?assertEqual(OriginalPid, LoaderModule:whereis(Loader)),
+    ?assertEqual([locus_logger], locus_database:list_subscribers(Loader)),
+    ?assertEqual(OriginalPid, locus_database:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
--ifdef(BAD_HTTPC).
-async_waiter_success_test(_Config) ->
-    {skip, "The httpc version bundled with this OTP release has issues with URL fragments"}.
--else.
 async_waiter_success_test(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = async_waiter_success_test,
     Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, {self(),Ref}}}],
+    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     ?assertRecv({Ref, {ok, _LoadedVersion}}),
     ok = locus:stop_loader(Loader).
--endif.
 
 async_waiter_failure_test(Config) ->
     BaseURL = proplists:get_value(base_url, Config),
     URL = BaseURL ++ "/foobarbarfoofoobar",
     Loader = async_waiter_failure_test,
     Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, {self(),Ref}}}],
+    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     ?assertRecv({Ref, {error, _Reason}}),
     ok = locus:stop_loader(Loader).
+
+loader_child_spec_test(Config) ->
+    _ = process_flag(trap_exit, true),
+    URL = proplists:get_value(url, Config),
+    Loader = loader_child_spec_test,
+
+    {ok, Supervisor} = custom_loader_sup:start_link(Loader, URL),
+    {ok, LoadedVersion} = locus:wait_for_loader(Loader, 10000),
+    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+
+    % it conflicts with supervisor-spawned loaders under the same name
+    ?assertMatch({error, {shutdown, {failed_to_start_child,_,{already_started,_}}}},
+                 custom_loader_sup:start_link(Loader, URL)),
+
+    % it conflicts with regular loaders under the same name
+    ?assertMatch({error, already_started}, locus:start_loader(Loader, URL)),
+
+    % addresses can be looked up like in regular loaders
+    ?assertEqual({error, not_found}, locus:lookup(Loader, "127.0.0.1")),
+    ?assertMatch({ok, #{}},          locus:lookup(Loader, ?IPV4_STR_ADDR)),
+    ?assertMatch({ok, #{}},          locus:lookup(Loader, ?IPV6_STR_ADDR)),
+
+    % if stopped like a regular loader,
+    % its supervisor will decide whether to restart it
+    % (and it will, in this case)
+    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+    ?assertEqual(ok, locus:stop_loader(Loader)),
+    timer:sleep(500),
+    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+
+    % it can be permanently stopped by stopping its supervisor
+    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+    ok = custom_loader_sup:stop(Supervisor),
+    timer:sleep(500),
+    ?assertEqual({error,database_unknown}, locus:get_info(Loader)),
+
+    ok.
+
+wait_for_loader_failures_test(_Config) ->
+    Loader = wait_for_loader_failures_test,
+
+    ?assertEqual({error, database_unknown},
+                 locus:wait_for_loader(Loader)),
+
+    ?assertEqual({error, timeout},
+                 locus:wait_for_loader(Loader, 0)),
+    ?assertEqual({error, database_unknown},
+                 locus:wait_for_loader(Loader, 500)),
+
+    ?assertMatch({error, timeout},
+                 locus:wait_for_loaders([Loader], 0)),
+    ?assertMatch({error, {Loader, database_unknown}},
+                 locus:wait_for_loaders([Loader], 500)),
+    ok.
 
 %%%
 

@@ -24,7 +24,7 @@
 %% locus includes code extracted from OTP source code, by Ericsson AB,
 %% released under the Apache License 2.0.
 
--module(main_mmdb_SUITE).
+-module(maxmind_main_mmdb_SUITE).
 -compile(export_all).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -43,7 +43,7 @@
 all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
--ifdef(RUNNING_ON_TRAVIS).
+-ifdef(RUNNING_ON_CI).
 groups() ->
     % This suite is too heavy for Travis. It runs ok but screws up
     % locus_SUITE which runs right after, e.g. with unexpected timeouts.
@@ -106,13 +106,14 @@ load_database_test(Config) ->
     case lists:member({is_broken,true}, Config) of
         false ->
             ?assertMatch(
-               {#{tree := _} = _DatabaseParts, {{_,_,_},{_,_,_}} = _DatabaseVersion},
+               {{{_,_,_},{_,_,_}} = _DatabaseVersion,
+                #{tree := _} = _DatabaseParts},
                decode_database_parts(Config));
         true ->
             ?assertError(
                _,
                begin
-                   {DatabaseParts, DatabaseVersion} = decode_database_parts(Config),
+                   {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
                    ct:pal("Loaded version ~p", [DatabaseVersion]),
                    ok = locus_mmdb:analyze_([{database,DatabaseParts}])
                end)
@@ -121,7 +122,7 @@ load_database_test(Config) ->
 expected_lookup_results_test(Config) ->
     case lists:keymember(json_group_def, 1, Config) of
         true ->
-            {DatabaseParts, DatabaseVersion} = decode_database_parts(Config),
+            {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
             ct:pal("Database version: ~p", [DatabaseVersion]),
             lists:foreach(
               fun ({Address, Expectation}) ->
@@ -138,7 +139,7 @@ expected_lookup_results_test(Config) ->
 %% ------------------------------------------------------------------
 
 guess_brokenness(GroupName) ->
-    LowerCase = string:lowercase(GroupName),
+    LowerCase = string:to_lower(GroupName),
     lists:any(
       fun (Pattern) ->
               string:str(LowerCase, Pattern) > 0
@@ -148,7 +149,7 @@ guess_brokenness(GroupName) ->
 decode_database_parts(Config) ->
     BinDatabase = proplists:get_value(bin_database, Config),
     Source = {filesystem, ""},
-    locus_mmdb:decode_database_parts(BinDatabase, Source).
+    locus_mmdb:decode_database_parts(Source, BinDatabase).
 
 expected_lookup_results(Config) ->
     JsonGroupDef = proplists:get_value(json_group_def, Config),
