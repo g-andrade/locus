@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [1.7.0] - 2019-08-12
 ### Added
+- ability of loading databases from uncompressed tarballs (`.tar`)
+- ability of loading databases directly (`.mmdb` and `.mmdb.gz`)
 - stacktrace of caught exceptions to event reporting (including custom logger)
 - ability of launching database loaders under library consumers' own supervisors
 - `wait_for_loaders/2` API method for waiting on multiple databases concurrently
