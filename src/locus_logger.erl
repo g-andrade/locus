@@ -77,7 +77,7 @@ on_app_start() -> ok.
 -else.
 on_app_start() ->
     CurrentLevel = application:get_env(locus, log_level, undefined),
-    ok = logger:set_application_level(locus, CurrentLevel),
+    _ = logger:set_application_level(locus, CurrentLevel),
     ok.
 -endif.
 
