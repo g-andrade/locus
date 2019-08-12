@@ -93,7 +93,7 @@
 -endif.
 -export_type([success/0]).
 
--type path() :: path().
+-type path() :: nonempty_string().
 -export_type([path/0]).
 
 -record(state, {
