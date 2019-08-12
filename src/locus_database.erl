@@ -84,7 +84,7 @@
 -export_type([opt/0]).
 
 -type database_opt() ::
-    {event_subscriber, module() | pid()} |
+    {event_subscriber, atom() | pid()} |
     {internal, internal_opt()}.
 -export_type([database_opt/0]).
 
@@ -116,7 +116,7 @@
 -record(state, {
           id :: atom(),
           loader_pid :: pid(),
-          subscribers :: [module() | pid()],
+          subscribers :: [atom() | pid()],
           subscriber_mons :: #{monitor() => pid()},
           waiters :: #{reference() => pid()},
           waiter_mons :: #{monitor() => reference()},
