@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - case-sensitive search of `.mmdb` file within tarball
 - overly verbose `logger` messages on OTP 21.1+
+- HTTPS certificate validation test cases on OTP 22
 
 ## [1.6.2] - 2019-03-16
 ### Fixed
