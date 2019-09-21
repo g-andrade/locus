@@ -18,5 +18,4 @@ otp_release:
     - 21.2
     - 21.3
     - 22.0
-    - 22.1
 script: RUNNING_ON_CI=yes make ci_test
