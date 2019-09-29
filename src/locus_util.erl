@@ -20,9 +20,6 @@
 %%
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
-%%
-%% locus includes code extracted from OTP source code, by Ericsson AB,
-%% released under the Apache License 2.0.
 
 %% @private
 -module(locus_util).
@@ -37,7 +34,6 @@
    [parse_ip_address/1,
     lists_anymap/2,
     lists_take/2,
-    maps_take/2,
     bin_to_hex_str/1,
     flush_link_exit/2
    ]).
@@ -90,21 +86,6 @@ lists_anymap(_Fun, []) ->
 -spec lists_take(term(), list()) -> {ok, list()} | error.
 lists_take(Elem, List) ->
     lists_take_recur(Elem, List, []).
-
--spec maps_take(term(), map()) -> {term(), map()} | error.
--ifdef(POST_OTP_18).
-maps_take(Key, Map) ->
-    maps:take(Key, Map).
--else.
-maps_take(Key, Map) ->
-    try maps:get(Key, Map) of
-        Value ->
-            {Value, maps:remove(Key, Map)}
-    catch
-        error:{badkey,Key} ->
-            error
-    end.
--endif.
 
 -spec bin_to_hex_str(binary()) -> [48..57 | 97..102].
 bin_to_hex_str(Bin) ->

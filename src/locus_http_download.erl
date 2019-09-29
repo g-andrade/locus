@@ -20,9 +20,6 @@
 %%
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
-%%
-%% locus includes code extracted from OTP source code, by Ericsson AB,
-%% released under the Apache License 2.0.
 
 -module(locus_http_download).
 -behaviour(gen_server).
@@ -114,17 +111,10 @@
         {download_finished, BodySize :: non_neg_integer(), {error, timeout}}.
 -export_type([event_download_finished/0]).
 
--ifdef(POST_OTP_18).
 -type success() ::
         #{ headers := headers(),
            body := binary()
          }.
--else.
--type success() ::
-        #{ headers => headers(),
-           body => binary()
-         }.
--endif.
 -export_type([success/0]).
 
 -type url() :: string().

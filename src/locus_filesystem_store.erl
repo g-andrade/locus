@@ -20,9 +20,6 @@
 %%
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
-%%
-%% locus includes code extracted from OTP source code, by Ericsson AB,
-%% released under the Apache License 2.0.
 
 -module(locus_filesystem_store).
 -behaviour(gen_server).

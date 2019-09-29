@@ -20,9 +20,6 @@
 %%
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
-%%
-%% locus includes code extracted from OTP source code, by Ericsson AB,
-%% released under the Apache License 2.0.
 
 %% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
 
@@ -81,7 +78,6 @@
 -type source() :: locus_loader:source().
 -export_type([source/0]).
 
--ifdef(POST_OTP_18).
 -type parts() ::
         #{ tree := binary(),
            data_section := binary(),
@@ -90,16 +86,6 @@
            source := source(),
            version := calendar:datetime()
          }.
--else.
--type parts() ::
-        #{ tree => binary(),
-           data_section => binary(),
-           metadata => metadata(),
-           ipv4_root_index => non_neg_integer(),
-           source => source(),
-           version => calendar:datetime()
-         }.
--endif.
 -export_type([parts/0]).
 
 -type metadata() :: mmdb_map().
@@ -139,23 +125,13 @@
         data_record_decoding_failed().
 -export_type([analysis_flaw/0]).
 
--ifdef(POST_OTP_18).
 -type max_depth_exceeded() ::
         {max_depth_exceeded, #{ tree_prefix := {inet:ip_address(), 0..128},
                                 node_index := non_neg_integer(),
                                 depth := 33 | 129
                               }}.
 -export_type([max_depth_exceeded/0]).
--else.
--type max_depth_exceeded() ::
-        {max_depth_exceeded, #{ tree_prefix => {inet:ip_address(), 0..128},
-                                node_index => non_neg_integer(),
-                                depth => 33 | 129
-                              }}.
--export_type([max_depth_exceeded/0]).
--endif.
 
--ifdef(POST_OTP_18).
 -type node_dereference_failed() ::
         {node_dereference_failed, #{ tree_prefix := {inet:ip_address(), 0..128},
                                      node_index := non_neg_integer(),
@@ -163,33 +139,14 @@
                                      reason := term()
                                    }}.
 -export_type([node_dereference_failed/0]).
--else.
--type node_dereference_failed() ::
-        {node_dereference_failed, #{ tree_prefix => {inet:ip_address(), 0..128},
-                                     node_index => non_neg_integer(),
-                                     class => error | throw | exit,
-                                     reason => term()
-                                   }}.
--export_type([node_dereference_failed/0]).
--endif.
 
--ifdef(POST_OTP_18).
 -type bad_record_data_type() ::
          {bad_record_data_type, #{ data_index := non_neg_integer(),
                                    data_record := term(),
                                    tree_prefixes := [{inet:ip_address(), 0..128}, ...]
                                  }}.
 -export_type([bad_record_data_type/0]).
--else.
--type bad_record_data_type() ::
-         {bad_record_data_type, #{ data_index => non_neg_integer(),
-                                   data_record => term(),
-                                   tree_prefixes => [{inet:ip_address(), 0..128}, ...]
-                                 }}.
--export_type([bad_record_data_type/0]).
--endif.
 
--ifdef(POST_OTP_18).
 -type data_record_decoding_failed() ::
         {data_record_decoding_failed, #{ data_index := non_neg_integer(),
                                          class := error | throw | exit,
@@ -197,15 +154,6 @@
                                          tree_prefixes := [{inet:ip_address(), 0..128}, ...]
                                        }}.
 -export_type([data_record_decoding_failed/0]).
--else.
--type data_record_decoding_failed() ::
-        {data_record_decoding_failed, #{ data_index => non_neg_integer(),
-                                         class => error | throw | exit,
-                                         reason => term(),
-                                         tree_prefixes => [{inet:ip_address(), 0..128}, ...]
-                                       }}.
--export_type([data_record_decoding_failed/0]).
--endif.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions

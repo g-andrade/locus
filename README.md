@@ -233,7 +233,7 @@ The API reference can be found on [HexDocs](https://hexdocs.pm/locus/).
 
 ##### Tested setup
 
-  - Erlang/OTP 18.0 or newer
+  - Erlang/OTP 19 or newer
   - rebar3
 
 ##### License
@@ -263,9 +263,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 `locus` is an independent project and has not been authorized,
 sponsored, or otherwise approved by MaxMind.
-
-`locus` includes code extracted from OTP source code, by Ericsson AB,
-released under the Apache License 2.0.
 
 ##### Alternative Libraries (Erlang)
 

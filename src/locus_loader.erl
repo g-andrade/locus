@@ -20,11 +20,6 @@
 %%
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
-%%
-%% locus includes code extracted from OTP source code, by Ericsson AB,
-%% released under the Apache License 2.0.
-
--include("locus_pre_otp19_compat.hrl").
 
 -module(locus_loader).
 -behaviour(gen_server).
@@ -328,7 +323,7 @@ cached_database_path_for_url(URL) ->
     Hash = crypto:hash(sha256, URL),
     HexHash = locus_util:bin_to_hex_str(Hash),
     Filename = HexHash ++ ".mmdb.gz",
-    UserCachePath = ?filename_basedir(user_cache, "locus_erlang"),
+    UserCachePath = filename:basedir(user_cache, "locus_erlang"),
     filename:join(UserCachePath, Filename).
 
 %% ------------------------------------------------------------------

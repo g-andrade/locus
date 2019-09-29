@@ -20,9 +20,6 @@
 %%
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
-%%
-%% locus includes code extracted from OTP source code, by Ericsson AB,
-%% released under the Apache License 2.0.
 
 -module(locus_database).
 -behaviour(gen_server).
@@ -92,7 +89,6 @@
     {async_waiter, reference(), pid()}.
 -export_type([internal_opt/0]).
 
--ifdef(POST_OTP_18).
 -type static_child_spec() ::
     #{ id := term(),
        start := {?MODULE, start_link, [atom() | origin() | [opt()], ...]},
@@ -101,16 +97,6 @@
        type := worker,
        modules := [?MODULE, ...]
      }.
--else.
--type static_child_spec() ::
-    #{ id => term(),
-       start => {?MODULE, start_link, [atom() | origin() | [opt()], ...]},
-       restart => permanent,
-       shutdown => non_neg_integer(),
-       type => worker,
-       modules => [?MODULE, ...]
-     }.
--endif.
 -export_type([static_child_spec/0]).
 
 -record(state, {
@@ -395,7 +381,7 @@ report_event(Event, #state{id = Id, subscribers = Subscribers}) ->
 -spec handle_monitored_process_death(monitor(), state()) -> {noreply, state()}.
 handle_monitored_process_death(Ref, State) ->
     #state{subscribers = Subscribers, subscriber_mons = SubscriberMons} = State,
-    case locus_util:maps_take(Ref, SubscriberMons) of
+    case maps:take(Ref, SubscriberMons) of
         {Pid, UpdatedSubscriberMons} ->
             {ok, UpdatedSubscribers} = locus_util:lists_take(Pid, Subscribers),
             UpdatedState = State#state{ subscribers = UpdatedSubscribers,
@@ -403,8 +389,8 @@ handle_monitored_process_death(Ref, State) ->
             {noreply, UpdatedState};
         error ->
             #state{waiters = Waiters, waiter_mons = WaiterMons} = State,
-            {WaiterRef, UpdatedWaiterMons} = locus_util:maps_take(Ref, WaiterMons),
-            {_, UpdatedWaiters} = locus_util:maps_take(WaiterRef, Waiters),
+            {WaiterRef, UpdatedWaiterMons} = maps:take(Ref, WaiterMons),
+            {_, UpdatedWaiters} = maps:take(WaiterRef, Waiters),
             UpdatedState = State#state{ waiters = UpdatedWaiters,
                                         waiter_mons = UpdatedWaiterMons },
             {noreply, UpdatedState}

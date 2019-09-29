@@ -1,5 +1,0 @@
--ifdef(POST_OTP_18).
--define(filename_basedir, (fun filename:basedir/2)).
--else.
--define(filename_basedir, (fun locus_filename_compat:basedir/2)).
--endif.
