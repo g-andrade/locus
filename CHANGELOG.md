@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - episodes of `locus` managerial processes keeping references to old binaries, upon a database update,
   for hours, days or even weeks (OTP 20+ only)
+- broken logging for playground console on OTP 21.1+
 
 ## [1.7.0] - 2019-08-12
 ### Added

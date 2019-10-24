@@ -55,7 +55,7 @@ cover: $(REBAR3) test
 
 console: export ERL_FLAGS =? +pc unicode
 console:
-	@$(REBAR3) as development shell --apps locus
+	@$(REBAR3) as development shell --apps locus --config console.config
 
 doc: $(REBAR3)
 	@$(REBAR3) edoc
