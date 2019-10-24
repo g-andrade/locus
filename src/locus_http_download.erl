@@ -80,41 +80,41 @@
 -export_type([msg/0]).
 
 -type event() ::
-        event_request_sent() |
-        event_download_dismissed() |
-        event_download_failed_to_start() |
-        event_download_started() |
-        event_download_finished().
+    event_request_sent() |
+    event_download_dismissed() |
+    event_download_failed_to_start() |
+    event_download_started() |
+    event_download_finished().
 -export_type([event/0]).
 
 -type event_request_sent() ::
-        {request_sent, url(), headers()}.
+    {request_sent, url(), headers()}.
 -export_type([event_request_sent/0]).
 
 -type event_download_dismissed() ::
-        {download_dismissed, {http, response_status(), headers(), body()}}.
+    {download_dismissed, {http, response_status(), headers(), body()}}.
 -export_type([event_download_dismissed/0]).
 
 -type event_download_failed_to_start() ::
-        {download_failed_to_start, {http, response_status(), headers(), body()}} |
-        {download_failed_to_start, {error, term()}} |
-        {download_failed_to_start, timeout}.
+    {download_failed_to_start, {http, response_status(), headers(), body()}} |
+    {download_failed_to_start, {error, term()}} |
+    {download_failed_to_start, timeout}.
 -export_type([event_download_failed_to_start/0]).
 
 -type event_download_started() ::
-        {download_started, headers()}.
+    {download_started, headers()}.
 -export_type([event_download_started/0]).
 
 -type event_download_finished() ::
-        {download_finished, BodySize :: non_neg_integer(), {ok, TrailingHeaders :: headers()}} |
-        {download_finished, BodySize :: non_neg_integer(), {error, term()}} |
-        {download_finished, BodySize :: non_neg_integer(), {error, timeout}}.
+    {download_finished, BodySize :: non_neg_integer(), {ok, TrailingHeaders :: headers()}} |
+    {download_finished, BodySize :: non_neg_integer(), {error, term()}} |
+    {download_finished, BodySize :: non_neg_integer(), {error, timeout}}.
 -export_type([event_download_finished/0]).
 
 -type success() ::
-        #{ headers := headers(),
-           body := binary()
-         }.
+    #{ headers := headers(),
+       body := binary()
+     }.
 -export_type([success/0]).
 
 -type url() :: string().

@@ -60,19 +60,19 @@
 -export_type([database_error/0]).
 
 -type database_entry() ::
-        #{ prefix => ip_address_prefix(),
-           unicode:unicode_binary() => locus_mmdb:mmdb_value()
-         }.
+    #{ prefix => ip_address_prefix(),
+       unicode:unicode_binary() => locus_mmdb:mmdb_value()
+     }.
 -export_type([database_entry/0]).
 
 -type ip_address_prefix() :: locus_mmdb:ip_address_prefix().
 -export_type([ip_address_prefix/0]).
 
 -type database_info() ::
-        #{ metadata => database_metadata(),
-           source => database_source(),
-           version => database_version()
-         }.
+    #{ metadata => database_metadata(),
+       source => database_source(),
+       version => database_version()
+     }.
 -export_type([database_info/0]).
 
 -type database_metadata() :: locus_mmdb:metadata().

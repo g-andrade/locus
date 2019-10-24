@@ -122,24 +122,24 @@
 -type blob_format() :: tgz | tarball | gzip | gzipped_mmdb | mmdb | unknown.
 
 -type origin() ::
-        {http, locus_http_download:url()} |
-        {filesystem, locus_filesystem_load:path()}.
+    {http, locus_http_download:url()} |
+    {filesystem, locus_filesystem_load:path()}.
 -export_type([origin/0]).
 
 -type event() ::
-        locus_http_download:event() |
-        locus_filesystem_load:event() |
-        event_cache_attempt_finished().
+    locus_http_download:event() |
+    locus_filesystem_load:event() |
+    event_cache_attempt_finished().
 -export_type([event/0]).
 
 -type event_cache_attempt_finished() ::
-        {cache_attempt_finished, locus_filesystem_store:path(), ok} |
-        {cache_attempt_finished, locus_filesystem_store:path(), {error, term()}}.
+    {cache_attempt_finished, locus_filesystem_store:path(), ok} |
+    {cache_attempt_finished, locus_filesystem_store:path(), {error, term()}}.
 -export_type([event_cache_attempt_finished/0]).
 
 -type source() ::
-        {remote, locus_http_download:url()} |
-        locus_filesystem_load:source().
+    {remote, locus_http_download:url()} |
+    locus_filesystem_load:source().
 -export_type([source/0]).
 
 -type msg() ::

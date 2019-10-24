@@ -119,13 +119,13 @@
 -export_type([origin/0]).
 
 -type event() ::
-        locus_loader:event() |
-        event_load_attempt_finished().
+    locus_loader:event() |
+    event_load_attempt_finished().
 -export_type([event/0]).
 
 -type event_load_attempt_finished() ::
-        {load_attempt_finished, locus_loader:source(), {ok, Version :: calendar:datetime()}} |
-        {load_attempt_finished, locus_loader:source(), {error, term()}}.
+    {load_attempt_finished, locus_loader:source(), {ok, Version :: calendar:datetime()}} |
+    {load_attempt_finished, locus_loader:source(), {error, term()}}.
 -export_type([event_load_attempt_finished/0]).
 
 %% ------------------------------------------------------------------

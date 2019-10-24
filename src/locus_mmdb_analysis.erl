@@ -36,39 +36,39 @@
 %% ------------------------------------------------------------------
 
 -type flaw() ::
-        max_depth_exceeded() |
-        invalid_tree_data_section_pointer() |
-        bad_record_data_type() |
-        data_record_decoding_failed().
+    max_depth_exceeded() |
+    invalid_tree_data_section_pointer() |
+    bad_record_data_type() |
+    data_record_decoding_failed().
 -export_type([flaw/0]).
 
 -type max_depth_exceeded() ::
-        {max_depth_exceeded, #{ tree_prefix := {inet:ip_address(), 0..128},
-                                node_index := non_neg_integer(),
-                                depth := 33 | 129
-                              }}.
+    {max_depth_exceeded, #{ tree_prefix := {inet:ip_address(), 0..128},
+                            node_index := non_neg_integer(),
+                            depth := 33 | 129
+                          }}.
 -export_type([max_depth_exceeded/0]).
 
 -type invalid_tree_data_section_pointer() ::
-        {invalid_tree_data_section_pointer, #{ tree_prefix := {inet:ip_address(), 0..128},
-                                               node_index := non_neg_integer(),
-                                               value := neg_integer()
-                                   }}.
+    {invalid_tree_data_section_pointer, #{ tree_prefix := {inet:ip_address(), 0..128},
+                                           node_index := non_neg_integer(),
+                                           value := neg_integer()
+                               }}.
 -export_type([invalid_tree_data_section_pointer/0]).
 
 -type bad_record_data_type() ::
-         {bad_record_data_type, #{ data_index := non_neg_integer(),
-                                   data_record := term(),
-                                   tree_prefixes := [{inet:ip_address(), 0..128}, ...]
-                                 }}.
+     {bad_record_data_type, #{ data_index := non_neg_integer(),
+                               data_record := term(),
+                               tree_prefixes := [{inet:ip_address(), 0..128}, ...]
+                             }}.
 -export_type([bad_record_data_type/0]).
 
 -type data_record_decoding_failed() ::
-        {data_record_decoding_failed, #{ data_index := non_neg_integer(),
-                                         class := error | throw | exit,
-                                         reason := term(),
-                                         tree_prefixes := [{inet:ip_address(), 0..128}, ...]
-                                       }}.
+    {data_record_decoding_failed, #{ data_index := non_neg_integer(),
+                                     class := error | throw | exit,
+                                     reason := term(),
+                                     tree_prefixes := [{inet:ip_address(), 0..128}, ...]
+                                   }}.
 -export_type([data_record_decoding_failed/0]).
 
 %% ------------------------------------------------------------------

@@ -59,13 +59,13 @@
 -export_type([source/0]).
 
 -type parts() ::
-        #{ tree := binary(),
-           data_section := binary(),
-           metadata := metadata(),
-           ipv4_root_index := non_neg_integer(),
-           source := source(),
-           version := calendar:datetime()
-         }.
+    #{ tree := binary(),
+       data_section := binary(),
+       metadata := metadata(),
+       ipv4_root_index := non_neg_integer(),
+       source := source(),
+       version := calendar:datetime()
+     }.
 -export_type([parts/0]).
 
 -type metadata() :: locus_mmdb_data:decoded_map().

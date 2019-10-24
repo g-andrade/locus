@@ -77,12 +77,12 @@
 -export_type([decoded_array/0]).
 
 -type decoded_simple_value() ::
-        unicode:unicode_binary() |
-        float() |
-        binary() |
-        int32() |
-        uint128() |
-        boolean().
+    unicode:unicode_binary() |
+    float() |
+    binary() |
+    int32() |
+    uint128() |
+    boolean().
 -export_type([decoded_simple_value/0]).
 
 -type int32() :: -(1 bsl 32)..((1 bsl 32) - 1).
