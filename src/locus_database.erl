@@ -186,6 +186,7 @@ static_child_spec(ChildId, DatabaseId, Origin, Opts) ->
      }.
 
 -spec enqueue_waiter(atom()) -> reference().
+%% @private
 enqueue_waiter(DatabaseId) ->
     ServerName = server_name(DatabaseId),
     Pid = erlang:whereis(ServerName),

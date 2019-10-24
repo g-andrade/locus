@@ -23,7 +23,6 @@
 
 %% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
 
-%% @private
 -module(locus_mmdb_tree).
 
 %% ------------------------------------------------------------------
@@ -61,6 +60,7 @@
 %% ------------------------------------------------------------------
 
 -spec find_ipv4_root_index(locus_mmdb:metadata(), binary()) -> index().
+%% @private
 find_ipv4_root_index(#{<<"ip_version">> := 4}, _) ->
     0;
 find_ipv4_root_index(#{<<"ip_version">> := 6} = Metadata, Tree) ->
@@ -73,6 +73,7 @@ find_ipv4_root_index(#{<<"ip_version">> := 6} = Metadata, Tree) ->
              Tree :: binary(),
              Success :: {locus_mmdb_data:index(), ip_address_prefix()},
              Reason :: ipv4_database | not_found .
+%% @private
 lookup(Address, IPv4RootIndex, Metadata, Tree) ->
     case ip_address_to_bitstring(Address, IPv4RootIndex, Metadata) of
         {ok, BitAddress, RootNodeIndex} ->
@@ -93,6 +94,7 @@ lookup(Address, IPv4RootIndex, Metadata, Tree) ->
              AccN :: term(),
              Metadata :: locus_mmdb:metadata(),
              Tree :: binary().
+%% @private
 foldl(Fun, Acc0, Metadata, Tree) ->
     #{<<"node_count">> := NodeCount, <<"record_size">> := RecordSize} = Metadata,
     NodeSize = (RecordSize * 2) div 8,
@@ -106,6 +108,7 @@ foldl(Fun, Acc0, Metadata, Tree) ->
 
 -spec bitstring_ip_address_prefix(<<_:32>>,  0..32)  -> ip4_address_prefix();
                                  (<<_:128>>, 0..128) -> ip6_address_prefix().
+%% @private
 bitstring_ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 32 ->
     PrefixSize = 32 - SuffixSize,
     <<Prefix:PrefixSize/bits, _Suffix/bits>> = BitAddress,

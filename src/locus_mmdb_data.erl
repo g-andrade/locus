@@ -23,7 +23,6 @@
 
 %% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
 
-%% @private
 -module(locus_mmdb_data).
 
 %% ------------------------------------------------------------------
@@ -63,7 +62,7 @@
 -type size() :: pos_integer().
 -type type() :: pointer|utf8_string|double|bytes|uint16|uint32|map|int32|uint64|array|boolean|float.
 -type value() :: binary() | float() | integer() | boolean().
--export_type([index/0, size/0, type/0, value/0]).
+-export_type([index/0]).
 
 -type decoded_value() :: decoded_composite_value() | decoded_simple_value().
 -export_type([decoded_value/0]).
