@@ -31,9 +31,7 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [read_chunk/1,
-    decode_chunk/3,
-    decode_on_index/2
+   [decode_on_index/2
    ]).
 
 %% ------------------------------------------------------------------
@@ -98,9 +96,116 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec read_chunk(binary()) -> {size(), type(), value(), binary()} | finished.
+-spec decode_on_index(index(), binary()) -> {decoded_value(), binary()}.
 %% @private
-read_chunk(Data) ->
+decode_on_index(Index, FullData) ->
+    decode_on_index(Index, FullData, []).
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+decode_on_index(Index, FullData, Path) ->
+    UpdatedPath = [Index | Path],
+    case lists:member(Index, Path) of
+        true -> error({circular_path, UpdatedPath});
+        _ ->
+            <<_:Index/bytes, Chunk/bytes>> = FullData,
+            decode_chunk(Chunk, FullData, UpdatedPath)
+    end.
+
+-spec decode_chunk(binary(), binary(), [index()]) -> {decoded_value(), binary()}.
+decode_chunk(Chunk, FullData, Path) ->
+    case parse_chunk(Chunk) of
+        {_, pointer, Pointer, RemainingData} ->
+            {Value, _} = decode_on_index(Pointer, FullData, Path),
+            {Value, RemainingData};
+
+        {_, utf8_string, Bytes, RemainingData} ->
+            Text = decode_utf8_string(Bytes),
+            {Text, RemainingData};
+
+        {_, bytes, Bytes, RemainingData} ->
+            Blob = binary:copy(Bytes),
+            {Blob, RemainingData};
+
+        {_, map, Count, RemainingData} ->
+            decode_map(Count, RemainingData, FullData, Path);
+
+        {_, array, Count, RemainingData} ->
+            decode_array(Count, RemainingData, FullData, Path);
+
+        {_, _, Value, RemainingData} ->
+            {Value, RemainingData}
+    end.
+
+decode_utf8_string(Bytes) ->
+    Copy = binary:copy(Bytes),
+    case is_utf8_binary(Copy) of
+        true -> Copy;
+        _ -> error({not_utf8_text,Copy})
+    end.
+
+is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<>>) ->
+    true;
+is_utf8_binary(<<_/bytes>>) ->
+    false.
+
+decode_map(Count, Chunk, FullData, Path) ->
+    decode_map_recur(Count, Chunk, FullData, Path, []).
+
+decode_map_recur(0, RemainingData, _, _, KvAcc) ->
+    case lists:ukeysort(1, KvAcc) of
+        SortedKvAcc when length(SortedKvAcc) =:= length(KvAcc) ->
+            Map = maps:from_list(SortedKvAcc),
+            {Map, RemainingData}
+    end;
+decode_map_recur(Count, Chunk, FullData, Path, KvAcc) ->
+    {Key, RemainingData} = decode_map_key(Chunk, FullData, Path),
+    {Value, RemainingData2} = decode_chunk(RemainingData, FullData, Path),
+    UpdatedKvAcc = [{Key,Value} | KvAcc],
+    decode_map_recur(Count - 1, RemainingData2, FullData, Path, UpdatedKvAcc).
+
+decode_map_key(Chunk, FullData, Path) ->
+    case parse_chunk(Chunk) of
+        {_, pointer, Pointer, RemainingData} ->
+            {Text, _} = decode_map_key_on_index(Pointer, FullData, Path),
+            {Text, RemainingData};
+        {_, utf8_string, Bytes, RemainingData} ->
+            Text = decode_utf8_string(Bytes),
+            {Text, RemainingData}
+    end.
+
+decode_map_key_on_index(Index, FullData, Path) ->
+    UpdatedPath = [Index | Path],
+    case lists:member(Index, Path) of
+        true -> error({circular_path, UpdatedPath});
+        _ ->
+            <<_:Index/bytes, Chunk/bytes>> = FullData,
+            decode_map_key(Chunk, FullData, UpdatedPath)
+    end.
+
+decode_array(Count, Chunk, FullData, Path) ->
+    decode_array_recur(Count, Chunk, FullData, Path, []).
+
+decode_array_recur(0, RemainingData, _, _, Acc) ->
+    List = lists:reverse(Acc),
+    {List, RemainingData};
+decode_array_recur(Count, Chunk, FullData, Path, Acc) ->
+    {Value, RemainingData} = decode_chunk(Chunk, FullData, Path),
+    UpdatedAcc = [Value | Acc],
+    decode_array_recur(Count - 1, RemainingData, FullData, Path, UpdatedAcc).
+
+-spec parse_chunk(binary()) -> {size(), type(), value(), binary()} | finished.
+parse_chunk(Data) ->
     case Data of
         <<?pointer:3, 0:2, Pointer:11, RemainingData/bytes>> ->
             {2, pointer, Pointer, RemainingData};
@@ -144,10 +249,10 @@ read_chunk(Data) ->
             <<Bytes:Size/bytes, RemainingData/bytes>> = Tail,
             {4 + Size, bytes, Bytes, RemainingData};
 
-        <<?uint16:3, Size:5, Value:Size/unsigned-integer-unit:8, RemainingData/bytes>> 
+        <<?uint16:3, Size:5, Value:Size/unsigned-integer-unit:8, RemainingData/bytes>>
           when Size =< 2 ->
             {1 + Size, uint16, Value, RemainingData};
-        <<?uint32:3, Size:5, Value:Size/unsigned-integer-unit:8, RemainingData/bytes>> 
+        <<?uint32:3, Size:5, Value:Size/unsigned-integer-unit:8, RemainingData/bytes>>
           when Size =< 4 ->
             {1 + Size, uint32, Value, RemainingData};
 
@@ -163,13 +268,13 @@ read_chunk(Data) ->
             Count = BaseCount + 65821,
             {4, map, Count, RemainingData};
 
-        <<0:3, Size:5, ?extended_int32, Value:Size/signed-integer-unit:8, RemainingData/bytes>> 
+        <<0:3, Size:5, ?extended_int32, Value:Size/signed-integer-unit:8, RemainingData/bytes>>
           when Size =< 4 ->
             {2 + Size, int32, Value, RemainingData};
-        <<0:3, Size:5, ?extended_uint64, Value:Size/integer-unit:8, RemainingData/bytes>> 
+        <<0:3, Size:5, ?extended_uint64, Value:Size/integer-unit:8, RemainingData/bytes>>
           when Size =< 8 ->
             {2 + Size, uint64, Value, RemainingData};
-        <<0:3, Size:5, ?extended_uint128, Value:Size/integer-unit:8, RemainingData/bytes>> 
+        <<0:3, Size:5, ?extended_uint128, Value:Size/integer-unit:8, RemainingData/bytes>>
           when Size =< 16 ->
             {2 + Size, uint128, Value, RemainingData};
 
@@ -199,112 +304,3 @@ read_chunk(Data) ->
         <<>> ->
             finished
     end.
-
--spec decode_chunk(binary(), binary(), [index()]) -> {decoded_value(), binary()}.
-%% @private
-decode_chunk(Chunk, FullData, Path) ->
-    case read_chunk(Chunk) of
-        {_, pointer, Pointer, RemainingData} ->
-            {Value, _} = decode_on_index(Pointer, FullData, Path),
-            {Value, RemainingData};
-
-        {_, utf8_string, Bytes, RemainingData} ->
-            Text = decode_utf8_string(Bytes),
-            {Text, RemainingData};
-
-        {_, bytes, Bytes, RemainingData} ->
-            Blob = binary:copy(Bytes),
-            {Blob, RemainingData};
-
-        {_, map, Count, RemainingData} ->
-            decode_map(Count, RemainingData, FullData, Path);
-
-        {_, array, Count, RemainingData} ->
-            decode_array(Count, RemainingData, FullData, Path);
-
-        {_, _, Value, RemainingData} ->
-            {Value, RemainingData}
-    end.
-
--spec decode_on_index(index(), binary()) -> {decoded_value(), binary()}.
-%% @private
-decode_on_index(Index, FullData) ->
-    decode_on_index(Index, FullData, []).
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions
-%% ------------------------------------------------------------------
-
-decode_on_index(Index, FullData, Path) ->
-    UpdatedPath = [Index | Path],
-    case lists:member(Index, Path) of
-        true -> error({circular_path, UpdatedPath});
-        _ ->
-            <<_:Index/bytes, Chunk/bytes>> = FullData,
-            decode_chunk(Chunk, FullData, UpdatedPath)
-    end.
-
-decode_utf8_string(Bytes) ->
-    Copy = binary:copy(Bytes),
-    case is_utf8_binary(Copy) of
-        true -> Copy;
-        _ -> error({not_utf8_text,Copy})
-    end.
-
-is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<>>) ->
-    true;
-is_utf8_binary(<<_/bytes>>) ->
-    false.
-
-decode_map(Count, Chunk, FullData, Path) ->
-    decode_map_recur(Count, Chunk, FullData, Path, []).
-
-decode_map_recur(0, RemainingData, _, _, KvAcc) ->
-    case lists:ukeysort(1, KvAcc) of
-        SortedKvAcc when length(SortedKvAcc) =:= length(KvAcc) ->
-            Map = maps:from_list(SortedKvAcc),
-            {Map, RemainingData}
-    end;
-decode_map_recur(Count, Chunk, FullData, Path, KvAcc) ->
-    {Key, RemainingData} = decode_map_key(Chunk, FullData, Path),
-    {Value, RemainingData2} = decode_chunk(RemainingData, FullData, Path),
-    UpdatedKvAcc = [{Key,Value} | KvAcc],
-    decode_map_recur(Count - 1, RemainingData2, FullData, Path, UpdatedKvAcc).
-
-decode_map_key(Chunk, FullData, Path) ->
-    case read_chunk(Chunk) of
-        {_, pointer, Pointer, RemainingData} ->
-            {Text, _} = decode_map_key_on_index(Pointer, FullData, Path),
-            {Text, RemainingData};
-        {_, utf8_string, Bytes, RemainingData} ->
-            Text = decode_utf8_string(Bytes),
-            {Text, RemainingData}
-    end.
-
-decode_map_key_on_index(Index, FullData, Path) ->
-    UpdatedPath = [Index | Path],
-    case lists:member(Index, Path) of
-        true -> error({circular_path, UpdatedPath});
-        _ ->
-            <<_:Index/bytes, Chunk/bytes>> = FullData,
-            decode_map_key(Chunk, FullData, UpdatedPath)
-    end.
-
-decode_array(Count, Chunk, FullData, Path) ->
-    decode_array_recur(Count, Chunk, FullData, Path, []).
-
-decode_array_recur(0, RemainingData, _, _, Acc) ->
-    List = lists:reverse(Acc),
-    {List, RemainingData};
-decode_array_recur(Count, Chunk, FullData, Path, Acc) ->
-    {Value, RemainingData} = decode_chunk(Chunk, FullData, Path),
-    UpdatedAcc = [Value | Acc],
-    decode_array_recur(Count - 1, RemainingData, FullData, Path, UpdatedAcc).

@@ -41,16 +41,13 @@ main(Args) ->
     case Args of
         ["analyze" | CmdArgs] ->
             handle_analysis_command(CmdArgs);
-        ["filter" | CmdArgs] ->
-            handle_filter_command(CmdArgs);
         _ ->
             fall_from_grace(
               "~n"
               "Usage: locus [<command>] [<command_args>]~n"
               "~n"
               "Available commands:~n"
-              "  analyze~n"
-              "  filter")
+              "  analyze")
     end.
 
 %% ------------------------------------------------------------------
@@ -141,43 +138,6 @@ perform_analysis(DatabaseId) ->
             fall_from_grace("Database is corrupt or incompatible:~n"
                             ++ lists:flatten(["* ~p~n" || _ <- Flaws]),
                             Flaws)
-    end.
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions - Filtering
-%% ------------------------------------------------------------------
-
-handle_filter_command(CmdArgs) ->
-    OptSpecList =
-        [{load_timeout, undefined, "load-timeout", {integer,30}, "Database load timeout (in seconds)"},
-         {log_level,    undefined, "log-level",    {string,"error"}, "debug | info | warning | error"},
-         {url,          undefined, undefined,      utf8_binary, "Database URL (local or remote)"},
-         {output,       undefined, undefined,      utf8_binary, "Output MMDB filename"}],
-
-    case getopt:parse_and_check(OptSpecList, CmdArgs) of
-        {ok, {ParsedArgs, []}} ->
-            {load_timeout,LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
-            {log_level,StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
-            {url,DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
-            {output,OutputFilename} = lists:keyfind(output, 1, ParsedArgs),
-            LoadTimeout = timer:seconds(LoadTimeoutSecs),
-            LogLevel = list_to_atom(StrLogLevel),
-            ok = locus_logger:set_loglevel(LogLevel),
-            prepare_database(
-              DatabaseURL, LoadTimeout,
-              fun (DatabaseId) ->
-                      perform_filtering(DatabaseId, OutputFilename)
-              end);
-        _ ->
-            getopt:usage(OptSpecList, "locus filter"),
-            fall_from_grace()
-    end.
-
-perform_filtering(DatabaseId, OutputFilename) ->
-    stderr_println("Filtering database..."),
-    case locus_mmdb:filter(DatabaseId, OutputFilename) of
-        ok ->
-            stderr_println("Filtered database saved under \"~ts\".", [OutputFilename])
     end.
 
 -endif.

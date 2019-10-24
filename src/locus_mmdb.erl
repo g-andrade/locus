@@ -35,11 +35,9 @@
 -export([lookup/2]).
 -export([get_parts/1]).
 -export([analyze/1]).
--export([filter/2]).
 
 -ifdef(TEST).
 -export([lookup_/2]).
-%-export([filter_/1]).
 -endif.
 
 %% ------------------------------------------------------------------
@@ -154,18 +152,6 @@ get_parts(Id) ->
 %% @private
 analyze(Id) ->
     with_database_parts(Id, fun locus_mmdb_analysis:run/1).
-
--spec filter(atom(), string())
-        -> ok |
-           {error, database_unknown} |
-           {error, database_not_loaded}.
-%% @private
-filter(Id, OutputFilename) ->
-    with_database_parts(
-      Id,
-      fun (DatabaseParts) ->
-              locus_mmdb_filtering:run(DatabaseParts, OutputFilename)
-      end).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

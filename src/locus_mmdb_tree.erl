@@ -34,7 +34,6 @@
    [find_ipv4_root_index/2,
     lookup/4,
     foldl/4,
-    unique_data_indices/2,
     bitstring_ip_address_prefix/2
    ]).
 
@@ -98,24 +97,12 @@ foldl(Fun, Acc0, Metadata, Tree) ->
     #{<<"node_count">> := NodeCount, <<"record_size">> := RecordSize} = Metadata,
     NodeSize = (RecordSize * 2) div 8,
     RootNodeIndex = 0,
-    Params = 
-        #{ node_size => NodeSize, 
-           record_size => RecordSize, 
+    Params =
+        #{ node_size => NodeSize,
+           record_size => RecordSize,
            node_count => NodeCount
          },
     foldl_recur(Fun, 0, 0, Acc0, Tree, RootNodeIndex, Params).
-
--spec unique_data_indices(locus_mmdb:metadata(), binary()) -> [locus_mmdb_data:index()].
-unique_data_indices(Metadata, Tree) ->
-    #{<<"node_count">> := NodeCount, <<"record_size">> := RecordSize} = Metadata,
-    AllIndices =
-        case (RecordSize * 2) div 8 of
-            NodeSize when (NodeSize rem 2) =:= 0 ->
-                [Index - NodeCount - 16 || <<Index:RecordSize>> <= Tree, Index > NodeCount];
-            _ ->
-                odd_noded_tree_unique_data_indices(Tree, RecordSize, NodeCount, [])
-        end,
-    lists:usort(AllIndices).
 
 -spec bitstring_ip_address_prefix(<<_:32>>,  0..32)  -> ip4_address_prefix();
                                  (<<_:128>>, 0..128) -> ip6_address_prefix().
@@ -230,28 +217,3 @@ foldl_recur(Fun, IntegerPrefix, Depth, Acc, _, NodeIndex, #{node_count := NodeCo
     % pointer to the data section
     DataIndex = (NodeIndex - NodeCount) - 16,
     Fun(IntegerPrefix, Depth, NodeIndex, DataIndex, Acc).
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions - Extracting Data Indices
-%% ------------------------------------------------------------------
-
-odd_noded_tree_unique_data_indices(Tree, RecordSize, NodeCount, Acc) ->
-    LeftWholeSz = (RecordSize bsr 3) bsl 3,
-    LeftRemainderSz = RecordSize band 2#111,
-    case Tree of
-        <<LeftLow:LeftWholeSz, LeftHigh:LeftRemainderSz, Right:RecordSize, Remaining/bits>> ->
-            Left = (LeftHigh bsl LeftWholeSz) bor LeftLow,
-            Acc2 =
-                case  Left > NodeCount of
-                    true -> [Left - NodeCount - 16 | Acc];
-                    _ -> Acc
-                end,
-            Acc3 =
-                case Right > NodeCount of
-                    true -> [Right - NodeCount - 16 | Acc];
-                    _ -> Acc2
-                end,
-            odd_noded_tree_unique_data_indices(Remaining, RecordSize, NodeCount, Acc3);
-        <<>> ->
-            Acc
-    end.
