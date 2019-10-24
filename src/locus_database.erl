@@ -352,14 +352,14 @@ init_opts([], State) ->
 handle_loader_msg({event, Event}, State) ->
     report_event(Event, State),
     {noreply, State};
-handle_loader_msg({update_success, Source, Version, Parts}, State) ->
+handle_loader_msg({load_success, Source, Version, Parts}, State) ->
     #state{id = Id} = State,
     locus_mmdb:update(Id, Parts),
     State2 = State#state{ last_version = Version },
     report_event({load_attempt_finished, Source, {ok,Version}}, State),
     State3 = reply_to_waiters({ok,Version}, State2),
     {noreply, State3};
-handle_loader_msg({update_failure, Source, Reason}, State) ->
+handle_loader_msg({load_failure, Source, Reason}, State) ->
     report_event({load_attempt_finished, Source, {error,Reason}}, State),
     case {Source, Reason} of
         {{cache,_}, not_found} ->

@@ -140,8 +140,8 @@
 
 -type msg() ::
     {event, event()} |
-    {update_success, source(), calendar:datetime(), locus_mmdb:parts()} |
-    {update_failure, source(), Reason :: term()}.
+    {load_success, source(), calendar:datetime(), locus_mmdb:parts()} |
+    {load_failure, source(), Reason :: term()}.
 -export_type([msg/0]).
 
 %% ------------------------------------------------------------------
@@ -429,7 +429,7 @@ handle_database_fetch_success(Source, Success, State) ->
                                      binary(), calendar:datetime(), state()) -> {noreply, state()}.
 handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified, State) ->
     State2 = State#state{ last_modified = LastModified },
-    notify_owner({update_success, Source, Version, Parts}, State2),
+    notify_owner({load_success, Source, Version, Parts}, State2),
 
     case Source of
         {remote,_} when (State2#state.settings)#settings.use_cache ->
@@ -447,12 +447,12 @@ handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified
 
 -spec handle_database_decode_error(source(), term(), state()) -> {noreply, state()}.
 handle_database_decode_error(Source, Reason, State) ->
-    notify_owner({update_failure, Source, Reason}, State),
+    notify_owner({load_failure, Source, Reason}, State),
     handle_update_conclusion(Source, State).
 
 -spec handle_database_fetch_error(source(), term(), state()) -> {noreply, state()}.
 handle_database_fetch_error(Source, Reason, State) ->
-    notify_owner({update_failure, Source, Reason}, State),
+    notify_owner({load_failure, Source, Reason}, State),
     handle_update_conclusion(Source, State).
 
 -spec handle_update_conclusion(source(), state()) -> {noreply, state()}.
