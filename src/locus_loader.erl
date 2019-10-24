@@ -58,6 +58,10 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
+-ifndef(NO_GEN_SERVER_HIBERNATE_AFTER).
+-define(HIBERNATE_AFTER, (timer:seconds(5))).
+-endif.
+
 -define(DEFAULT_HTTP_UNREADY_UPDATE_PERIOD, (timer:minutes(1))).
 -define(DEFAULT_HTTP_READY_UPDATE_PERIOD, (timer:hours(6))).
 
@@ -163,7 +167,9 @@ validate_opts(Origin, MixedOpts) ->
 -spec start_link(atom(), origin(), [loader_opt()], [fetcher_opt()]) -> {ok, pid()}.
 %% @private
 start_link(DatabaseId, Origin, LoaderOpts, FetcherOpts) ->
-    gen_server:start_link(?MODULE, [self(), DatabaseId, Origin, LoaderOpts, FetcherOpts], []).
+    Opts = [self(), DatabaseId, Origin, LoaderOpts, FetcherOpts],
+    ServerOpts = server_opts(),
+    gen_server:start_link(?MODULE, Opts, ServerOpts).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -236,6 +242,12 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Initialization
 %% ------------------------------------------------------------------
+
+-ifndef(NO_GEN_SERVER_HIBERNATE_AFTER).
+server_opts() -> [{hibernate_after, ?HIBERNATE_AFTER}].
+-else.
+server_opts() -> [].
+-endif.
 
 -spec validate_fetcher_opts(origin(), list())
         -> {ok, {[fetcher_opt()], list()}} |

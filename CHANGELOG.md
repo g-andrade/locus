@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     - `stacktrace_compat` [1.0.2 => 1.1.1]
 ### Removed
 - support for OTP 18
+### Fixed
+- episodes of `locus` managerial processes keeping references to old binaries, upon a database update,
+  for hours, days or even weeks (OTP 20+ only)
 
 ## [1.7.0] - 2019-08-12
 ### Added

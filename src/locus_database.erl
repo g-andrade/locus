@@ -63,6 +63,10 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
+-ifndef(NO_GEN_SERVER_HIBERNATE_AFTER).
+-define(HIBERNATE_AFTER, (timer:seconds(5))).
+-endif.
+
 -define(DEFAULT_HTTP_UNREADY_UPDATE_PERIOD, (timer:minutes(1))).
 -define(DEFAULT_HTTP_READY_UPDATE_PERIOD, (timer:hours(6))).
 
@@ -161,7 +165,8 @@ stop(Id) ->
 %% @private
 start_link(Id, Origin, Opts) ->
     ServerName = server_name(Id),
-    gen_server:start_link({local,ServerName}, ?MODULE, [Id, Origin, Opts], []).
+    ServerOpts = server_opts(),
+    gen_server:start_link({local,ServerName}, ?MODULE, [Id, Origin, Opts], ServerOpts).
 
 -spec dynamic_child_spec(term()) -> supervisor:child_spec().
 %% @private
@@ -275,6 +280,12 @@ server_name(Id) ->
       ++ "."
       ++ atom_to_list(Id)
      ).
+
+-ifndef(NO_GEN_SERVER_HIBERNATE_AFTER).
+server_opts() -> [{hibernate_after, ?HIBERNATE_AFTER}].
+-else.
+server_opts() -> [].
+-endif.
 
 -spec validate_opts(origin(), list())
         -> {ok, {[database_opt()], [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]}} |
