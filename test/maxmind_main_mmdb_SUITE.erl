@@ -112,7 +112,7 @@ load_database_test(Config) ->
                begin
                    {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
                    ct:pal("Loaded version ~p", [DatabaseVersion]),
-                   ok = locus_mmdb:analyze_([{database,DatabaseParts}])
+                   ok = locus_mmdb_analysis:run_(DatabaseParts)
                end)
     end.
 
@@ -163,7 +163,7 @@ expected_lookup_results(Address, UncomparableSuccess, Acc) ->
 determine_lookup_reality(DatabaseParts, Address) ->
     ct:pal("Looking up ~s", [Address]),
     {ok, ParsedAddress} = locus_util:parse_ip_address(Address),
-    case locus_mmdb:lookup_([{database, DatabaseParts}], ParsedAddress) of
+    case locus_mmdb:lookup_(ParsedAddress, DatabaseParts) of
         {ok, UncomparableSuccessWithExtras} ->
             UncomparableSuccess = maps:without([prefix], UncomparableSuccessWithExtras),
             Success = comparable_lookup_success(UncomparableSuccess),

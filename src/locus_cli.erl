@@ -41,17 +41,20 @@ main(Args) ->
     case Args of
         ["analyze" | CmdArgs] ->
             handle_analysis_command(CmdArgs);
+        ["filter" | CmdArgs] ->
+            handle_filter_command(CmdArgs);
         _ ->
             fall_from_grace(
               "~n"
               "Usage: locus [<command>] [<command_args>]~n"
               "~n"
               "Available commands:~n"
-              "  analyze")
+              "  analyze~n"
+              "  filter")
     end.
 
 %% ------------------------------------------------------------------
-%% Internal Function Definitions
+%% Internal Function Definitions - Utils
 %% ------------------------------------------------------------------
 
 ensure_apps_are_started(Apps) ->
@@ -61,27 +64,7 @@ ensure_apps_are_started(Apps) ->
       end,
       Apps).
 
-handle_analysis_command(CmdArgs) ->
-    OptSpecList =
-        [{load_timeout, undefined, "load-timeout", {integer,30}, "Database load timeout (in seconds)"},
-         {log_level,    undefined, "log-level",    {string,"error"}, "debug | info | warning | error"},
-         {url,          undefined, undefined,      utf8_binary, "Database URL (local or remote)"}],
-
-    case getopt:parse_and_check(OptSpecList, CmdArgs) of
-        {ok, {ParsedArgs, []}} ->
-            {load_timeout,LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
-            {log_level,StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
-            {url,DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
-            LoadTimeout = timer:seconds(LoadTimeoutSecs),
-            LogLevel = list_to_atom(StrLogLevel),
-            ok = locus_logger:set_loglevel(LogLevel),
-            prepare_analysis(DatabaseURL, LoadTimeout);
-        _ ->
-            getopt:usage(OptSpecList, "locus analyze"),
-            fall_from_grace()
-    end.
-
-prepare_analysis(DatabaseURL, LoadTimeout) ->
+prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
     DatabaseId = cli_analysis,
     WaitRef = make_ref(),
     BaseOpts = [{internal, {async_waiter, WaitRef, self()}}],
@@ -94,30 +77,19 @@ prepare_analysis(DatabaseURL, LoadTimeout) ->
     stderr_println("Loading database from \"~ts\"...", [DatabaseURL]),
     case locus:start_loader(DatabaseId, DatabaseURL, BaseOpts ++ ExtraOpts) of
         ok ->
-            wait_for_analysis_database_load(DatabaseId, WaitRef, LoadTimeout)
+            wait_for_database_load(DatabaseId, WaitRef, LoadTimeout, SuccessHandler)
     end.
 
-wait_for_analysis_database_load(DatabaseId, WaitRef, LoadTimeout) ->
+wait_for_database_load(DatabaseId, WaitRef, LoadTimeout, SuccessHandler) ->
     receive
         {WaitRef, {ok, LoadedVersion}} ->
             stderr_println("Database version ~p successfully loaded", [LoadedVersion]),
-            perform_analysis(DatabaseId);
+            SuccessHandler(DatabaseId);
         {WaitRef, {error, Reason}} ->
             fall_from_grace("Failed to load database: ~p", [Reason])
     after
         LoadTimeout ->
             fall_from_grace("Timeout loading the database")
-    end.
-
-perform_analysis(DatabaseId) ->
-    stderr_println("Analyzing database for flaws..."),
-    case locus:analyze(DatabaseId) of
-        ok ->
-            stderr_println("Database is wholesome.");
-        {error, {flawed, Flaws}} ->
-            fall_from_grace("Database is corrupt or incompatible:~n"
-                            ++ lists:flatten(["* ~p~n" || _ <- Flaws]),
-                            Flaws)
     end.
 
 fall_from_grace() ->
@@ -135,5 +107,77 @@ stderr_println(Fmt) ->
 
 stderr_println(Fmt, Args) ->
     io:format(standard_error, Fmt ++ "~n", Args).
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Analysis
+%% ------------------------------------------------------------------
+
+handle_analysis_command(CmdArgs) ->
+    OptSpecList =
+        [{load_timeout, undefined, "load-timeout", {integer,30}, "Database load timeout (in seconds)"},
+         {log_level,    undefined, "log-level",    {string,"error"}, "debug | info | warning | error"},
+         {url,          undefined, undefined,      utf8_binary, "Database URL (local or remote)"}],
+
+    case getopt:parse_and_check(OptSpecList, CmdArgs) of
+        {ok, {ParsedArgs, []}} ->
+            {load_timeout,LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
+            {log_level,StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
+            {url,DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
+            LoadTimeout = timer:seconds(LoadTimeoutSecs),
+            LogLevel = list_to_atom(StrLogLevel),
+            ok = locus_logger:set_loglevel(LogLevel),
+            prepare_database(DatabaseURL, LoadTimeout, fun perform_analysis/1);
+        _ ->
+            getopt:usage(OptSpecList, "locus analyze"),
+            fall_from_grace()
+    end.
+
+perform_analysis(DatabaseId) ->
+    stderr_println("Analyzing database for flaws..."),
+    case locus:analyze(DatabaseId) of
+        ok ->
+            stderr_println("Database is wholesome.");
+        {error, {flawed, Flaws}} ->
+            fall_from_grace("Database is corrupt or incompatible:~n"
+                            ++ lists:flatten(["* ~p~n" || _ <- Flaws]),
+                            Flaws)
+    end.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Filtering
+%% ------------------------------------------------------------------
+
+handle_filter_command(CmdArgs) ->
+    OptSpecList =
+        [{load_timeout, undefined, "load-timeout", {integer,30}, "Database load timeout (in seconds)"},
+         {log_level,    undefined, "log-level",    {string,"error"}, "debug | info | warning | error"},
+         {url,          undefined, undefined,      utf8_binary, "Database URL (local or remote)"},
+         {output,       undefined, undefined,      utf8_binary, "Output MMDB filename"}],
+
+    case getopt:parse_and_check(OptSpecList, CmdArgs) of
+        {ok, {ParsedArgs, []}} ->
+            {load_timeout,LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
+            {log_level,StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
+            {url,DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
+            {output,OutputFilename} = lists:keyfind(output, 1, ParsedArgs),
+            LoadTimeout = timer:seconds(LoadTimeoutSecs),
+            LogLevel = list_to_atom(StrLogLevel),
+            ok = locus_logger:set_loglevel(LogLevel),
+            prepare_database(
+              DatabaseURL, LoadTimeout,
+              fun (DatabaseId) ->
+                      perform_filtering(DatabaseId, OutputFilename)
+              end);
+        _ ->
+            getopt:usage(OptSpecList, "locus filter"),
+            fall_from_grace()
+    end.
+
+perform_filtering(DatabaseId, OutputFilename) ->
+    stderr_println("Filtering database..."),
+    case locus_mmdb:filter(DatabaseId, OutputFilename) of
+        ok ->
+            stderr_println("Filtered database saved under \"~ts\".", [OutputFilename])
+    end.
 
 -endif.

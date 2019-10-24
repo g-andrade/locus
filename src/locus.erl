@@ -65,9 +65,7 @@
          }.
 -export_type([database_entry/0]).
 
--type ip_address_prefix() ::
-        {inet:ip4_address(), 0..32} |
-        {inet:ip6_address(), 0..128}.
+-type ip_address_prefix() :: locus_mmdb:ip_address_prefix().
 -export_type([ip_address_prefix/0]).
 
 -type database_info() ::
