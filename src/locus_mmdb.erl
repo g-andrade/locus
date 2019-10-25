@@ -34,6 +34,7 @@
 -export([update/2]).
 -export([lookup/2]).
 -export([get_parts/1]).
+-export([get_shared_binaries/1]).
 -export([analyze/1]).
 
 -ifdef(TEST).
@@ -143,6 +144,16 @@ lookup(Id, Address) ->
 %% @private
 get_parts(Id) ->
     with_database_parts(Id, fun (DatabaseParts) -> {ok, DatabaseParts} end).
+
+-spec get_shared_binaries(atom()) -> {ok, [binary(),...]} |
+                                     {error, database_unknown | database_not_loaded}.
+%% @private
+get_shared_binaries(Id) ->
+    with_database_parts(
+      Id,
+      fun (#{data_section := DataSection, tree := Tree}) ->
+              {ok, [DataSection,Tree]}
+      end).
 
 -spec analyze(atom())
         -> ok |

@@ -201,6 +201,39 @@ report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Error}}
            log_error("~p database failed to cache: ~p", [DatabaseId, Error]);
        true ->
            ok
+    end;
+report(MinWeight, DatabaseId, {garbage_collection_started, #{target := Target}}) ->
+    if MinWeight =< ?debug ->
+           log_info(
+             "~p database started garbage collection of locus '~s' data",
+             [DatabaseId, Target]);
+       true ->
+           ok
+    end;
+report(MinWeight, DatabaseId, {garbage_collection_finished,
+                               #{target := Target,
+                                 context := Context,
+                                 duration := Duration,
+                                 processes_affected := ProcessesAffected
+                                }}) ->
+    Millis = erlang:convert_time_unit(Duration, native, millisecond),
+    ShouldWarn = (ProcessesAffected >= 5000 orelse Millis >= 5000),
+    ShouldLog = ShouldWarn orelse ProcessesAffected > 0,
+
+    if MinWeight =< ?debug, not ShouldWarn, ShouldLog ->
+           log_info(
+             "~p database garbage-collected locus '~s' data of ~b processes",
+             [DatabaseId, Target, ProcessesAffected]
+            );
+       MinWeight =< ?warning, ShouldWarn ->
+           log_warning(
+             "~p database garbage-collected locus '~s' data"
+             " of ~b processes in ~.3fs (context: ~p)",
+             [DatabaseId, Target, ProcessesAffected,
+              Millis / 1.0e3, Context]
+            );
+       true ->
+           ok
     end.
 
 -ifdef(NO_LOGGER).

@@ -81,7 +81,8 @@
 
 -type opt() ::
     database_opt() |
-    locus_loader:opt().
+    locus_loader:opt() |
+    locus_garbage_collector:opt().
 -export_type([opt/0]).
 
 -type database_opt() ::
@@ -106,6 +107,7 @@
 -record(state, {
           id :: atom(),
           loader_pid :: pid(),
+          garbage_collector_pid :: pid(),
           subscribers :: [atom() | pid()],
           subscriber_mons :: #{monitor() => pid()},
           waiters :: #{reference() => pid()},
@@ -120,6 +122,7 @@
 
 -type event() ::
     locus_loader:event() |
+    locus_garbage_collector:event() |
     event_load_attempt_finished().
 -export_type([event/0]).
 
@@ -223,8 +226,8 @@ list_subscribers(Id) ->
 init([Id, Origin, Opts]) ->
     _ = process_flag(trap_exit, true),
     case validate_opts(Origin, Opts) of
-        {ok, {DatabaseOpts, LoaderOpts, FetcherOpts}} ->
-            init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts);
+        {ok, {DatabaseOpts, LoaderOpts, FetcherOpts, GarbageCollectorOpts}} ->
+            init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts, GarbageCollectorOpts);
         {error, BadOpt} ->
             {stop, {invalid_opt,BadOpt}}
     end.
@@ -252,6 +255,9 @@ handle_cast(_Cast, State) ->
 handle_info({LoaderPid, Msg}, State)
   when LoaderPid =:= State#state.loader_pid ->
     handle_loader_msg(Msg, State);
+handle_info({GarbageCollectorPid, Msg}, State)
+  when GarbageCollectorPid =:= State#state.garbage_collector_pid ->
+    handle_garbage_collector_msg(Msg, State);
 handle_info({'DOWN', Ref, process, _, _}, State) ->
     handle_monitored_process_death(Ref, State);
 handle_info({'EXIT', Pid, Reason}, State) ->
@@ -288,20 +294,34 @@ server_opts() -> [].
 -endif.
 
 -spec validate_opts(origin(), list())
-        -> {ok, {[database_opt()], [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]}} |
+        -> {ok, {[database_opt()],
+                 [locus_loader:loader_opt()],
+                 [locus_loader:fetcher_opt()],
+                 [locus_garbage_collector:opt()]}} |
            {error, term()}.
 validate_opts(Origin, Opts) ->
     case locus_loader:validate_opts(Origin, Opts) of
-        {ok, {LoaderOpts, FetcherOpts, DatabaseOpts}} ->
-            validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts);
+        {ok, {LoaderOpts, FetcherOpts, OtherOpts}} ->
+            case locus_garbage_collector:validate_opts(OtherOpts) of
+                {ok, {GarbageCollectorOpts, DatabaseOpts}} ->
+                    validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts, GarbageCollectorOpts);
+                {error, BadOpt} ->
+                    {error, BadOpt}
+            end;
         {error, BadOpt} ->
             {error, BadOpt}
     end.
 
--spec validate_database_opts(list(), [locus_loader:loader_opt()], [locus_loader:fetcher_opt()])
-        -> {ok, {[database_opt()], [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]}} |
+-spec validate_database_opts(list(),
+                             [locus_loader:loader_opt()],
+                             [locus_loader:fetcher_opt()],
+                             [locus_garbage_collector:opt()])
+        -> {ok, {[database_opt()],
+                 [locus_loader:loader_opt()],
+                 [locus_loader:fetcher_opt()],
+                 [locus_garbage_collector:opt()]}} |
            {error, term()}.
-validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts) ->
+validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts, GarbageCollectorOpts) ->
     case
         locus_util:lists_anymap(
           fun ({event_subscriber, Module}) when is_atom(Module) ->
@@ -318,17 +338,19 @@ validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts) ->
         {true, BadOpt} ->
             {error, BadOpt};
         false ->
-            {ok, {DatabaseOpts, LoaderOpts, FetcherOpts}}
+            {ok, {DatabaseOpts, LoaderOpts, FetcherOpts, GarbageCollectorOpts}}
     end.
 
 -spec init(atom(), origin(), [database_opt()], [locus_loader:loader_opt()],
-           [locus_loader:fetcher_opt()]) -> {ok, state()}.
-init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts) ->
+           [locus_loader:fetcher_opt()], [locus_garbage_collector:opt()]) -> {ok, state()}.
+init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts, GarbageCollectorOpts) ->
     {ok, LoaderPid} = locus_loader:start_link(Id, Origin, LoaderOpts, FetcherOpts),
+    {ok, GarbageCollectorPid} = locus_garbage_collector:start_link(GarbageCollectorOpts),
     BaseState =
         #state{
            id = Id,
            loader_pid = LoaderPid,
+           garbage_collector_pid = GarbageCollectorPid,
            subscribers = [],
            subscriber_mons = #{},
            waiters = #{},
@@ -364,10 +386,11 @@ handle_loader_msg({event, Event}, State) ->
     report_event(Event, State),
     {noreply, State};
 handle_loader_msg({load_success, Source, Version, Parts}, State) ->
+    maybe_trigger_garbage_collection(State),
     #state{id = Id} = State,
     locus_mmdb:update(Id, Parts),
     State2 = State#state{ last_version = Version },
-    report_event({load_attempt_finished, Source, {ok,Version}}, State),
+    report_event({load_attempt_finished, Source, {ok,Version}}, State2),
     State3 = reply_to_waiters({ok,Version}, State2),
     {noreply, State3};
 handle_loader_msg({load_failure, Source, Reason}, State) ->
@@ -379,6 +402,11 @@ handle_loader_msg({load_failure, Source, Reason}, State) ->
             UpdatedState = reply_to_waiters({error,Reason}, State),
             {noreply, UpdatedState}
     end.
+
+-spec handle_garbage_collector_msg(locus_garbage_collector:msg(), state()) -> {noreply, state()}.
+handle_garbage_collector_msg({event, Event}, State) ->
+    report_event(Event, State),
+    {noreply, State}.
 
 -spec report_event(event(), state()) -> ok.
 report_event(Event, #state{id = Id, subscribers = Subscribers}) ->
@@ -409,10 +437,25 @@ handle_monitored_process_death(Ref, State) ->
     end.
 
 -spec handle_linked_process_death(pid(), term(), state())
-        -> {stop, {loader_stopped, pid(), term()}, state()}.
+        -> {stop, {WhoStopped, pid(), term()}, state()}
+        when WhoStopped :: loader_stopped | garbage_collector_stopped.
 handle_linked_process_death(Pid, Reason, State)
   when Pid =:= State#state.loader_pid ->
-    {stop, {loader_stopped, Pid, Reason}, State}.
+    {stop, {loader_stopped, Pid, Reason}, State};
+handle_linked_process_death(Pid, Reason, State)
+  when Pid =:= State#state.garbage_collector_pid ->
+    {stop, {garbage_collector_stopped, Pid, Reason}, State}.
+
+maybe_trigger_garbage_collection(#state{last_version = undefined}) ->
+    ok;
+maybe_trigger_garbage_collection(#state{last_version = LastVersion,
+                                        id = Id,
+                                        garbage_collector_pid = Pid
+                                       })
+->
+    {ok, Binaries} = locus_mmdb:get_shared_binaries(Id),
+    Context = {database_version_replaced, LastVersion},
+    locus_garbage_collector:dispatch_binaries(Pid, Binaries, Context).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Waiters

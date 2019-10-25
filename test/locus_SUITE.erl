@@ -37,7 +37,7 @@
 -define(IPV6_STR_ADDR, "2606:2800:220:1:248:1893:25c8:1946"). % example.com
 
 -define(assertRecv(Pattern),
-        ((fun () -> receive Msg -> ?assertMatch((Pattern), Msg)
+        ((fun () -> receive Msg -> ?assertMatch(Pattern, Msg)
                     after 30000 -> error(timeout) end end)())).
 
 -define(VERSION1_TIMESTAMP, {{2018,01,01}, {00,00,00}}).
@@ -217,7 +217,7 @@ cold_remote_loading_httptest(Config) ->
 warm_remote_loading_httptest(Config) ->
     URL = proplists:get_value(url, Config),
     Loader = warm_regular_loading_httptest,
-    LoaderOpts = [{event_subscriber, self()}],
+    LoaderOpts = [no_garbage_collection, {event_subscriber, self()}],
     ok = locus:start_loader(Loader, URL, LoaderOpts),
     {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
     {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
@@ -245,7 +245,8 @@ update_works_httptest(_IsRemote, Config) ->
     Path = proplists:get_value(path, Config),
     Loader = update_works_httptest,
     PostReadinessUpdatePeriod = 200,
-    LoaderOpts = [no_cache, {post_readiness_update_period, PostReadinessUpdatePeriod},
+    LoaderOpts = [no_cache, no_garbage_collection,
+                  {post_readiness_update_period, PostReadinessUpdatePeriod},
                   {event_subscriber, self()}],
     %%
     ok = set_file_mtime(Path, ?VERSION1_TIMESTAMP),
@@ -549,6 +550,64 @@ wait_for_loader_failures_test(_Config) ->
     ?assertMatch({error, {Loader, database_unknown}},
                  locus:wait_for_loaders([Loader], 500)),
     ok.
+
+garbage_collector_httptest(Config) ->
+    IsRemote = proplists:get_value(is_remote, Config),
+    garbage_collector_httptest(IsRemote, Config).
+
+garbage_collector_httptest(IsRemote, _Config) when IsRemote ->
+    {skip, "Unable to tweak modification time of remote files"};
+garbage_collector_httptest(_, Config) ->
+    URL = proplists:get_value(url, Config),
+    Path = proplists:get_value(path, Config),
+    Loader = garbage_collector_httptest,
+    PostReadinessUpdatePeriod = 1000,
+    LoaderOpts = [no_cache, {garbage_collection_delay,100},
+                  {post_readiness_update_period, PostReadinessUpdatePeriod},
+                  {event_subscriber, self()}],
+
+    % first download
+    ok = set_file_mtime(Path, ?VERSION1_TIMESTAMP),
+    ok = locus:start_loader(Loader, URL, LoaderOpts),
+    ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+    ?assertRecv({locus, Loader, {download_started, _Headers}}),
+    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+    ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
+
+    % propagate references to database binary throughout helper processes
+    TestPid = self(),
+    NrOfProcs = 1000,
+    _ = [spawn_link(
+           fun () ->
+                   Result = locus:lookup(Loader, {93,184,216,34}),
+                   _ = locus:lookup(Loader, {93,184,216,34}),
+                   timer:sleep(10000),
+                   unlink(TestPid),
+                   Result
+           end)
+         || _ <- lists:seq(1, NrOfProcs)],
+
+    % second download
+    ok = set_file_mtime(Path, ?VERSION2_TIMESTAMP),
+    ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+    ?assertRecv({locus, Loader, {download_started, _Headers}}),
+    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+    ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
+
+    % garbage collection started
+    ?assertRecv(
+       {locus, Loader, {garbage_collection_started,
+                        #{target := shared_binaries
+                         }}}),
+
+    % garbage collection finished
+    ?assertRecv(
+       {locus, Loader, {garbage_collection_finished,
+                        #{target := shared_binaries,
+                          processes_affected := ProcessesAffected
+                       }}}
+         when ProcessesAffected >= NrOfProcs andalso
+              ProcessesAffected =< NrOfProcs + 10).
 
 %%%
 
