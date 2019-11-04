@@ -170,7 +170,7 @@ run_analysis_coordinator(ParentPid, DatabaseParts) ->
 analyze_tree(DataAnalyzers, MaxDepth, Metadata, Tree) ->
     locus_mmdb_tree:foldl(
       fun (Prefix, Depth, NodeIndex, _DataIndex, Acc) when Depth > MaxDepth ->
-              [{max_depth_exceeded, 
+              [{max_depth_exceeded,
                 #{ tree_prefix => analysis_flaw_prefix(MaxDepth, Depth, Prefix),
                    node_index => NodeIndex
                  }} | Acc];
@@ -238,9 +238,9 @@ handle_data_analyzer_msg({CoordinatorPid, collect_bad_results},
 
 handle_data_record_analysis(DataIndex, Depth, Prefix, State) ->
     #{data_section := DataSection} = State,
-    try 
-        begin 
-            locus_mmdb_data:decode_on_index(DataIndex, DataSection) 
+    try
+        begin
+            locus_mmdb_data:decode_on_index(DataIndex, DataSection)
         end
     of
         {#{}, _} ->
