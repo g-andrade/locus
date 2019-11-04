@@ -5,10 +5,6 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Added
-- optional garbage collection of processes referencing old database binaries
-  to avoid their backing memory staying unreclaimed for too long (on by default)
-- new event types for the above (`locus_garbabe_collector:event/0`)
 ### Changed
 - MMDB-handling code, which was split into distinct tree, data section and analysis modules
 - dependency versions:
@@ -17,7 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - support for OTP 18
 ### Fixed
 - episodes of `locus` managerial processes keeping references to old binaries, upon a database update,
-  for hours, days or even longer (OTP 20+ only if the newly added garbage collection is disabled)
+  for hours, days or even weeks (OTP 20+ only)
 - broken logging for playground console on OTP 21.1+
 
 ## [1.7.0] - 2019-08-12
