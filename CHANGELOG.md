@@ -6,9 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Changed
-- MMDB-handling code, which was split into distinct tree, data section and analysis modules
-- dependency versions:
-    - `stacktrace_compat` [1.0.2 => 1.1.1]
+- MMDB decoder, which was split into separate tree, data section and analysis modules
+- imported `stacktrace_compat` version [1.0.2 => 1.1.1]
 ### Removed
 - support for OTP 18
 ### Fixed
