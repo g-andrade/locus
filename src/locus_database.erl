@@ -282,7 +282,7 @@ server_name(Id) ->
      ).
 
 -ifndef(NO_GEN_SERVER_HIBERNATE_AFTER).
-server_opts() -> [{hibernate_after, ?HIBERNATE_AFTER}].
+server_opts() -> [{locus_util:dialyzer_opaque_atom(hibernate_after), ?HIBERNATE_AFTER}].
 -else.
 server_opts() -> [].
 -endif.

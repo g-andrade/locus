@@ -35,7 +35,8 @@
     lists_anymap/2,
     lists_take/2,
     bin_to_hex_str/1,
-    flush_link_exit/2
+    flush_link_exit/2,
+    dialyzer_opaque_atom/1
    ]).
 
 %% ------------------------------------------------------------------
@@ -106,6 +107,10 @@ flush_link_exit(Pid, Timeout) ->
     after
         Timeout -> false
     end.
+
+-spec dialyzer_opaque_atom(atom()) -> atom().
+dialyzer_opaque_atom(Atom) ->
+    list_to_atom( atom_to_list(Atom) ).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
