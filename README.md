@@ -17,7 +17,7 @@ towards MaxMind.
 
 #### Usage
 
-Clone the repository and run `make console` to bring up a shell.
+Clone the repository and run `make shell`.
 
 ##### 1\. Start the database loader
 

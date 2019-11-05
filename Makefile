@@ -18,7 +18,7 @@ CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
 
 .PHONY: all build clean check dialyzer xref
 .PHONY: test ci_test cover
-.PHONY: console doc publish cli
+.PHONY: shell console doc publish cli
 
 .NOTPARALLEL: check cover test ci_test
 
@@ -53,9 +53,11 @@ ci_test: $(REBAR3) cli
 cover: $(REBAR3) test
 	@$(REBAR3) cover
 
-console: export ERL_FLAGS =? +pc unicode
-console:
-	@$(REBAR3) as development shell --apps locus --config console.config
+shell: export ERL_FLAGS =? +pc unicode
+shell:
+	@$(REBAR3) as development shell --apps locus --config shell.config
+
+console: shell
 
 doc: $(REBAR3)
 	@$(REBAR3) edoc

@@ -17,7 +17,7 @@ both for reliability and netiquette towards MaxMind.
 
 <h4>Usage</h4>
 
-Clone the repository and run `make console' to bring up a shell.
+Clone the repository and run `make shell'.
 
 <h5>1. Start the database loader</h5>
 
