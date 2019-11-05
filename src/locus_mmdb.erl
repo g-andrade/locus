@@ -71,8 +71,14 @@
 -type metadata() :: locus_mmdb_data:decoded_map().
 -export_type([metadata/0]).
 
--type mmdb_value() :: locus_mmdb_data:decoded_value().
--export_type([mmdb_value/0]).
+-type lookup_success() :: lookup_success(prefix, ip_address_prefix()).
+-export_type([lookup_success/0]).
+
+-type lookup_success(K,V) ::
+    locus_mmdb_data:extended_decoded_map(K, V) |
+    {locus_mmdb_data:decoded_array(), #{K := V}} |
+    {locus_mmdb_data:decoded_simple_value(), #{K := V}}.
+-export_type([lookup_success/2]).
 
 -type ip_address_prefix() :: locus_mmdb_tree:ip_address_prefix().
 -export_type([ip_address_prefix/0]).
@@ -122,8 +128,7 @@ update(Id, DatabaseParts) ->
     ets:insert(Table, {database,DatabaseParts}).
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
-        -> {ok, #{ prefix => {inet:ip_address(), 0..128},
-                   unicode:unicode_binary() => mmdb_value() }} |
+        -> {ok, lookup_success()} |
            {error, (not_found | invalid_address | ipv4_database |
                     database_unknown | database_not_loaded)}.
 %% @private
@@ -163,7 +168,7 @@ table_name(Id) ->
 
 -spec decode_metadata(binary()) -> metadata().
 decode_metadata(BinMetadata) ->
-    {Metadata, _FinalChunk} = locus_mmdb_data:decode_on_index(0, BinMetadata),
+    {#{} = Metadata, _FinalChunk} = locus_mmdb_data:decode_on_index(0, BinMetadata),
     Metadata.
 
 is_known_database_format(FmtMajorVersion) ->
@@ -191,9 +196,15 @@ lookup_(Address, DatabaseParts) ->
 
     case locus_mmdb_tree:lookup(Address, IPv4RootIndex, Metadata, Tree) of
         {ok, {DataIndex, Prefix}} ->
-            {#{} = Entry, _} = locus_mmdb_data:decode_on_index(DataIndex, DataSection),
-            ExtendedEntry = Entry#{ prefix => Prefix },
-            {ok, ExtendedEntry};
+            {Entry, _} = locus_mmdb_data:decode_on_index(DataIndex, DataSection),
+            Success = lookup_success(Entry, #{ prefix => Prefix }),
+            {ok, Success};
         {error, Reason} ->
             {error, Reason}
     end.
+
+lookup_success(Entry, ExtraAttributes)
+  when is_map(Entry) ->
+    maps:merge(Entry, ExtraAttributes);
+lookup_success(Entry, ExtraAttributes) ->
+    {Entry, ExtraAttributes}.

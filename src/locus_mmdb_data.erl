@@ -73,6 +73,9 @@
 -type decoded_map() :: #{unicode:unicode_binary() => decoded_value()}.
 -export_type([decoded_map/0]).
 
+-type extended_decoded_map(K,V) :: #{unicode:unicode_binary() => decoded_value(), K := V}.
+-export_type([extended_decoded_map/2]).
+
 -type decoded_array() :: [decoded_value()].
 -export_type([decoded_array/0]).
 

@@ -59,10 +59,7 @@
 -type database_error() :: database_unknown | database_not_loaded.
 -export_type([database_error/0]).
 
--type database_entry() ::
-    #{ prefix => ip_address_prefix(),
-       unicode:unicode_binary() => locus_mmdb:mmdb_value()
-     }.
+-type database_entry() :: locus_mmdb:lookup_success().
 -export_type([database_entry/0]).
 
 -type ip_address_prefix() :: locus_mmdb:ip_address_prefix().

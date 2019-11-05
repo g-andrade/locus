@@ -38,7 +38,6 @@
 -type flaw() ::
     max_depth_exceeded() |
     invalid_tree_data_section_pointer() |
-    bad_record_data_type() |
     data_record_decoding_failed().
 -export_type([flaw/0]).
 
@@ -55,13 +54,6 @@
                                            value := neg_integer()
                                }}.
 -export_type([invalid_tree_data_section_pointer/0]).
-
--type bad_record_data_type() ::
-     {bad_record_data_type, #{ data_index := non_neg_integer(),
-                               data_record := term(),
-                               tree_prefixes := [{inet:ip_address(), 0..128}, ...]
-                             }}.
--export_type([bad_record_data_type/0]).
 
 -type data_record_decoding_failed() ::
     {data_record_decoding_failed, #{ data_index := non_neg_integer(),
@@ -148,13 +140,7 @@ run_analysis_coordinator(ParentPid, DatabaseParts) ->
 
     DataRecordFlaws =
         maps:fold(
-          fun (DataIndex, {{bad_record_data_type,NotAMap}, TreeRefs}, Acc) ->
-                  [{bad_record_data_type,
-                    #{ data_index => DataIndex,
-                       data_record => NotAMap,
-                       tree_prefixes => data_analysis_bad_tree_prefixes(MaxDepth, TreeRefs)
-                     }} | Acc];
-              (DataIndex, {{data_record_decoding_failed,Class,Reason}, TreeRefs}, Acc) ->
+          fun (DataIndex, {{data_record_decoding_failed,Class,Reason}, TreeRefs}, Acc) ->
                   [{data_record_decoding_failed,
                     #{ data_index => DataIndex,
                        class => Class,
@@ -243,15 +229,10 @@ handle_data_record_analysis(DataIndex, Depth, Prefix, State) ->
             locus_mmdb_data:decode_on_index(DataIndex, DataSection)
         end
     of
-        {#{}, _} ->
+        {_, _} ->
             #{good := Good} = State,
             UpdatedGood = gb_sets:insert(DataIndex, Good),
-            maps:update(good, UpdatedGood, State);
-        {NotAMap, _} ->
-            #{bad := Bad} = State,
-            FlawInfo = {bad_record_data_type, NotAMap},
-            UpdatedBad = maps:put(DataIndex, {FlawInfo,[{Depth,Prefix}]}, Bad),
-            maps:update(bad, UpdatedBad, State)
+            maps:update(good, UpdatedGood, State)
     catch
         Class:Reason ->
             #{bad := Bad} = State,
