@@ -35,8 +35,7 @@
     lists_anymap/2,
     lists_take/2,
     bin_to_hex_str/1,
-    flush_link_exit/2,
-    processes_sharing_binary/1
+    flush_link_exit/2
    ]).
 
 %% ------------------------------------------------------------------
@@ -108,20 +107,6 @@ flush_link_exit(Pid, Timeout) ->
         Timeout -> false
     end.
 
--spec processes_sharing_binary(binary()) -> [pid()].
-processes_sharing_binary(Binary) ->
-    case ref_counted_binary_id(Binary) of
-        {id, BinaryId} ->
-            lists:filter(
-              fun (Pid) ->
-                      {binary, BinaryInfos} = process_info(Pid, binary),
-                      lists:keymember(BinaryId, 1, BinaryInfos) andalso (Pid =/= self())
-              end,
-              processes());
-        undefined ->
-            []
-    end.
-
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
@@ -133,47 +118,3 @@ lists_take_recur(Elem, [H|T], Acc) ->
     lists_take_recur(Elem, T, [H|Acc]);
 lists_take_recur(_, [], _) ->
     error.
-
--spec ref_counted_binary_id(binary()) -> {id, term()} | undefined.
-ref_counted_binary_id(Binary) ->
-    CallerPid = self(),
-    HelperRef = make_ref(),
-    {HelperPid, HelperMon} =
-        spawn_monitor(
-          fun () ->
-                  receive
-                      {HelperRef, MaybeCopiedBinary} ->
-                          {binary, CopiedBinaryInfos} = process_info(self(), binary),
-                          _ = binary:referenced_byte_size(MaybeCopiedBinary),
-                          _ = CallerPid ! {HelperRef, CopiedBinaryInfos}
-                  after
-                      5000 ->
-                          exit(timeout)
-                  end
-          end),
-
-    _ = HelperPid ! {HelperRef, Binary},
-    receive
-        {HelperRef, CopiedBinaryInfos} ->
-            demonitor(HelperMon, [flush]),
-            {binary, OwnBinaryInfos} = process_info(self(), binary),
-            case lists:filter(
-                   fun ({BinaryId, _, _}) ->
-                           lists:keymember(BinaryId, 1, OwnBinaryInfos)
-                   end,
-                   CopiedBinaryInfos)
-            of
-                [{BinaryId, _, _}] ->
-                    {id, BinaryId};
-                [] ->
-                    undefined
-            end;
-
-        {'DOWN', HelperMon, _, _, Reason} ->
-            exit({helper_proc, Reason})
-    after
-        5000 ->
-            demonitor(HelperMon, [flush]),
-            exit(HelperPid, kill),
-            exit(timeout)
-    end.
