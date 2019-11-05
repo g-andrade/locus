@@ -42,7 +42,7 @@ dialyzer: $(REBAR3)
 xref: $(REBAR3)
 	@$(REBAR3) xref
 
-test: $(REBAR3) cli
+test: $(REBAR3) cli test/MaxMind-DB/test-data
 	@$(REBAR3) ct
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
@@ -76,3 +76,6 @@ publish: $(REBAR3)
 cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
+
+test/MaxMind-DB/test-data:
+	git submodule update --init --recursive -- test/MaxMind-DB
