@@ -202,7 +202,7 @@ arguments.
 
   - Five logging levels are supported: `debug`, `info`, `warning`,
     `error` and `none`
-  - The chosen backend ON OTP 21.1+ is
+  - The chosen backend on OTP 21.1+ is
     [logger](http://erlang.org/doc/man/logger.html) **if**
     [lager](https://github.com/erlang-lager/lager/) is either missing or
     it hasn't
