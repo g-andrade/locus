@@ -1,0 +1,79 @@
+/* copied and modified from standard EDoc style sheet */
+body {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+    margin-left: .25in;
+    margin-right: .2in;
+    margin-top: 0.2in;
+    margin-bottom: 0.2in;
+    color: #010d2c;
+    background-color: #f9f9f9;
+    max-width: 1024px;
+}
+h1,h2 {
+}
+div.navbar, h2.indextitle, h3.function, h3.typedecl {
+    background-color: #e8e8e8;
+}
+div.navbar, h2.indextitle {
+    background-image: linear-gradient(to right, #e8e8e8, #f9f9f9);
+}
+div.navbar {
+	padding: 0.2em;
+    border-radius: 3px;
+}
+h2.indextitle {
+	padding: 0.4em;
+    border-radius: 3px;
+}
+h3.function, h3.typedecl {
+    display: inline;
+}
+div.spec {
+ 	margin-left: 2em;
+	background-color: #eeeeee;
+    border-radius: 3px;
+}
+a.module {
+	text-decoration:none
+}
+a.module:hover {
+	background-color: #eeeeee;
+}
+ul.definitions {
+	list-style-type: none;
+}
+ul.index {
+	list-style-type: none;
+	background-color: #eeeeee;
+}
+
+/*
+ * Minor style tweaks
+ */
+ul {
+	list-style-type: disc;
+}
+table {
+	border-collapse: collapse;
+}
+td {
+	padding: 3
+}
+
+/*
+ * Extra style tweaks
+ */
+code, pre {
+    background-color: #ececec;
+    font: Consolas,"Andale Mono WT","Andale Mono","Lucida Console","Lucida Sans Typewriter","DejaVu Sans Mono","Bitstream Vera Sans Mono","Liberation Mono","Nimbus Mono L",Monaco,"Courier New",Courier,monospace;
+}
+code {
+    padding-left: 2px;
+    padding-right: 2px;
+}
+pre {
+    color: #00000;
+    padding: 5px;
+    border: 0.5px dotted grey;
+    border-radius: 2px;
+}
