@@ -43,7 +43,7 @@ ok = locus:start_loader(country).
 {ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 ```
 
-##### 4\. Lookup IP addresses
+##### 4\. Look up IP addresses
 
 ``` erlang
 
