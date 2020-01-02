@@ -85,9 +85,9 @@
 -export_type([ip_address_prefix/0]).
 
 -type database_info() ::
-    #{ metadata => database_metadata(),
-       source => database_source(),
-       version => database_version()
+    #{ metadata := database_metadata(),
+       source := database_source(),
+       version := database_version()
      }.
 -export_type([database_info/0]).
 
