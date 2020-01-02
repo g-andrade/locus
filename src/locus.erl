@@ -108,14 +108,12 @@
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
-%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% <li>`DatabaseEdition' must be an atom.</li>
 %% </ul>
 %%
 %% Returns:
 %% <ul>
 %% <li>`ok' in case of success.</li>
-%% <li>`{error, invalid_url}' if the source is invalid.</li>
 %% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
 %% </ul>
 %% @see wait_for_loader/1
@@ -214,8 +212,7 @@ stop_loader(DatabaseId) ->
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
-%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% <li>`DatabaseEdition' must be an atom.</li>
 %% </ul>
 %%
 %% Returns:
