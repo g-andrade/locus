@@ -65,9 +65,6 @@
 -define(might_be_chardata(V), (is_binary((V)) orelse ?is_proper_list((V)))).
 -define(is_proper_list(V), (length((V)) >= 0)).
 
--define(legacy_geolite2_http_url_prefix, "http://geolite.maxmind.com/download/geoip/database/GeoLite2-").
--define(legacy_geolite2_https_url_prefix, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-").
-
 %% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
@@ -151,7 +148,7 @@ start_loader(DatabaseEdition)
 %% @see wait_for_loader/2
 %% @see start_loader/1
 %% @see start_loader/3
--spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL) -> ok | {error, Error} | no_return()
+-spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
@@ -178,7 +175,7 @@ start_loader(DatabaseId, DatabaseEditionOrURL) ->
 %% @see wait_for_loader/2
 %% @see start_loader/1
 %% @see start_loader/2
--spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ok | {error, Error} | no_return()
+-spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ok | {error, Error}
             when DatabaseId :: atom(),
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
@@ -195,10 +192,6 @@ start_loader(DatabaseId, DatabaseURL, Opts)
     case parse_url(DatabaseURL) of
         false ->
             {error, invalid_url};
-        {http, ?legacy_geolite2_http_url_prefix ++ _} ->
-            error('Public access removed on 2019-12-30; you now need a license key.');
-        {http, ?legacy_geolite2_https_url_prefix ++ _} ->
-            error('Public access removed on 2019-12-30; you now need a license key.');
         Origin ->
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:start(DatabaseId, Origin, OptsWithDefaults)
@@ -328,10 +321,6 @@ loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
     case parse_url(DatabaseURL) of
         false ->
             error(invalid_url);
-        {http, ?legacy_geolite2_http_url_prefix ++ _} ->
-            error('Public access removed on 2019-12-30; you now need a license key.');
-        {http, ?legacy_geolite2_https_url_prefix ++ _} ->
-            error('Public access removed on 2019-12-30; you now need a license key.');
         Origin ->
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults)
@@ -577,8 +566,8 @@ parse_database_edition(DatabaseEdition) ->
 -spec parse_url(database_url()) -> locus_database:origin() | false.
 parse_url(DatabaseURL) ->
     case parse_http_url(DatabaseURL) of
-        {http, ParsedURL} ->
-            {http, ParsedURL};
+        Origin when is_tuple(Origin) ->
+            Origin;
         false ->
             parse_filesystem_url(DatabaseURL)
     end.
@@ -597,12 +586,45 @@ parse_http_url(DatabaseURL) ->
     try io_lib:printable_latin1_list(ByteList) andalso
         http_uri:parse(ByteList)
     of
-        false -> false;
-        {ok, _Result} -> {http, ByteList};
-        {error, _Reason} -> false
+        false ->
+            false;
+        {ok, {Scheme, "", "geolite.maxmind.com", Port, "/download/geoip/database/GeoLite2-" ++ Suffix, _}}
+          when Scheme =:= http, Port =:= 80;
+               Scheme =:= https, Port =:= 443 ->
+            parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList);
+        {ok, {Scheme, "", "geolite.maxmind.com", Port, "/download/geoip/database/GeoLite2-" ++ Suffix, _, _}}
+          when Scheme =:= http, Port =:= 80;
+               Scheme =:= https, Port =:= 443 ->
+            parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList);
+        {ok, _Result} ->
+            {http, ByteList};
+        {error, _Reason} ->
+            false
     catch
         error:badarg -> false
     end.
+
+parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList) ->
+    case Suffix of
+        "Country.tar.gz" ->
+            log_warning_on_use_of_discontinued_geolite2_http_url(DatabaseURL, 'GeoLite2-Country'),
+            {maxmind, 'GeoLite2-Country'};
+        "City.tar.gz" ->
+            log_warning_on_use_of_discontinued_geolite2_http_url(DatabaseURL, 'GeoLite2-City'),
+            {maxmind, 'GeoLite2-City'};
+        "ASN.tar.gz" ->
+            log_warning_on_use_of_discontinued_geolite2_http_url(DatabaseURL, 'GeoLite2-ASN'),
+            {maxmind, 'GeoLite2-ASN'};
+        _ ->
+            {http, ByteList}
+    end.
+
+log_warning_on_use_of_discontinued_geolite2_http_url(LegacyURL, DatabaseEdition) ->
+    locus_logger:log_warning(
+      "Public access to GeoLite2 was discontinued on 2019-12-30; converting legacy URL for your convenience.~n"
+      "Update your `:start_loader' and `:loader_child_spec' calls to silence this message.~n"
+      "(Use the atom '~ts' instead of the legacy URL \"~ts\")",
+      [DatabaseEdition, LegacyURL]).
 
 parse_filesystem_url(DatabaseURL) ->
     try unicode:characters_to_list(DatabaseURL) of

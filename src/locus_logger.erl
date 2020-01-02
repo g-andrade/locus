@@ -38,6 +38,12 @@
 -export([report/2]).
 
 %% ------------------------------------------------------------------
+%% Private Function Exports
+%% ------------------------------------------------------------------
+
+-export([log_warning/2]).
+
+%% ------------------------------------------------------------------
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
@@ -207,6 +213,8 @@ report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Error}}
 log_info(Fmt, Args) ->
     log_to_error_logger(info_msg, Fmt, Args).
 
+-spec log_warning(string(), list()) -> ok.
+%% @private
 log_warning(Fmt, Args) ->
     log_to_error_logger(warning_msg, Fmt, Args).
 
@@ -220,6 +228,8 @@ log_info(Fmt, Args) ->
         false -> log_to_logger(info, Fmt, Args)
     end.
 
+-spec log_warning(string(), list()) -> ok.
+%% @private
 log_warning(Fmt, Args) ->
     case use_error_logger() of
         true -> log_to_error_logger(warning_msg, Fmt, Args);
