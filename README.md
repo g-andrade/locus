@@ -17,32 +17,40 @@ towards MaxMind.
 
 #### Usage
 
-Clone the repository and run `make shell`.
+##### 1\. Configure your license key
 
-##### 1\. Start the database loader
+Get a free [license key](https://www.maxmind.com/en/geolite2/signup)
+from MaxMind if you haven't one already. Once logged in, you'll find the
+page to generate it on the left menu, under "My License Key".
+
+Then clone the repository, run `make shell` and declare your key:
 
 ``` erlang
-URL = "https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz",
-ok = locus:start_loader(country, URL).
-
-% URL can also be a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
+application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 ```
 
-##### 2\. Wait for the database to load (optional)
+##### 2\. Start the database loader
+
+``` erlang
+ok = locus:start_loader(country).
+% You can also use a HTTP URL or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
+```
+
+##### 3\. Wait for the database to load (optional)
 
 ``` erlang
 % Give up after 30 seconds
 {ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
 ```
 
-##### 3\. Lookup IP addresses
+##### 4\. Lookup IP addresses
 
 ``` erlang
 
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
-{ok,#{prefix => {{93,184,216,0},24},
+{ok,#{prefix => {{93,184,216,0},31},
       <<"continent">> =>
           #{<<"code">> => <<"NA">>,
             <<"geoname_id">> => 6255149,

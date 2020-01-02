@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- support for loading databases with full awareness of license keys (now mandatory)
+
 ## [1.8.0] - 2019-11-05
 ### Added
 - support for returning types other than map upon successful lookups

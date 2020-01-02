@@ -38,7 +38,10 @@
    ]).
 
 -ifdef(TEST).
--export([cached_database_path_for_url/1]).
+-export(
+   [cached_database_path_for_maxmind_edition/2,
+    cached_database_path_for_url/1
+   ]).
 -endif.
 
 %% ------------------------------------------------------------------
@@ -122,9 +125,16 @@
 -type blob_format() :: tgz | tarball | gzip | gzipped_mmdb | mmdb | unknown.
 
 -type origin() ::
+    {maxmind, atom()} |
     {http, locus_http_download:url()} |
     {filesystem, locus_filesystem_load:path()}.
 -export_type([origin/0]).
+
+-type maxmind_origin_params() ::
+    #{ license_key := unicode:unicode_binary(),
+       date => calendar:date()
+     }.
+-export_type([maxmind_origin_params/0]).
 
 -type event() ::
     locus_http_download:event() |
@@ -138,7 +148,7 @@
 -export_type([event_cache_attempt_finished/0]).
 
 -type source() ::
-    {remote, locus_http_download:url()} |
+    {remote, atom() | locus_http_download:url()} |
     locus_filesystem_load:source().
 -export_type([source/0]).
 
@@ -252,6 +262,8 @@ server_opts() -> [].
 -spec validate_fetcher_opts(origin(), list())
         -> {ok, {[fetcher_opt()], list()}} |
            {error, term()}.
+validate_fetcher_opts({maxmind,_}, MixedOpts) ->
+    locus_maxmind_download:validate_opts(MixedOpts);
 validate_fetcher_opts({http,_}, MixedOpts) ->
     locus_http_download:validate_opts(MixedOpts);
 validate_fetcher_opts({filesystem,_}, MixedOpts) ->
@@ -282,13 +294,23 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
     end.
 
 -spec default_settings(origin()) -> settings().
+default_settings({maxmind,_}) ->
+    default_http_origin_settings();
 default_settings({http,_}) ->
+    default_http_origin_settings();
+default_settings({filesystem,_}) ->
+    default_filesystem_origin_settings().
+
+-spec default_http_origin_settings() -> settings().
+default_http_origin_settings() ->
     #settings{
        unready_update_period = ?DEFAULT_HTTP_UNREADY_UPDATE_PERIOD,
        ready_update_period = ?DEFAULT_HTTP_READY_UPDATE_PERIOD,
        use_cache = true
-      };
-default_settings({filesystem,_}) ->
+      }.
+
+-spec default_filesystem_origin_settings() -> settings().
+default_filesystem_origin_settings() ->
     #settings{
        unready_update_period = ?DEFAULT_FS_UNREADY_UPDATE_PEROID,
        ready_update_period = ?DEFAULT_FS_READY_UPDATE_PERIOD,
@@ -325,18 +347,52 @@ schedule_update(Interval, State)
 
 -spec cached_database_path(state()) -> nonempty_string().
 cached_database_path(State) ->
-    #state{origin = Origin} = State,
-    {http, URL} = Origin,
-    cached_database_path_for_url(URL).
+    case State#state.origin of
+        {maxmind, Edition} ->
+            FetcherOpts = State#state.fetcher_opts,
+            MaybeDate = proplists:get_value(date, FetcherOpts),
+            cached_database_path_for_maxmind_edition(Edition, MaybeDate);
+        {http, URL} ->
+            cached_database_path_for_url(URL)
+    end.
+
+-spec cached_database_path_for_maxmind_edition(atom(), undefined | calendar:date())
+        -> nonempty_string().
+%% @private
+cached_database_path_for_maxmind_edition(Edition, MaybeDate) ->
+    DirectoryPath = cache_directory_path(),
+    BinEdition = atom_to_binary(Edition, utf8),
+    BaseFilename = locus_util:filesystem_safe_name(BinEdition),
+    FilenameIoData =
+        case MaybeDate of
+            undefined ->
+                io_lib:format("~ts.mmdb.gz", [BaseFilename]);
+            {Year, Month, Day} ->
+                io_lib:format("~ts.~4..0B-~2..0B-~2..0B.mmdb.gz",
+                              [BaseFilename, Year, Month, Day])
+        end,
+    Filename = unicode:characters_to_list(FilenameIoData),
+    filename:join(DirectoryPath, Filename).
 
 -spec cached_database_path_for_url(string()) -> nonempty_string().
 %% @private
 cached_database_path_for_url(URL) ->
-    Hash = crypto:hash(sha256, URL),
-    HexHash = locus_util:bin_to_hex_str(Hash),
-    Filename = HexHash ++ ".mmdb.gz",
-    UserCachePath = filename:basedir(user_cache, "locus_erlang"),
-    filename:join(UserCachePath, Filename).
+    DirectoryPath = cache_directory_path(),
+    URLHash = crypto:hash(sha256, URL),
+    HexURLHash = locus_util:bin_to_hex_str(URLHash),
+    Filename = HexURLHash ++ ".mmdb.gz",
+    filename:join(DirectoryPath, Filename).
+
+-spec cache_directory_path() -> nonempty_string().
+-ifdef(TEST).
+cache_directory_path() ->
+    filename:join(
+      filename:basedir(user_cache, "locus_erlang"),
+      "tests").
+-else.
+cache_directory_path() ->
+    filename:basedir(user_cache, "locus_erlang").
+-endif.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Database Updates
@@ -350,6 +406,10 @@ begin_update(State)
            last_modified = LastModified} = State,
 
     case Origin of
+        {maxmind, Edition} ->
+            Headers = http_request_headers(LastModified),
+            {ok, FetcherPid} = locus_maxmind_download:start_link(Edition, Headers, FetcherOpts),
+            State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote,Edition} };
         {http, URL} ->
             Headers = http_request_headers(LastModified),
             {ok, FetcherPid} = locus_http_download:start_link(URL, Headers, FetcherOpts),
@@ -392,7 +452,7 @@ handle_fetcher_msg({event,Event}, State) ->
     end;
 handle_fetcher_msg({finished,Status}, State) ->
     #state{fetcher_pid = FetcherPid, fetcher_source = Source} = State,
-    expect_linked_process_termination(FetcherPid),
+    locus_util:expect_linked_process_termination(FetcherPid),
     UpdatedState = State#state{ fetcher_pid = undefined, fetcher_source = undefined },
     case Status of
         dismissed ->
@@ -407,7 +467,7 @@ handle_fetcher_msg({finished,Status}, State) ->
 handle_cacher_msg({finished,Status}, State) ->
     #state{cacher_pid = CacherPid, cacher_path = CacherPath, cacher_source = Source} = State,
 
-    expect_linked_process_termination(CacherPid),
+    locus_util:expect_linked_process_termination(CacherPid),
     UpdatedState = State#state{ cacher_pid = undefined,
                                 cacher_path = undefined,
                                 cacher_source = undefined },
@@ -678,15 +738,6 @@ fetched_database_modification_datetime({cache,_}, #{modified_on := ModificationD
     ModificationDate;
 fetched_database_modification_datetime({filesystem,_}, #{modified_on := ModificationDate}) ->
     ModificationDate.
-
--spec expect_linked_process_termination(pid()) -> boolean().
-expect_linked_process_termination(Pid) ->
-    case locus_util:flush_link_exit(Pid, 5000) of
-        true -> true;
-        false ->
-            exit(Pid, kill),
-            locus_util:flush_link_exit(Pid, 1000)
-    end.
 
 %-spec make_cached_database_blob(nonempty_string(), binary()) -> binary().
 make_cached_database_blob(CachedTarballPath, BinDatabase) ->
