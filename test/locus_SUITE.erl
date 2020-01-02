@@ -134,7 +134,7 @@ init_per_group(GroupName, Config) ->
             ok = locus_logger:set_loglevel(debug),
             ok = application:set_env(locus, license_key, license_key_from_environment()),
             % RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36), % FIXME
-            Edition = country,
+            Edition = 'GeoLite2-Country',
             [{is_http, true},
              {is_remote, true},
              {url_or_edition, Edition}

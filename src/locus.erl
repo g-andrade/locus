@@ -27,11 +27,9 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_loader/1]).                -ignore_xref({start_loader,1}).
 -export([start_loader/2]).                -ignore_xref({start_loader,2}).
 -export([start_loader/3]).                -ignore_xref({start_loader,3}).
 -export([stop_loader/1]).                 -ignore_xref({stop_loader,1}).
--export([loader_child_spec/1]).           -ignore_xref({loader_child_spec,1}).
 -export([loader_child_spec/2]).           -ignore_xref({loader_child_spec,2}).
 -export([loader_child_spec/3]).           -ignore_xref({loader_child_spec,3}).
 -export([loader_child_spec/4]).           -ignore_xref({loader_child_spec,4}).
@@ -69,7 +67,7 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
--type database_edition() :: country | city | asn | atom().
+-type database_edition() :: atom().
 -export_type([database_edition/0]).
 
 -type database_url() :: unicode:chardata().
@@ -103,30 +101,6 @@
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
-
-%% @doc Like `:start_loader/2' but only for MaxMind-hosted databases
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`ok' in case of success.</li>
-%% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
-%% </ul>
-%% @see wait_for_loader/1
-%% @see wait_for_loader/2
-%% @see start_loader/2
-%% @see start_loader/3
--spec start_loader(DatabaseEdition) -> ok | {error, Error}
-            when DatabaseEdition :: database_edition(),
-                 Error :: already_started | application_not_running.
-start_loader(DatabaseEdition)
-  when is_atom(DatabaseEdition) ->
-    DatabaseId = DatabaseEdition,
-    start_loader(DatabaseId, DatabaseEdition).
 
 %% @doc Like `:start_loader/3' but with default options
 %%
@@ -207,29 +181,6 @@ start_loader(DatabaseId, DatabaseURL, Opts)
                  Error :: not_found.
 stop_loader(DatabaseId) ->
     locus_database:stop(DatabaseId).
-
-%% @doc Like `:loader_child_spec/2' but only for MaxMind-hosted databases
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>A `supervisor:child_spec()'.</li>
-%% </ul>
-%% @see loader_child_spec/2
-%% @see loader_child_spec/3
-%% @see wait_for_loader/1
-%% @see wait_for_loader/2
-%% @see start_loader/2
--spec loader_child_spec(DatabaseEdition) -> ChildSpec
-            when DatabaseEdition :: database_edition(),
-                 ChildSpec :: locus_database:static_child_spec().
-loader_child_spec(DatabaseEdition)
-  when is_atom(DatabaseEdition) ->
-    loader_child_spec(DatabaseEdition, []).
 
 %% @doc Like `:loader_child_spec/2' but with default options
 %%
@@ -551,12 +502,6 @@ main(Args) ->
 
 -spec parse_database_edition(database_edition()) -> {maxmind, atom()}.
 %% @private
-parse_database_edition(country) ->
-    {maxmind, 'GeoLite2-Country'};
-parse_database_edition(city) ->
-    {maxmind, 'GeoLite2-City'};
-parse_database_edition(asn) ->
-    {maxmind, 'GeoLite2-ASN'};
 parse_database_edition(DatabaseEdition) ->
     {maxmind, DatabaseEdition}.
 
