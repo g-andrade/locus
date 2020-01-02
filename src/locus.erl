@@ -27,9 +27,11 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
+-export([start_loader/1]).                -ignore_xref({start_loader,1}).
 -export([start_loader/2]).                -ignore_xref({start_loader,2}).
 -export([start_loader/3]).                -ignore_xref({start_loader,3}).
 -export([stop_loader/1]).                 -ignore_xref({stop_loader,1}).
+-export([loader_child_spec/1]).           -ignore_xref({loader_child_spec,1}).
 -export([loader_child_spec/2]).           -ignore_xref({loader_child_spec,2}).
 -export([loader_child_spec/3]).           -ignore_xref({loader_child_spec,3}).
 -export([loader_child_spec/4]).           -ignore_xref({loader_child_spec,4}).
@@ -55,6 +57,19 @@
 %% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
+
+-define(might_be_chardata(V), (is_binary((V)) orelse ?is_proper_list((V)))).
+-define(is_proper_list(V), (length((V)) >= 0)).
+
+%% ------------------------------------------------------------------
+%% Type Definitions
+%% ------------------------------------------------------------------
+
+-type database_edition() :: country | city | asn | atom().
+-export_type([database_edition/0]).
+
+-type database_url() :: unicode:chardata().
+-export_type([database_url/0]).
 
 -type database_error() :: database_unknown | database_not_loaded.
 -export_type([database_error/0]).
@@ -85,54 +100,91 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Like `:start_loader/3' but with default options
+%% @doc Like `:start_loader/2' but only for MaxMind-hosted databases
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% </ul>
 %%
 %% Returns:
 %% <ul>
 %% <li>`ok' in case of success.</li>
-%% <li>`{error, invalid_url}' if the URL is invalid.</li>
+%% <li>`{error, invalid_url}' if the source is invalid.</li>
 %% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
 %% </ul>
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
+%% @see start_loader/2
 %% @see start_loader/3
--spec start_loader(DatabaseId, DatabaseURL) -> ok | {error, Error}
+-spec start_loader(DatabaseEdition) -> ok | {error, Error}
+            when DatabaseEdition :: database_edition(),
+                 Error :: already_started | application_not_running.
+start_loader(DatabaseEdition)
+  when is_atom(DatabaseEdition) ->
+    DatabaseId = DatabaseEdition,
+    start_loader(DatabaseId, DatabaseEdition).
+
+%% @doc Like `:start_loader/3' but with default options
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`ok' in case of success.</li>
+%% <li>`{error, invalid_url}' if the source is invalid.</li>
+%% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
+%% </ul>
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/1
+%% @see start_loader/3
+-spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL) -> ok | {error, Error}
             when DatabaseId :: atom(),
-                 DatabaseURL :: string() | binary(),
-                 Error :: (invalid_url | already_started |
-                           {invalid_opt,term()} | application_not_running).
-start_loader(DatabaseId, DatabaseURL) ->
-    start_loader(DatabaseId, DatabaseURL, []).
+                 DatabaseEdition :: database_edition(),
+                 DatabaseURL :: database_url(),
+                 Error :: invalid_url | already_started | application_not_running.
+start_loader(DatabaseId, DatabaseEditionOrURL) ->
+    start_loader(DatabaseId, DatabaseEditionOrURL, []).
 
 %% @doc Starts a database loader under id `DatabaseId' with options `Opts'.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
 %%
 %% Returns:
 %% <ul>
 %% <li>`ok' in case of success.</li>
-%% <li>`{error, invalid_url}' if the URL is invalid.</li>
+%% <li>`{error, invalid_url}' if the source is invalid.</li>
 %% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
 %% </ul>
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
+%% @see start_loader/1
 %% @see start_loader/2
--spec start_loader(DatabaseId, DatabaseURL, Opts) -> ok | {error, Error}
+-spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ok | {error, Error}
             when DatabaseId :: atom(),
-                 DatabaseURL :: string() | binary(),
+                 DatabaseEdition :: database_edition(),
+                 DatabaseURL :: database_url(),
                  Opts :: [locus_database:opt()],
                  Error :: (invalid_url | already_started |
                            {invalid_opt,term()} | application_not_running).
-start_loader(DatabaseId, DatabaseURL, Opts) ->
+start_loader(DatabaseId, DatabaseEdition, Opts)
+  when is_atom(DatabaseEdition) ->
+    Origin = parse_database_edition(DatabaseEdition),
+    OptsWithDefaults = opts_with_defaults(Opts),
+    locus_database:start(DatabaseId, Origin, OptsWithDefaults);
+start_loader(DatabaseId, DatabaseURL, Opts)
+  when ?might_be_chardata(DatabaseURL) ->
     case parse_url(DatabaseURL) of
         false ->
             {error, invalid_url};
@@ -154,33 +206,61 @@ start_loader(DatabaseId, DatabaseURL, Opts) ->
 stop_loader(DatabaseId) ->
     locus_database:stop(DatabaseId).
 
-%% @doc Like `:loader_child_spec/2' but with default options
+%% @doc Like `:loader_child_spec/2' but only for MaxMind-hosted databases
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% </ul>
 %%
 %% Returns:
 %% <ul>
 %% <li>A `supervisor:child_spec()'.</li>
 %% </ul>
+%% @see loader_child_spec/2
 %% @see loader_child_spec/3
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
 %% @see start_loader/2
--spec loader_child_spec(DatabaseId, DatabaseURL) -> ChildSpec | no_return()
-            when DatabaseId :: atom(),
-                 DatabaseURL :: string() | binary(),
+-spec loader_child_spec(DatabaseEdition) -> ChildSpec
+            when DatabaseEdition :: database_edition(),
                  ChildSpec :: locus_database:static_child_spec().
-loader_child_spec(DatabaseId, DatabaseURL) ->
-    loader_child_spec(DatabaseId, DatabaseURL, []).
+loader_child_spec(DatabaseEdition)
+  when is_atom(DatabaseEdition) ->
+    loader_child_spec(DatabaseEdition, []).
+
+%% @doc Like `:loader_child_spec/2' but with default options
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom.</li>
+%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>A `supervisor:child_spec()'.</li>
+%% </ul>
+%% @see loader_child_spec/1
+%% @see loader_child_spec/3
+%% @see wait_for_loader/1
+%% @see wait_for_loader/2
+%% @see start_loader/2
+-spec loader_child_spec(DatabaseId, DatabaseEdition | DatabaseURL) -> ChildSpec | no_return()
+            when DatabaseId :: atom(),
+                 DatabaseEdition :: database_edition(),
+                 DatabaseURL :: database_url(),
+                 ChildSpec :: locus_database:static_child_spec().
+loader_child_spec(DatabaseId, DatabaseEditionOrURL) ->
+    loader_child_spec(DatabaseId, DatabaseEditionOrURL, []).
 
 %% @doc Like `:loader_child_spec/3' but with default child id
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
 %%
@@ -188,23 +268,26 @@ loader_child_spec(DatabaseId, DatabaseURL) ->
 %% <ul>
 %% <li>A `supervisor:child_spec()'.</li>
 %% </ul>
+%% @see loader_child_spec/3
 %% @see loader_child_spec/4
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
 %% @see start_loader/3
--spec loader_child_spec(DatabaseId, DatabaseURL, Opts) -> ChildSpec | no_return()
+-spec loader_child_spec(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ChildSpec | no_return()
             when DatabaseId :: atom(),
-                 DatabaseURL :: string() | binary(),
+                 DatabaseEdition :: database_edition(),
+                 DatabaseURL :: database_url(),
                  Opts :: [locus_database:opt()],
                  ChildSpec :: locus_database:static_child_spec().
-loader_child_spec(DatabaseId, DatabaseURL, Opts) ->
-    loader_child_spec({locus_database,DatabaseId}, DatabaseId, DatabaseURL, Opts).
+loader_child_spec(DatabaseId, DatabaseEditionOrURL, Opts) ->
+    loader_child_spec({locus_database,DatabaseId}, DatabaseId, DatabaseEditionOrURL, Opts).
 
 %% @doc Returns a supervisor child spec for a database loader under id `DatabaseId' with options `Opts'.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseURL' must be either a string or a binary containing a HTTP(S) or filesystem URL.</li>
+%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
 %%
@@ -216,18 +299,26 @@ loader_child_spec(DatabaseId, DatabaseURL, Opts) ->
 %% @see wait_for_loader/1
 %% @see wait_for_loader/2
 %% @see start_loader/3
--spec loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts) -> ChildSpec | no_return()
+-spec loader_child_spec(ChildId, DatabaseId, DatabaseEdition | DatabaseURL, Opts)
+        -> ChildSpec | no_return()
             when ChildId :: term(),
                  DatabaseId :: atom(),
-                 DatabaseURL :: string() | binary(),
+                 DatabaseEdition :: database_edition(),
+                 DatabaseURL :: database_url(),
                  Opts :: [locus_database:opt()],
                  ChildSpec :: locus_database:static_child_spec().
-loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts) ->
+loader_child_spec(ChildId, DatabaseId, DatabaseEdition, Opts)
+  when is_atom(DatabaseEdition) ->
+    Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
+    locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults);
+loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
+  when ?might_be_chardata(DatabaseURL) ->
     case parse_url(DatabaseURL) of
         false ->
             error(invalid_url);
         Origin ->
+            OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults)
     end.
 
@@ -457,6 +548,17 @@ main(Args) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec parse_database_edition(database_edition()) -> {maxmind, atom()}.
+parse_database_edition(country) ->
+    {maxmind, 'GeoLite2-Country'};
+parse_database_edition(city) ->
+    {maxmind, 'GeoLite2-City'};
+parse_database_edition(asn) ->
+    {maxmind, 'GeoLite2-ASN'};
+parse_database_edition(DatabaseEdition) ->
+    {maxmind, DatabaseEdition}.
+
+-spec parse_url(database_url()) -> locus_database:origin() | false.
 parse_url(DatabaseURL) ->
     case parse_http_url(DatabaseURL) of
         {http, ParsedURL} ->
@@ -465,15 +567,22 @@ parse_url(DatabaseURL) ->
             parse_filesystem_url(DatabaseURL)
     end.
 
-parse_http_url(Binary) when is_binary(Binary) ->
-    String = binary_to_list(Binary),
-    parse_http_url(String);
-parse_http_url(String) ->
-    try io_lib:printable_latin1_list(String) andalso
-        http_uri:parse(String)
+parse_http_url(DatabaseURL) when is_list(DatabaseURL) ->
+    try unicode:characters_to_binary(DatabaseURL) of
+        <<BinaryChardata/bytes>> ->
+            parse_http_url(BinaryChardata);
+        _ ->
+            false
+    catch
+        _:_ -> false
+    end;
+parse_http_url(DatabaseURL) ->
+    ByteList = binary_to_list(DatabaseURL),
+    try io_lib:printable_latin1_list(ByteList) andalso
+        http_uri:parse(ByteList)
     of
         false -> false;
-        {ok, _Result} -> {http, String};
+        {ok, _Result} -> {http, ByteList};
         {error, _Reason} -> false
     catch
         error:badarg -> false

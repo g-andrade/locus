@@ -18,7 +18,8 @@
   {modules, []},
 
   {env,
-   [{log_level, error} % debug | info | warning | error
+   [{license_key, "YOUR_LICENSE_KEY"},
+    {log_level, error} % debug | info | warning | error
    ]},
 
   {licenses, ["MIT"]},

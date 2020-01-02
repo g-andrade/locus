@@ -143,23 +143,10 @@ decode_chunk(Chunk, FullData, Path) ->
 
 decode_utf8_string(Bytes) ->
     Copy = binary:copy(Bytes),
-    case is_utf8_binary(Copy) of
+    case locus_util:is_utf8_binary(Copy) of
         true -> Copy;
         _ -> error({not_utf8_text,Copy})
     end.
-
-is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<>>) ->
-    true;
-is_utf8_binary(<<_/bytes>>) ->
-    false.
 
 decode_map(Count, Chunk, FullData, Path) ->
     decode_map_recur(Count, Chunk, FullData, Path, []).

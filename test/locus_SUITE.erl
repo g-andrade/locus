@@ -448,7 +448,7 @@ database_still_loading_httptest(Config) ->
 invalid_args_test(Config) ->
     _ = process_flag(trap_exit, true),
     URL = proplists:get_value(url, Config),
-    NotAnURL = not_an_url,
+    NotAnURL = [{}],
     Loader = invalid_args_test,
     NotAnOpt = not_an_opt,
     InvalidOpts = [NotAnOpt],

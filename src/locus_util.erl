@@ -35,8 +35,13 @@
     lists_anymap/2,
     lists_take/2,
     bin_to_hex_str/1,
-    flush_link_exit/2,
-    dialyzer_opaque_atom/1
+    expect_linked_process_termination/1,
+    dialyzer_opaque_atom/1,
+    url_query_encode/1,
+    filesystem_safe_name/1,
+    is_utf8_binary/1,
+    is_unicode_string/1,
+    is_date/1
    ]).
 
 -ignore_xref(
@@ -104,17 +109,62 @@ bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
 bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
 
--spec flush_link_exit(pid(), timeout()) -> boolean().
-flush_link_exit(Pid, Timeout) ->
-    receive
-        {'EXIT', Pid, _} -> true
-    after
-        Timeout -> false
+-spec expect_linked_process_termination(pid()) -> boolean().
+expect_linked_process_termination(Pid) ->
+    case flush_link_exit(Pid, 5000) of
+        true -> true;
+        false ->
+            exit(Pid, kill),
+            flush_link_exit(Pid, 1000)
     end.
 
 -spec dialyzer_opaque_atom(atom()) -> atom().
 dialyzer_opaque_atom(Atom) ->
     list_to_atom( atom_to_list(Atom) ).
+
+-spec url_query_encode(unicode:chardata()) -> binary().
+url_query_encode(Chardata) ->
+    <<Binary/bytes>> = unicode:characters_to_binary(Chardata),
+    << <<(url_query_encode_codepoint(Codepoint))/bytes>> || <<Codepoint/utf8>> <= Binary >>.
+
+-spec filesystem_safe_name(binary()) -> binary().
+filesystem_safe_name(Name) ->
+    OnlyWordsAndSpaces = re:replace(Name, "[^\\w\\s-]+", "-", [global, unicode, ucp]),
+    re:replace(OnlyWordsAndSpaces, "[-\\s]+", "-", [global, unicode, ucp, {return, binary}]).
+
+-spec is_utf8_binary(term()) -> boolean().
+is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
+    is_utf8_binary(Next);
+is_utf8_binary(<<>>) ->
+    true;
+is_utf8_binary(_) ->
+    false.
+
+-spec is_unicode_string(term()) -> boolean().
+is_unicode_string(Value)
+  when length(Value) >= 0 ->
+    try unicode:characters_to_binary(Value) of
+        <<_/bytes>> -> true;
+        _ -> false
+    catch
+        _:_ -> false
+    end;
+is_unicode_string(_) ->
+    false.
+
+-spec is_date(term()) -> boolean().
+is_date(Date) ->
+    try calendar:valid_date(Date) of
+        IsValidDate -> IsValidDate
+    catch
+        _:_ -> false
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -127,3 +177,26 @@ lists_take_recur(Elem, [H|T], Acc) ->
     lists_take_recur(Elem, T, [H|Acc]);
 lists_take_recur(_, [], _) ->
     error.
+
+-spec flush_link_exit(pid(), timeout()) -> boolean().
+flush_link_exit(Pid, Timeout) ->
+    receive
+        {'EXIT', Pid, _} -> true
+    after
+        Timeout -> false
+    end.
+
+url_query_encode_codepoint(Codepoint)
+  when Codepoint >= $A, Codepoint =< $Z;
+       Codepoint >= $a, Codepoint =< $z;
+       Codepoint >= $0, Codepoint =< $9;
+       Codepoint =:= $*;
+       Codepoint =:= $-;
+       Codepoint =:= $.;
+       Codepoint =:= $_ ->
+    <<Codepoint>>;
+url_query_encode_codepoint($\ ) ->
+    <<$+>>;
+url_query_encode_codepoint(Codepoint) ->
+    UTF8Bytes = <<Codepoint/utf8>>,
+    << <<$%, (integer_to_binary(Byte, 16))/bytes>> || <<Byte>> <= UTF8Bytes >>.
