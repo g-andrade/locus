@@ -46,6 +46,10 @@
 
 -deprecated([{get_version,1,eventually}]).
 
+-ifdef(TEST).
+-export([parse_database_edition/1]).
+-endif.
+
 %% ------------------------------------------------------------------
 %% CLI-only Function Exports
 %% ------------------------------------------------------------------
@@ -549,6 +553,7 @@ main(Args) ->
 %% ------------------------------------------------------------------
 
 -spec parse_database_edition(database_edition()) -> {maxmind, atom()}.
+%% @private
 parse_database_edition(country) ->
     {maxmind, 'GeoLite2-Country'};
 parse_database_edition(city) ->

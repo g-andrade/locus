@@ -258,6 +258,6 @@ log_to_error_logger(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt ++ "~n",
     error_logger:(Fun)(FullFmt, Args).
 
--spec resumed_source(locus_loader:source()) -> maxmind | cache | remote | filesystem.
+-spec resumed_source(locus_loader:source()) -> cache | remote | filesystem.
 resumed_source({SourceType, _SourceLocation}) ->
     SourceType.

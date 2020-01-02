@@ -148,8 +148,7 @@
 -export_type([event_cache_attempt_finished/0]).
 
 -type source() ::
-    {maxmind, atom()} |
-    {remote, locus_http_download:url()} |
+    {remote, atom() | locus_http_download:url()} |
     locus_filesystem_load:source().
 -export_type([source/0]).
 
@@ -385,8 +384,15 @@ cached_database_path_for_url(URL) ->
     filename:join(DirectoryPath, Filename).
 
 -spec cache_directory_path() -> nonempty_string().
+-ifdef(TEST).
+cache_directory_path() ->
+    filename:join(
+      filename:basedir(user_cache, "locus_erlang"),
+      "tests").
+-else.
 cache_directory_path() ->
     filename:basedir(user_cache, "locus_erlang").
+-endif.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Database Updates
@@ -403,7 +409,7 @@ begin_update(State)
         {maxmind, Edition} ->
             Headers = http_request_headers(LastModified),
             {ok, FetcherPid} = locus_maxmind_download:start_link(Edition, Headers, FetcherOpts),
-            State#state{ fetcher_pid = FetcherPid, fetcher_source = {maxmind,Edition} };
+            State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote,Edition} };
         {http, URL} ->
             Headers = http_request_headers(LastModified),
             {ok, FetcherPid} = locus_http_download:start_link(URL, Headers, FetcherOpts),
@@ -498,8 +504,7 @@ handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified
     notify_owner({load_success, Source, Version, Parts}, State2),
 
     case Source of
-        {SourceType,_} when (SourceType =:= maxmind orelse SourceType =:= remote),
-                            (State2#state.settings)#settings.use_cache ->
+        {remote,_} when (State2#state.settings)#settings.use_cache ->
             CachedDatabasePath = cached_database_path(State2),
             CachedDatabaseBlob = make_cached_database_blob(CachedDatabasePath, BinDatabase),
             {ok, CacherPid} = locus_filesystem_store:start_link(CachedDatabasePath, CachedDatabaseBlob,
@@ -683,9 +688,7 @@ filename_extension_parts_recur(Filename, Acc) ->
     end.
 
 -spec fetched_database_format_and_blob(source(), fetcher_success()) -> {blob_format(), binary()}.
-fetched_database_format_and_blob({SourceType,_}, #{headers := Headers, body := Body})
-  when SourceType =:= maxmind;
-       SourceType =:= remote ->
+fetched_database_format_and_blob({remote,_}, #{headers := Headers, body := Body}) ->
     case {lists:keyfind("content-type", 1, Headers), Body} of
         {{_,"application/gzip"}, _} ->
             {gzip, Body};
@@ -723,9 +726,7 @@ fetched_database_format_and_blob({SourceType,Path}, #{content := Content})
     end.
 
 -spec fetched_database_modification_datetime(source(), fetcher_success()) -> calendar:datetime().
-fetched_database_modification_datetime({SourceType,_}, #{headers := Headers})
-  when SourceType =:= maxmind;
-       SourceType =:= remote ->
+fetched_database_modification_datetime({remote,_}, #{headers := Headers}) ->
     case lists:keyfind("last-modified", 1, Headers) of
         {"last-modified", LastModified} ->
             ({_,_} = ModificationDate) = httpd_util:convert_request_date(LastModified),
