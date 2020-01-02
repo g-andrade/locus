@@ -79,10 +79,10 @@ currently_checkedout_commit_is_likely_tagged() ->
         [_,_,_] -> true; % likely a tagged commit
         _ -> false
     end.
+-endif.
 
 license_key_from_environment() ->
     os:getenv("MAXMIND_LICENSE_KEY").
--endif.
 
 test_cases(Suffix) ->
     exported_functions_with_suffixes(["_test", Suffix]).
