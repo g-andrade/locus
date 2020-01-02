@@ -65,6 +65,9 @@
 -define(might_be_chardata(V), (is_binary((V)) orelse ?is_proper_list((V)))).
 -define(is_proper_list(V), (length((V)) >= 0)).
 
+-define(legacy_geolite2_http_url_prefix, "http://geolite.maxmind.com/download/geoip/database/GeoLite2-").
+-define(legacy_geolite2_https_url_prefix, "https://geolite.maxmind.com/download/geoip/database/GeoLite2-").
+
 %% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
@@ -148,7 +151,7 @@ start_loader(DatabaseEdition)
 %% @see wait_for_loader/2
 %% @see start_loader/1
 %% @see start_loader/3
--spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL) -> ok | {error, Error}
+-spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL) -> ok | {error, Error} | no_return()
             when DatabaseId :: atom(),
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
@@ -175,7 +178,7 @@ start_loader(DatabaseId, DatabaseEditionOrURL) ->
 %% @see wait_for_loader/2
 %% @see start_loader/1
 %% @see start_loader/2
--spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ok | {error, Error}
+-spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ok | {error, Error} | no_return()
             when DatabaseId :: atom(),
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
@@ -192,6 +195,10 @@ start_loader(DatabaseId, DatabaseURL, Opts)
     case parse_url(DatabaseURL) of
         false ->
             {error, invalid_url};
+        {http, ?legacy_geolite2_http_url_prefix ++ _} ->
+            error('Public access removed on 2019-12-30; you now need a license key.');
+        {http, ?legacy_geolite2_https_url_prefix ++ _} ->
+            error('Public access removed on 2019-12-30; you now need a license key.');
         Origin ->
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:start(DatabaseId, Origin, OptsWithDefaults)
@@ -321,6 +328,10 @@ loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
     case parse_url(DatabaseURL) of
         false ->
             error(invalid_url);
+        {http, ?legacy_geolite2_http_url_prefix ++ _} ->
+            error('Public access removed on 2019-12-30; you now need a license key.');
+        {http, ?legacy_geolite2_https_url_prefix ++ _} ->
+            error('Public access removed on 2019-12-30; you now need a license key.');
         Origin ->
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults)
