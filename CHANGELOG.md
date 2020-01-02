@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [1.9.0-beta] - 2020-01-02
 ### Added
 - support for loading databases with full awareness of license keys (now mandatory)
+### Deprecated
+- the use of discontinued "https://geolite.maxmind.com/download/geoip/database/GeoLite2-..." database URLs
 
 ## [1.8.0] - 2019-11-05
 ### Added
