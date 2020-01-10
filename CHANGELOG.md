@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- rejection of successful HTTP downloads if the body size doesn't match `content-length`
+
 ## [1.9.0-beta] - 2020-01-02
 ### Added
 - support for loading databases with full awareness of license keys (now mandatory)

@@ -322,14 +322,27 @@ handle_httpc_message(Msg, State)
             Body = iolist_to_binary(BodyAcc),
             BodySize = byte_size(Body),
             report_event({download_finished, BodySize, {ok,CiTrailingHeaders}}, State),
-            Success = #{headers => Headers, body => Body},
-            notify_owner({finished, {success, Success}}, State),
-            {stop, normal, State};
+            handle_successful_download_conclusion(Headers, Body, State);
         {_, {error, Reason}} ->
             #state{response_body = BodyAcc} = State,
             BodySizeSoFar = iolist_size(BodyAcc),
             report_event({download_finished, BodySizeSoFar, {error, Reason}}, State),
             notify_owner({finished, {error, {http,Reason}}}, State),
+            {stop, normal, State}
+    end.
+
+handle_successful_download_conclusion(Headers, Body, State) ->
+    ActualContentLength = integer_to_list( byte_size(Body) ),
+
+    case lists:keyfind("content-length", 1, Headers) of
+        {_, DeclaredContentLength} when DeclaredContentLength =/= ActualContentLength ->
+            ErrorReason = {body_size_mismatch, #{declared_content_length => DeclaredContentLength,
+                                                 actual_content_length => ActualContentLength}},
+            notify_owner({finished, {error, ErrorReason}}, State),
+            {stop, normal, State};
+        _ ->
+            Success = #{headers => Headers, body => Body},
+            notify_owner({finished, {success, Success}}, State),
             {stop, normal, State}
     end.
 
