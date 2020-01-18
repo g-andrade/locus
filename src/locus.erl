@@ -352,13 +352,13 @@ wait_for_loader(DatabaseId, Timeout) ->
                  Reason ::{DatabaseId,LoaderFailure} | timeout,
                  LoaderFailure :: database_unknown | {loading,term()}.
 wait_for_loaders(DatabaseIds, Timeout) ->
-    {WaiterPid, WaiterMon} = locus_waiter:start(DatabaseIds, Timeout),
-    case perform_wait(WaiterPid, WaiterMon) of
-        {ok, LoadedVersionPerDatabase} ->
-            {ok, LoadedVersionPerDatabase};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    ReplyRef = make_ref(),
+    UniqueDatabaseIds = lists:usort(DatabaseIds),
+    EmulateLegacyBehaviour = true,
+    WaiterOpts = [{emulate_legacy_behaviour, EmulateLegacyBehaviour}],
+    Waiters = [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
+               || DatabaseId <- UniqueDatabaseIds],
+    perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses.
 %%
@@ -586,31 +586,62 @@ info_from_db_parts(Parts) ->
 opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
 
-perform_wait(WaiterPid, WaiterMon) ->
-    receive
-        {WaiterPid, Result} ->
-            demonitor(WaiterMon, [flush]),
-            handle_waiter_result(Result);
-        {'DOWN', WaiterMon, _, _, Reason} ->
-            error({waiter_stopped, WaiterPid, Reason})
+perform_wait(_ReplyRef, [], Successes, Failures, EmulateLegacyBehaviour) ->
+    case map_size(Failures) =:= 0 of
+        true ->
+            {ok, Successes};
+        false ->
+            false = EmulateLegacyBehaviour, % an assertion of self-consistency
+            {error, #{successes => Successes, failures => Failures}}
+    end;
+perform_wait(ReplyRef, WaitersLeft, Successes, Failures, EmulateLegacyBehaviour) ->
+    case receive_waiter_reply(ReplyRef) of
+        {DatabaseId, {ok, Version}} ->
+            {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
+            UpdatedSuccesses = Successes#{ DatabaseId => Version },
+            perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses, Failures, EmulateLegacyBehaviour);
+        {DatabaseId, {error, Reason}}
+          when EmulateLegacyBehaviour ->
+            {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
+            stop_waiters(RemainingWaitersLeft),
+            flush_waiter_replies(ReplyRef),
+            case Reason =:= timeout of
+                true  -> {error, timeout};
+                false -> {error, {DatabaseId, Reason}}
+            end;
+        {DatabaseId, {error, Reason}} ->
+            {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
+            UpdatedFailures = Failures#{ DatabaseId => Reason },
+            perform_wait(ReplyRef, RemainingWaitersLeft, Successes, UpdatedFailures, EmulateLegacyBehaviour)
     end.
 
-handle_waiter_result({ok, LoadedVersionPerDatabase}) ->
-    {ok, LoadedVersionPerDatabase};
-handle_waiter_result({error, {DatabaseId, Reason}}) ->
-    {error, {DatabaseId, Reason}};
-handle_waiter_result({error, {stopped, DatabaseId, Reason}}) ->
-    case Reason of
-        noproc ->
-            {error, {DatabaseId, database_unknown}};
-        normal ->
-            {error, {DatabaseId, database_unknown}};
-        shutdown ->
-            {error, {DatabaseId, database_unknown}};
-        {shutdown,_} ->
-            {error, {DatabaseId, database_unknown}};
-        _ ->
-            exit(Reason)
-    end;
-handle_waiter_result({error, timeout}) ->
-    {error, timeout}.
+receive_waiter_reply(ReplyRef) ->
+    receive
+        {ReplyRef, DatabaseId, Reply} ->
+            {DatabaseId, Reply}
+    end.
+
+flush_waiter_replies(ReplyRef) ->
+    receive
+        {ReplyRef, _, _} ->
+            flush_waiter_replies(ReplyRef)
+    after
+        0 -> ok
+    end.
+
+stop_waiters(Waiters) ->
+    lists:foreach(
+      fun ({_DatabaseId, WaiterPid}) ->
+              WaiterMon = monitor(process, WaiterPid),
+              unlink(WaiterPid),
+              exit(WaiterPid, normal),
+              receive
+                  {'DOWN', WaiterMon, _, _, _} ->
+                      ok
+              after
+                  5000 -> % TODO make this concurrent, lest waiting periods accumulate
+                      demonitor(WaiterMon, [flush]),
+                      exit(WaiterPid, kill)
+              end
+      end,
+      Waiters).

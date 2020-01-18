@@ -63,8 +63,7 @@ ensure_apps_are_started(Apps) ->
 
 prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
     DatabaseId = cli_analysis,
-    WaitRef = make_ref(),
-    BaseOpts = [{internal, {async_waiter, WaitRef, self()}}],
+    BaseOpts = [{event_subscriber, self()}],
     ExtraOpts =
         case http_uri:parse(DatabaseURL) of
             {ok, _} -> [no_cache];
@@ -74,15 +73,15 @@ prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
     stderr_println("Loading database from \"~ts\"...", [DatabaseURL]),
     case locus:start_loader(DatabaseId, DatabaseURL, BaseOpts ++ ExtraOpts) of
         ok ->
-            wait_for_database_load(DatabaseId, WaitRef, LoadTimeout, SuccessHandler)
+            wait_for_database_load(DatabaseId, LoadTimeout, SuccessHandler)
     end.
 
-wait_for_database_load(DatabaseId, WaitRef, LoadTimeout, SuccessHandler) ->
+wait_for_database_load(DatabaseId, LoadTimeout, SuccessHandler) ->
     receive
-        {WaitRef, {ok, LoadedVersion}} ->
-            stderr_println("Database version ~p successfully loaded", [LoadedVersion]),
+        {locus, DatabaseId, {load_attempt_finished, _, {ok, Version}}} ->
+            stderr_println("Database version ~p successfully loaded", [Version]),
             SuccessHandler(DatabaseId);
-        {WaitRef, {error, Reason}} ->
+        {locus, DatabaseId, {load_attempt_finished, _, {error, Reason}}} ->
             fall_from_grace("Failed to load database: ~p", [Reason])
     after
         LoadTimeout ->

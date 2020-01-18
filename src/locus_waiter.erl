@@ -28,62 +28,97 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start/2]).
+-export([start/4]).
+
+%% ------------------------------------------------------------------
+%% Record and Type Definitions
+%% ------------------------------------------------------------------
+
+-type opt() :: {emulate_legacy_behaviour, boolean()}.
+-export_type([opt/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start([atom()], timeout()) -> {pid(), reference()}.
-start(DatabaseIds, Timeout) ->
+-spec start(reference(), [atom()], timeout(), [opt()]) -> pid().
+start(ReplyRef, DatabaseId, Timeout, Opts) ->
     OwnerPid = self(),
-    spawn_monitor(
+    spawn_link(
       fun () ->
-              run_waiter(OwnerPid, DatabaseIds, Timeout)
+              run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout, Opts)
       end).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-run_waiter(OwnerPid, DatabaseIds, Timeout) ->
+run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout, Opts) ->
+    _ = process_flag(trap_exit, true),
     _ = maybe_schedule_timeout(Timeout),
-    OwnerMon = monitor(process, OwnerPid),
-    WaitRefs = lists:map(fun locus_database:enqueue_waiter/1, DatabaseIds),
-    WaitList = lists:zip(WaitRefs, DatabaseIds),
-    run_waiter_loop(OwnerPid, OwnerMon, WaitList, #{}).
+    EmulateLegacyBehaviour = proplists:get_value(emulate_legacy_behaviour, Opts),
 
-run_waiter_loop(OwnerPid, _OwnerMon, [], Successes) ->
-    _ = OwnerPid ! {self(), {ok, Successes}},
-    exit(normal);
-run_waiter_loop(OwnerPid, OwnerMon, WaitList, Successes) ->
-    receive
-        Msg ->
-            handle_msg(Msg, OwnerPid, OwnerMon, WaitList, Successes)
+    case locus_database:get_version_or_subscribe(DatabaseId) of
+        {version, Version} ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {ok, Version});
+        {subscribed, DatabasePid} ->
+            DatabaseMon = monitor(process, DatabasePid),
+            wait_for_success(OwnerPid, DatabaseMon, ReplyRef, DatabaseId, Opts, []);
+        database_unknown 
+          when EmulateLegacyBehaviour, Timeout =:= 0 ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, timeout});
+        database_unknown ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, database_unknown})
     end.
 
-handle_msg(Msg, OwnerPid, OwnerMon, WaitList, Successes) ->
-    case Msg of
+-spec reply_to_owner(pid(), reference(), atom(), tuple()) -> no_return().
+reply_to_owner(OwnerPid, ReplyRef, DatabaseId, Reply) ->
+    _ = OwnerPid ! {ReplyRef, DatabaseId, Reply},
+    unlink(OwnerPid),
+    exit(normal).
+
+wait_for_success(OwnerPid, DatabaseMon, ReplyRef, DatabaseId, Opts, LoadAttemptFailures) ->
+    EmulateLegacyBehaviour = proplists:get_value(emulate_legacy_behaviour, Opts),
+
+    case receive_message(OwnerPid, DatabaseMon, DatabaseId) of
+        {event, {load_attempt_finished, {cache, _}, {error, not_found}}} ->
+            wait_for_success(OwnerPid, DatabaseMon, ReplyRef, DatabaseId, Opts, LoadAttemptFailures);
+        {event, {load_attempt_finished, _, {ok, Version}}} ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {ok, Version});
+        {event, {load_attempt_finished, _, {error, Reason}}}
+          when EmulateLegacyBehaviour ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, {loading, Reason}});
+        {event, {load_attempt_finished, _, {error, Reason}}} ->
+            UpdatedLoadAttemptFailures = [Reason | LoadAttemptFailures],
+            wait_for_success(OwnerPid, DatabaseMon, ReplyRef, DatabaseId, Opts, UpdatedLoadAttemptFailures);
+        {event, _} ->
+            wait_for_success(OwnerPid, DatabaseMon, ReplyRef, DatabaseId, Opts, LoadAttemptFailures);
+
+        timeout when LoadAttemptFailures =:= [] ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, timeout});
         timeout ->
-            _ = OwnerPid ! {self(), {error, timeout}},
-            exit(normal);
-        {'DOWN', OwnerMon, _, _, _} ->
-            exit(normal);
-        {'DOWN', Ref, _, _, Reason} ->
-            {_,DatabaseId} = lists:keyfind(Ref, 1, WaitList),
-            _ = OwnerPid ! {self(), {error, {stopped, DatabaseId, Reason}}},
-            exit(normal);
-        {Ref, {error,Reason}}
-          when is_reference(Ref) ->
-            {_,DatabaseId} = lists:keyfind(Ref, 1, WaitList),
-            _ = OwnerPid ! {self(), {error, {DatabaseId, Reason}}},
-            exit(normal);
-        {Ref, {ok,Version}}
-          when is_reference(Ref) ->
-            {value, {_,DatabaseId}, UpdatedWaitList} = lists:keytake(Ref, 1, WaitList),
-            demonitor(Ref, [flush]),
-            UpdatedSuccesses = Successes#{ DatabaseId => Version },
-            run_waiter_loop(OwnerPid, OwnerMon, UpdatedWaitList, UpdatedSuccesses)
+            Reason = {load_attempts, lists:reverse(LoadAttemptFailures)},
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, Reason});
+
+        {database_stopped, _Reason}
+          when EmulateLegacyBehaviour ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, database_unknown});
+        {database_stopped, Reason} ->
+            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, {stopped, Reason}});
+        owner_stopped ->
+            exit(normal)
+    end.
+
+receive_message(OwnerPid, DatabaseMon, DatabaseId) ->
+    receive
+        {locus, DatabaseId, Event} ->
+            {event, Event};
+        timeout ->
+            timeout;
+        {'DOWN', DatabaseMon, _, _, Reason} ->
+            {database_stopped, Reason};
+        {'EXIT', OwnerPid, _} ->
+            owner_stopped
     end.
 
 maybe_schedule_timeout(infinity) ->

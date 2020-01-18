@@ -479,28 +479,6 @@ subscriber_death_test(Config) ->
     ?assertEqual(OriginalPid, locus_database:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
-async_waiter_success_test(Config) ->
-    URLOrEdition = proplists:get_value(url_or_edition, Config),
-    Loader = async_waiter_success_test,
-    Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
-    ok = locus:start_loader(Loader, URLOrEdition, LoaderOpts),
-    ?assertRecv({Ref, {ok, _LoadedVersion}}),
-    ok = locus:stop_loader(Loader).
-
-async_waiter_failure_fstest(Config) ->
-    async_waiter_failure_localhttptest(Config).
-
-async_waiter_failure_localhttptest(Config) ->
-    BaseURL = proplists:get_value(base_url, Config),
-    URL = BaseURL ++ "/foobarbarfoofoobar",
-    Loader = async_waiter_failure_test,
-    Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
-    ok = locus:start_loader(Loader, URL, LoaderOpts),
-    ?assertRecv({Ref, {error, _Reason}}),
-    ok = locus:stop_loader(Loader).
-
 loader_child_spec_test(Config) ->
     _ = process_flag(trap_exit, true),
     URLOrEdition = proplists:get_value(url_or_edition, Config),
