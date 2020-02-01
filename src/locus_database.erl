@@ -230,7 +230,9 @@ init([Id, Origin, Opts]) ->
     end.
 
 -spec handle_call(term(), {pid(),reference()}, state())
-        -> {stop, unexpected_call, state()}.
+        -> {reply, {subscribed, pid()}, state()} |
+           {reply, {version, calendar:datetime()}, state()} |
+           {stop, unexpected_call, state()}.
 %% @private
 handle_call(get_version_or_subscribe, {Pid, _}, State) ->
     case State#state.last_version of
@@ -248,8 +250,7 @@ handle_call(_Call, _From, State) ->
     {stop, unexpected_call, State}.
 
 -spec handle_cast(term(), state())
-        -> {noreply, state()} |
-           {stop, unexpected_cast, state()}.
+        -> {stop, unexpected_cast, state()}.
 %% @private
 handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
