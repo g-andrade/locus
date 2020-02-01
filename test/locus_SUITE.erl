@@ -246,8 +246,9 @@ update_works_httptest(_IsRemote, Config) ->
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Path = proplists:get_value(path, Config),
     Loader = update_works_httptest,
-    PostReadinessUpdatePeriod = 200,
-    LoaderOpts = [no_cache, {post_readiness_update_period, PostReadinessUpdatePeriod},
+    UpdatePeriod = 200,
+    LoaderOpts = [no_cache,
+                  {update_period, UpdatePeriod},
                   {event_subscriber, self()}],
     %%
     ok = set_file_mtime(Path, ?VERSION1_TIMESTAMP),
@@ -264,13 +265,13 @@ update_works_httptest(_IsRemote, Config) ->
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
     ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
-    ?assert(MillisecondsElapsedA / PostReadinessUpdatePeriod >= 0.90),
+    ?assert(MillisecondsElapsedA / UpdatePeriod >= 0.90),
     %%
     {TimeElapsedB, _} = timer:tc(fun () -> ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}) end),
     MillisecondsElapsedB = TimeElapsedB / 1000,
     ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedB]),
     ?assertRecv({locus, Loader, {download_dismissed, {http, {304,_}, _Headers, _Body}}}),
-    ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod >= 0.90),
+    ?assert(MillisecondsElapsedB / UpdatePeriod >= 0.90),
     %%
     ok = locus:stop_loader(Loader).
 

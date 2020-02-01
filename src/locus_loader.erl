@@ -65,12 +65,6 @@
 -define(HIBERNATE_AFTER, (timer:seconds(5))).
 -endif.
 
--define(DEFAULT_HTTP_UNREADY_UPDATE_PERIOD, (timer:minutes(1))).
--define(DEFAULT_HTTP_READY_UPDATE_PERIOD, (timer:hours(6))).
-
--define(DEFAULT_FS_UNREADY_UPDATE_PEROID, (timer:seconds(5))).
--define(DEFAULT_FS_READY_UPDATE_PERIOD, (timer:seconds(30))).
-
 -define(is_pos_integer(V), ((is_integer((V)) andalso ((V) >= 1)))).
 
 % https://en.wikipedia.org/wiki/Gzip
@@ -84,10 +78,32 @@
 -export_type([opt/0]).
 
 -type loader_opt() ::
-    {pre_readiness_update_period, pos_integer()} |
-    {post_readiness_update_period, pos_integer()} |
-    no_cache.
+    {update_period, milliseconds_interval()} |
+    {error_retries, error_retry_behaviour()} |
+    no_cache |
+    deprecated_loader_opt().
 -export_type([loader_opt/0]).
+
+-type milliseconds_interval() :: pos_integer().
+-export_type([milliseconds_interval/0]).
+
+-type error_retry_behaviour() ::
+    {backoff, milliseconds_interval()} |
+    {exponential_backoff, exponential_backoff_params()}.
+-export_type([error_retry_behaviour/0]).
+
+-type exponential_backoff_params() ::
+    #{min_interval := milliseconds_interval(),
+      max_interval := milliseconds_interval(),
+      growth_base := milliseconds_interval(),
+      growth_exponent := number()
+     }.
+-export_type([exponential_backoff_params/0]).
+
+-type deprecated_loader_opt() ::
+    {pre_readiness_update_period, milliseconds_interval()} |
+    {post_readiness_update_period, milliseconds_interval()}.
+-export_type([deprecated_loader_opt/0]).
 
 -type fetcher_opt() :: locus_http_download:opt().
 -export_type([fetcher_opt/0]).
@@ -108,6 +124,7 @@
 
           fetcher_pid :: pid() | undefined,
           fetcher_source :: source() | undefined,
+          error_backoff_count :: non_neg_integer(),
 
           cacher_pid :: pid() | undefined,
           cacher_path :: locus_filesystem_store:path() | undefined,
@@ -116,8 +133,9 @@
 -type state() :: #state{}.
 
 -record(settings, {
-          unready_update_period :: pos_integer(),
-          ready_update_period :: pos_integer(),
+          update_period :: pos_integer(),
+          error_retry_behaviour :: error_retry_behaviour(),
+          error_retry_behaviour_applies_after_readiness :: boolean(),
           use_cache :: boolean()
          }).
 -type settings() :: #settings{}.
@@ -191,14 +209,15 @@ start_link(DatabaseId, Origin, LoaderOpts, FetcherOpts) ->
 init([OwnerPid, DatabaseId, Origin, LoaderOpts, FetcherOpts]) ->
     _ = process_flag(trap_exit, true),
     DefaultSettings = default_settings(Origin),
-    Settings = customized_settings(DefaultSettings, LoaderOpts),
+    Settings = customized_settings(DatabaseId, DefaultSettings, LoaderOpts),
     State =
         #state{
            owner_pid = OwnerPid,
            database_id = DatabaseId,
            origin = Origin,
            settings = Settings,
-           fetcher_opts = FetcherOpts
+           fetcher_opts = FetcherOpts,
+           error_backoff_count = 0
           },
     self() ! finish_initialization,
     {ok, State}.
@@ -275,12 +294,19 @@ validate_fetcher_opts({filesystem,_}, MixedOpts) ->
 validate_loader_opts(MixedOpts, FetcherOpts) ->
     try
         lists:partition(
-          fun ({pre_readiness_update_period, Interval} = Opt) ->
+          fun ({update_period, Interval} = Opt) ->
+                  ?is_pos_integer(Interval) orelse error({badopt,Opt});
+              ({error_retries, Behaviour} = Opt) ->
+                  is_error_retry_behaviour(Behaviour) orelse error({badopt,Opt});
+              (no_cache) ->
+                  true;
+              %
+              % Legacy options
+              %
+              ({pre_readiness_update_period, Interval} = Opt) ->
                   ?is_pos_integer(Interval) orelse error({badopt,Opt});
               ({post_readiness_update_period, Interval} = Opt) ->
                   ?is_pos_integer(Interval) orelse error({badopt,Opt});
-              (no_cache) ->
-                  true;
               (_) ->
                   false
           end,
@@ -293,6 +319,21 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
             {error, BadOpt}
     end.
 
+-spec is_error_retry_behaviour(term()) -> boolean().
+is_error_retry_behaviour({backoff, Interval}) ->
+    ?is_pos_integer(Interval);
+is_error_retry_behaviour({exponential_backoff, #{min_interval := MinInterval,
+                                                 max_interval := MaxInterval,
+                                                 growth_base := GrowthBase,
+                                                 growth_exponent := GrowthExponent}}) ->
+    ?is_pos_integer(MinInterval)
+    andalso ?is_pos_integer(MaxInterval)
+    andalso ?is_pos_integer(GrowthBase)
+    andalso is_number(GrowthExponent) andalso GrowthExponent >= 0
+    andalso MaxInterval >= MinInterval;
+is_error_retry_behaviour(_) ->
+    false.
+
 -spec default_settings(origin()) -> settings().
 default_settings({maxmind,_}) ->
     default_http_origin_settings();
@@ -304,30 +345,68 @@ default_settings({filesystem,_}) ->
 -spec default_http_origin_settings() -> settings().
 default_http_origin_settings() ->
     #settings{
-       unready_update_period = ?DEFAULT_HTTP_UNREADY_UPDATE_PERIOD,
-       ready_update_period = ?DEFAULT_HTTP_READY_UPDATE_PERIOD,
+       update_period = timer:hours(6),
+       error_retry_behaviour = default_http_origin_error_retry_behaviour(),
+       error_retry_behaviour_applies_after_readiness = true,
        use_cache = true
       }.
+
+default_http_origin_error_retry_behaviour() ->
+    {exponential_backoff, #{min_interval => timer:seconds(1),
+                            max_interval => timer:minutes(2),
+                            growth_base => timer:seconds(2),
+                            growth_exponent => 0.625}}.
 
 -spec default_filesystem_origin_settings() -> settings().
 default_filesystem_origin_settings() ->
     #settings{
-       unready_update_period = ?DEFAULT_FS_UNREADY_UPDATE_PEROID,
-       ready_update_period = ?DEFAULT_FS_READY_UPDATE_PERIOD,
+       update_period = timer:seconds(30),
+       error_retry_behaviour = default_filesystem_origin_error_retry_behaviour(),
+       error_retry_behaviour_applies_after_readiness = true,
        use_cache = false
       }.
 
--spec customized_settings(settings(), [loader_opt()]) -> settings().
-customized_settings(Settings, LoaderOpts) ->
+default_filesystem_origin_error_retry_behaviour() ->
+    {exponential_backoff, #{min_interval => timer:seconds(1),
+                            max_interval => timer:seconds(30),
+                            growth_base => timer:seconds(2),
+                            growth_exponent => 1.0}}.
+
+-spec customized_settings(atom(), settings(), [loader_opt()]) -> settings().
+customized_settings(DatabaseId, Settings, LoaderOpts) ->
     lists:foldl(
-      fun ({pre_readiness_update_period, Interval}, Acc) ->
-              Acc#settings{ unready_update_period = Interval };
-          ({post_readiness_update_period, Interval}, Acc) ->
-              Acc#settings{ ready_update_period = Interval };
+      fun ({update_period, Interval}, Acc) ->
+              Acc#settings{ update_period = Interval };
+          ({error_retries, Behaviour}, Acc) ->
+              Acc#settings{ error_retry_behaviour = Behaviour };
           (no_cache, Acc) ->
-              Acc#settings{ use_cache = false}
+              Acc#settings{ use_cache = false};
+          %
+          % Legacy options
+          %
+          ({pre_readiness_update_period, Interval} = Opt, Acc) ->
+              log_warning_on_use_of_legacy_opt(DatabaseId, Opt),
+              ErrorRetryBehaviour = {backoff, Interval},
+              Acc#settings{ error_retry_behaviour = ErrorRetryBehaviour,
+                            error_retry_behaviour_applies_after_readiness = false };
+          ({post_readiness_update_period, Interval} = Opt, Acc) ->
+              log_warning_on_use_of_legacy_opt(DatabaseId, Opt),
+              Acc#settings{ update_period = Interval }
       end,
       Settings, LoaderOpts).
+
+log_warning_on_use_of_legacy_opt(DatabaseId, {pre_readiness_update_period, Interval}) ->
+    locus_logger:log_warning(
+      "[~ts] You've specified the following legacy option: {pre_readiness_update_period, ~b}.~n"
+      "However, the default behaviour is now exponential backoff, and therefore much improved.~n"
+      "If you don't want to give it a chance and prefer to keep constant backoffs~n"
+      "while silencing this warning, use `{error_retries, {backoff, ~b}}` instead.",
+      [DatabaseId, Interval]);
+log_warning_on_use_of_legacy_opt(DatabaseId, {post_readiness_update_period, Interval}) ->
+    locus_logger:log_warning(
+      "[~ts] You've specified the following legacy option: {post_readiness_update_period, ~b}.~n"
+      "To silence this warning, use {update_period, ~b} instead.",
+      [DatabaseId, Interval, Interval]).
 
 -spec finish_initialization(state()) -> state().
 finish_initialization(State)
@@ -339,7 +418,7 @@ finish_initialization(State)
 finish_initialization(State) ->
     schedule_update(0, State).
 
--spec schedule_update(non_neg_integer(), state()) -> state().
+-spec schedule_update(0 | milliseconds_interval(), state()) -> state().
 schedule_update(Interval, State)
   when State#state.update_timer =:= undefined ->
     NewTimer = erlang:send_after(Interval, self(), begin_update),
@@ -471,20 +550,19 @@ handle_cacher_msg({finished,Status}, State) ->
     UpdatedState = State#state{ cacher_pid = undefined,
                                 cacher_path = undefined,
                                 cacher_source = undefined },
-
     case Status of
         success ->
             report_event({cache_attempt_finished, CacherPath, ok}, UpdatedState),
-            handle_update_conclusion(Source, UpdatedState);
+            handle_load_attempt_conclusion(Source, reset, UpdatedState);
         {error, Reason} ->
             report_event({cache_attempt_finished, CacherPath, {error,Reason}}, UpdatedState),
-            handle_update_conclusion(Source, UpdatedState)
+            handle_load_attempt_conclusion(Source, reset, UpdatedState)
     end.
 
 -spec handle_database_fetch_dismissal(source(), state()) -> {noreply, state()}.
 handle_database_fetch_dismissal(Source, State)
   when State#state.last_modified =/= undefined -> % sanity check
-    handle_update_conclusion(Source, State).
+    handle_load_attempt_conclusion(Source, reset, State).
 
 -spec handle_database_fetch_success(source(), fetcher_success(), state()) -> {noreply, state()}.
 handle_database_fetch_success(Source, Success, State) ->
@@ -514,39 +592,70 @@ handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified
                                    cacher_source = Source },
             {noreply, State3};
         _ ->
-            handle_update_conclusion(Source, State2)
+            handle_load_attempt_conclusion(Source, reset, State2)
     end.
 
 -spec handle_database_decode_error(source(), term(), state()) -> {noreply, state()}.
 handle_database_decode_error(Source, Reason, State) ->
     notify_owner({load_failure, Source, Reason}, State),
-    handle_update_conclusion(Source, State).
+    handle_load_attempt_conclusion(Source, +1, State).
 
 -spec handle_database_fetch_error(source(), term(), state()) -> {noreply, state()}.
 handle_database_fetch_error(Source, Reason, State) ->
     notify_owner({load_failure, Source, Reason}, State),
-    handle_update_conclusion(Source, State).
-
--spec handle_update_conclusion(source(), state()) -> {noreply, state()}.
-handle_update_conclusion(Source, State) ->
-    TimeToNextUpdate = time_to_next_update(Source, State),
-    UpdatedState = schedule_update(TimeToNextUpdate, State),
-    {noreply, UpdatedState}.
-
--spec time_to_next_update(source(), state()) -> non_neg_integer().
-time_to_next_update(LastFetchSource, State) ->
-    #state{settings = Settings, last_modified = LastModified} = State,
-    #settings{ready_update_period = ReadyPeriod, unready_update_period = UnreadyPeriod} = Settings,
-    HasVersionLoaded = (LastModified =/= undefined),
-
-    case LastFetchSource of
-        {cache,_} ->
-            0; % XXX document this exception
-        _ when HasVersionLoaded ->
-            ReadyPeriod;
-        _ ->
-            UnreadyPeriod
+    case Source of
+        {cache,_} -> handle_load_attempt_conclusion(Source, reset, State);
+        _         -> handle_load_attempt_conclusion(Source, +1, State)
     end.
+
+-spec handle_load_attempt_conclusion(source(), reset | +1, state()) -> {noreply, state()}.
+handle_load_attempt_conclusion(Source, ErrorBackoffUpdate, State) ->
+    State2 = update_error_backoff_count(ErrorBackoffUpdate, State),
+    TimeToNextUpdate = time_to_next_update(Source, State2),
+    State3 = schedule_update(TimeToNextUpdate, State2),
+    {noreply, State3}.
+
+-spec update_error_backoff_count(reset | +1, state()) -> state().
+update_error_backoff_count(reset, State) ->
+    State#state{ error_backoff_count = 0 };
+update_error_backoff_count(Increment, State) ->
+    Current = State#state.error_backoff_count,
+    State#state{ error_backoff_count = Current + Increment }.
+
+-spec time_to_next_update(source(), state()) -> milliseconds_interval().
+time_to_next_update(LastFetchSource, State) ->
+    #state{settings = Settings, error_backoff_count = ErrorBackoffCount} = State,
+    {LastFetchSourceType, _} = LastFetchSource,
+    HasAchievedReadiness = (State#state.last_modified =/= undefined),
+
+    if LastFetchSourceType =:= cache ->
+           0;
+
+       ErrorBackoffCount > 0,
+       (Settings#settings.error_retry_behaviour_applies_after_readiness
+        orelse not HasAchievedReadiness) ->
+           error_backoff_interval(ErrorBackoffCount, Settings#settings.error_retry_behaviour);
+
+       HasAchievedReadiness ->
+           Settings#settings.update_period
+    end.
+
+-spec error_backoff_interval(pos_integer(), error_retry_behaviour()) -> milliseconds_interval().
+error_backoff_interval(_, {backoff, Interval}) ->
+    Interval;
+error_backoff_interval(Count, {exponential_backoff, Params}) ->
+    exponential_error_backoff_interval(Count, Params).
+
+exponential_error_backoff_interval(1, Params) ->
+    #{min_interval := Min} = Params,
+    Min;
+exponential_error_backoff_interval(Count, Params) ->
+    #{min_interval := Min, max_interval := Max,
+      growth_base := GrowthBase, growth_exponent := GrowthExponent} = Params,
+
+    MultipliedGrowthExponent = Count * GrowthExponent,
+    Growth = math:pow(GrowthBase, MultipliedGrowthExponent),
+    min(Max, Min + trunc(Growth)).
 
 -spec decode_database_from_blob(source(), blob_format(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |

@@ -37,6 +37,7 @@
     bin_to_hex_str/1,
     expect_linked_process_termination/1,
     dialyzer_opaque_atom/1,
+    dialyzer_opaque_term/1,
     url_query_encode/1,
     filesystem_safe_name/1,
     is_utf8_binary/1,
@@ -121,6 +122,10 @@ expect_linked_process_termination(Pid) ->
 -spec dialyzer_opaque_atom(atom()) -> atom().
 dialyzer_opaque_atom(Atom) ->
     list_to_atom( atom_to_list(Atom) ).
+
+-spec dialyzer_opaque_term(term()) -> term().
+dialyzer_opaque_term(Term) ->
+    binary_to_term( term_to_binary(Term) ).
 
 -spec url_query_encode(unicode:chardata()) -> binary().
 url_query_encode(Chardata) ->

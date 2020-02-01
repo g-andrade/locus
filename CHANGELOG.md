@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Added
 - rejection of successful HTTP downloads if the body size doesn't match `content-length`
+### Changed
+- default behaviour upon failing to load a database, as to retry while exponentially backing off
+  (using very short intervals at first)
 
 ## [1.9.0-beta] - 2020-01-02
 ### Added
