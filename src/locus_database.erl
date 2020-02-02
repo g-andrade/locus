@@ -34,7 +34,7 @@
     start_link/3,
     dynamic_child_spec/1,
     static_child_spec/4,
-    get_version_or_subscribe/1
+    async_get_version_or_subscribe/1
    ]).
 
 -ignore_xref(
@@ -182,22 +182,14 @@ static_child_spec(ChildId, DatabaseId, Origin, Opts) ->
        modules => [?MODULE]
      }.
 
--spec get_version_or_subscribe(atom()) -> {version, calendar:datetime()} |
-                                          {subscribed, pid()} |
-                                          database_unknown.
+-spec async_get_version_or_subscribe(atom()) -> {await, reference()}.
 %% @private
-get_version_or_subscribe(Id) ->
+async_get_version_or_subscribe(Id) ->
     ServerName = server_name(Id),
-    try gen_server:call(ServerName, get_version_or_subscribe) of
-        Reply -> Reply
-    catch
-        exit:{Reason, {gen_server, call, [ServerName|_]}}
-          when Reason =:= noproc;
-               Reason =:= normal;
-               Reason =:= shutdown;
-               element(1, Reason) =:= shutdown, tuple_size(Reason) =:= 2 ->
-            database_unknown
-    end.
+    ServerPid = erlang:whereis(ServerName),
+    Ref = monitor(process, ServerPid),
+    gen_server:cast(ServerPid, {get_version_or_subscribe, {self(), Ref}}),
+    {await, Ref}.
 
 -ifdef(TEST).
 %% @private
@@ -230,11 +222,16 @@ init([Id, Origin, Opts]) ->
     end.
 
 -spec handle_call(term(), {pid(),reference()}, state())
-        -> {reply, {subscribed, pid()}, state()} |
-           {reply, {version, calendar:datetime()}, state()} |
-           {stop, unexpected_call, state()}.
+        -> {stop, unexpected_call, state()}.
 %% @private
-handle_call(get_version_or_subscribe, {Pid, _}, State) ->
+handle_call(_Call, _From, State) ->
+    {stop, unexpected_call, State}.
+
+-spec handle_cast(term(), state())
+        -> {noreply, state()} |
+           {stop, unexpected_cast, state()}.
+%% @private
+handle_cast({get_version_or_subscribe, {Pid, Ref}}, State) ->
     case State#state.last_version of
         undefined ->
             Mon = monitor(process, Pid),
@@ -242,16 +239,11 @@ handle_call(get_version_or_subscribe, {Pid, _}, State) ->
             UpdatedSubscriberMons = maps:put(Mon, Pid, State#state.subscriber_mons),
             UpdatedState = State#state{ subscribers = UpdatedSubscribers,
                                         subscriber_mons = UpdatedSubscriberMons },
-            {reply, {subscribed, self()}, UpdatedState};
+            {noreply, UpdatedState};
         LastVersion ->
-            {reply, {version, LastVersion}, State}
+            _ = Pid ! {Ref, {version, LastVersion}},
+            {noreply, State}
     end;
-handle_call(_Call, _From, State) ->
-    {stop, unexpected_call, State}.
-
--spec handle_cast(term(), state())
-        -> {stop, unexpected_cast, state()}.
-%% @private
 handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
 

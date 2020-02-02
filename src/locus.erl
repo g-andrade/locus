@@ -33,20 +33,31 @@
 -export([loader_child_spec/2]).           -ignore_xref({loader_child_spec,2}).
 -export([loader_child_spec/3]).           -ignore_xref({loader_child_spec,3}).
 -export([loader_child_spec/4]).           -ignore_xref({loader_child_spec,4}).
--export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
--export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
--export([wait_for_loaders/2]).            -ignore_xref({wait_for_loaders,2}).
+-export([await_loader/1]).                -ignore_xref({await_loader,1}).
+-export([await_loader/2]).                -ignore_xref({await_loader,2}).
+-export([await_loaders/2]).               -ignore_xref({await_loaders,2}).
 -export([lookup/2]).                      -ignore_xref({lookup,2}).
--export([get_version/1]).                 -ignore_xref({get_version,1}).
 -export([get_info/1]).                    -ignore_xref({get_info,1}).
 -export([get_info/2]).                    -ignore_xref({get_info,2}).
 -export([analyze/1]).                     -ignore_xref({analyze,1}).
 
--deprecated([{get_version,1,eventually}]).
-
 -ifdef(TEST).
 -export([parse_database_edition/1]).
 -endif.
+
+%% ------------------------------------------------------------------
+%% Deprecated API Function Exports
+%% ------------------------------------------------------------------
+
+-export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
+-export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
+-export([wait_for_loaders/2]).            -ignore_xref({wait_for_loaders,2}).
+-export([get_version/1]).                 -ignore_xref({get_version,1}).
+
+-deprecated([{wait_for_loader,1,eventually}]).
+-deprecated([{wait_for_loader,2,eventually}]).
+-deprecated([{wait_for_loaders,2,eventually}]).
+-deprecated([{get_version,1,eventually}]).
 
 %% ------------------------------------------------------------------
 %% CLI-only Function Exports
@@ -116,8 +127,8 @@
 %% <li>`{error, invalid_url}' if the source is invalid.</li>
 %% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
 %% </ul>
-%% @see wait_for_loader/1
-%% @see wait_for_loader/2
+%% @see await_loader/1
+%% @see await_loader/2
 %% @see start_loader/1
 %% @see start_loader/3
 -spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL) -> ok | {error, Error}
@@ -143,8 +154,8 @@ start_loader(DatabaseId, DatabaseEditionOrURL) ->
 %% <li>`{error, invalid_url}' if the source is invalid.</li>
 %% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
 %% </ul>
-%% @see wait_for_loader/1
-%% @see wait_for_loader/2
+%% @see await_loader/1
+%% @see await_loader/2
 %% @see start_loader/1
 %% @see start_loader/2
 -spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ok | {error, Error}
@@ -196,8 +207,8 @@ stop_loader(DatabaseId) ->
 %% </ul>
 %% @see loader_child_spec/1
 %% @see loader_child_spec/3
-%% @see wait_for_loader/1
-%% @see wait_for_loader/2
+%% @see await_loader/1
+%% @see await_loader/2
 %% @see start_loader/2
 -spec loader_child_spec(DatabaseId, DatabaseEdition | DatabaseURL) -> ChildSpec | no_return()
             when DatabaseId :: atom(),
@@ -222,8 +233,8 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL) ->
 %% </ul>
 %% @see loader_child_spec/3
 %% @see loader_child_spec/4
-%% @see wait_for_loader/1
-%% @see wait_for_loader/2
+%% @see await_loader/1
+%% @see await_loader/2
 %% @see start_loader/3
 -spec loader_child_spec(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ChildSpec | no_return()
             when DatabaseId :: atom(),
@@ -248,8 +259,8 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL, Opts) ->
 %% <li>A `supervisor:child_spec()'.</li>
 %% </ul>
 %% @see loader_child_spec/3
-%% @see wait_for_loader/1
-%% @see wait_for_loader/2
+%% @see await_loader/1
+%% @see await_loader/2
 %% @see start_loader/3
 -spec loader_child_spec(ChildId, DatabaseId, DatabaseEdition | DatabaseURL, Opts)
         -> ChildSpec | no_return()
@@ -274,7 +285,7 @@ loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
             locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults)
     end.
 
-%% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails.
+%% @doc Like `await_loader/1' but with a default timeout of 30 seconds.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
@@ -284,20 +295,21 @@ loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
 %% <ul>
 %% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
+%% <li>`{error, {database_stopped, _}}' if the database loader for `DatabaseId' stopped while we waited.</li>
+%% <li>`{error, {timeout, [_]}}' if all the load attempts performed before timing out have failed.</li>
 %% </ul>
-%%
-%% @see wait_for_loader/2
-%% @see start_loader/2
--spec wait_for_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
+%% @see await_loader/2
+-spec await_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Reason}
             when DatabaseId :: atom(),
                  LoadedVersion :: database_version(),
-                 Error :: database_unknown | {loading, LoadingError},
-                 LoadingError :: term().
-wait_for_loader(DatabaseId) ->
-    wait_for_loader(DatabaseId, infinity).
+                 Reason :: (database_unknown |
+                            {database_stopped, term()} |
+                            {timeout, LoadAttemptFailures}),
+                 LoadAttemptFailures :: [term()].
+await_loader(DatabaseId) ->
+    await_loader(DatabaseId, 30000).
 
-%% @doc Like `wait_for_loader/1' but it can time-out.
+%% @doc Blocks caller execution until either readiness is achieved or the default timeout is triggered.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
@@ -308,28 +320,27 @@ wait_for_loader(DatabaseId) ->
 %% <ul>
 %% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
+%% <li>`{error, {database_stopped, _}}' if the database loader for `DatabaseId' stopped while we waited.</li>
+%% <li>`{error, {timeout, [_]}}' if all the load attempts performed before timing out have failed.</li>
 %% </ul>
-%% @see wait_for_loader/1
-%% @see start_loader/2
--spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
+%% @see await_loader/1
+%% @see await_loaders/2
+-spec await_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
             when DatabaseId :: atom(),
                  Timeout :: timeout(),
                  LoadedVersion :: database_version(),
-                 Reason :: database_unknown | {loading,term()} | timeout.
-wait_for_loader(DatabaseId, Timeout) ->
-    case wait_for_loaders([DatabaseId], Timeout) of
+                 Reason :: (database_unknown |
+                            {database_stopped, term()} |
+                            {timeout, LoadAttemptFailures}),
+                 LoadAttemptFailures :: [term()].
+await_loader(DatabaseId, Timeout) ->
+    case await_loaders([DatabaseId], Timeout) of
         {ok, #{DatabaseId := LoadedVersion}} ->
             {ok, LoadedVersion};
-        {error, {DatabaseId, Reason}} ->
-            {error, Reason};
-        {error, timeout} ->
-            {error, timeout}
+        {error, {#{DatabaseId := Reason}, _}} ->
+            {error, Reason}
     end.
 
-%% @doc Like `wait_for_loader/2' but it can concurrently await status from more than one database.
-%%
 %% <ul>
 %% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
 %% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
@@ -342,22 +353,40 @@ wait_for_loader(DatabaseId, Timeout) ->
 %% <li>`{error, {DatabaseId, {loading, term()}}}' if loading `DatabaseId' failed for some reason.</li>
 %% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% </ul>
-%% @see wait_for_loader/1
-%% @see start_loader/2
--spec wait_for_loaders(DatabaseIds, Timeout) -> {ok, LoadedVersionPerDatabase} | {error, Reason}
+
+%% @doc Like `await_loader/2' but it can concurrently await status from more than one database.
+%%
+%% <ul>
+%% <li>`DatabaseIds' must be list of atom referring to database loaders.</li>
+%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the database are ready to use.</li>
+%% <li>`{error, {#{DatabaseId => ErrorReason}, _}}' in case of errors.</li>
+%% </ul>
+%% @see await_loader/2
+-spec await_loaders(DatabaseIds, Timeout) -> ({ok, Successes} |
+                                              {error, {ErrorPerDatabase, PartialSuccesses}})
             when DatabaseIds :: [DatabaseId],
                  Timeout :: timeout(),
+                 Successes :: LoadedVersionPerDatabase,
+                 PartialSuccesses :: LoadedVersionPerDatabase,
                  LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
                  LoadedVersion :: database_version(),
-                 Reason ::{DatabaseId,LoaderFailure} | timeout,
-                 LoaderFailure :: database_unknown | {loading,term()}.
-wait_for_loaders(DatabaseIds, Timeout) ->
+                 ErrorPerDatabase :: #{DatabaseId := Reason},
+                 Reason :: (database_unknown |
+                            {database_stopped, term()} |
+                            {timeout, LoadAttemptFailures}),
+                 LoadAttemptFailures :: [term()].
+await_loaders(DatabaseIds, Timeout) ->
     ReplyRef = make_ref(),
     UniqueDatabaseIds = lists:usort(DatabaseIds),
-    EmulateLegacyBehaviour = true,
-    WaiterOpts = [{emulate_legacy_behaviour, EmulateLegacyBehaviour}],
+    WaiterOpts = [],
     Waiters = [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
                || DatabaseId <- UniqueDatabaseIds],
+    EmulateLegacyBehaviour = false,
     perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses.
@@ -388,26 +417,6 @@ wait_for_loaders(DatabaseIds, Timeout) ->
                            ipv4_database).
 lookup(DatabaseId, Address) ->
     locus_mmdb:lookup(DatabaseId, Address).
-
-%% @doc Returns the currently loaded database version.
-%% @deprecated Please use {@link get_info/2} instead.
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' in case of success</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
-%% </ul>
--spec get_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadedVersion :: database_version(),
-                 Error :: database_unknown | database_not_loaded.
-get_version(DatabaseId) ->
-    get_info(DatabaseId, version).
 
 %% @doc Returns the properties of a currently loaded database.
 %%
@@ -484,6 +493,112 @@ get_info(DatabaseId, Property) ->
                            database_not_loaded).
 analyze(DatabaseId) ->
     locus_mmdb:analyze(DatabaseId).
+
+%% ------------------------------------------------------------------
+%% Deprecated API Function Definitions
+%% ------------------------------------------------------------------
+
+%% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails.
+%% @deprecated Use {@link await_loader/1} instead.
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
+%% </ul>
+-spec wait_for_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
+            when DatabaseId :: atom(),
+                 LoadedVersion :: database_version(),
+                 Error :: database_unknown | {loading, LoadingError},
+                 LoadingError :: term().
+wait_for_loader(DatabaseId) ->
+    wait_for_loader(DatabaseId, infinity).
+
+%% @doc Like `wait_for_loader/1' but it can time-out.
+%% @deprecated Use {@link await_loader/2} instead.
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
+%% </ul>
+-spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
+            when DatabaseId :: atom(),
+                 Timeout :: timeout(),
+                 LoadedVersion :: database_version(),
+                 Reason :: database_unknown | {loading,term()} | timeout.
+wait_for_loader(DatabaseId, Timeout) ->
+    case wait_for_loaders([DatabaseId], Timeout) of
+        {ok, #{DatabaseId := LoadedVersion}} ->
+            {ok, LoadedVersion};
+        {error, {DatabaseId, Reason}} ->
+            {error, Reason};
+        {error, timeout} ->
+            {error, timeout}
+    end.
+
+%% @doc Like `wait_for_loader/2' but it can concurrently await status from more than one database.
+%% @deprecated Use {@link wait_for_loaders/2} instead.
+%%
+%% <ul>
+%% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
+%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
+%% <li>`{error, {DatabaseId, database_unknown}}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, {DatabaseId, {loading, term()}}}' if loading `DatabaseId' failed for some reason.</li>
+%% <li>`{error, timeout}' if we've given up on waiting.</li>
+%% </ul>
+-spec wait_for_loaders(DatabaseIds, Timeout) -> {ok, LoadedVersionPerDatabase} | {error, Reason}
+            when DatabaseIds :: [DatabaseId],
+                 Timeout :: timeout(),
+                 LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
+                 LoadedVersion :: database_version(),
+                 Reason ::{DatabaseId,LoaderFailure} | timeout,
+                 LoaderFailure :: database_unknown | {loading,term()}.
+wait_for_loaders(DatabaseIds, Timeout) ->
+    ReplyRef = make_ref(),
+    UniqueDatabaseIds = lists:usort(DatabaseIds),
+    EmulateLegacyBehaviour = true,
+    WaiterOpts = [{emulate_legacy_behaviour, EmulateLegacyBehaviour}],
+    Waiters = [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
+               || DatabaseId <- UniqueDatabaseIds],
+    perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
+
+%% @doc Returns the currently loaded database version.
+%% @deprecated Please use {@link get_info/2} instead.
+%%
+%% <ul>
+%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{ok, LoadedVersion}' in case of success</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% </ul>
+-spec get_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
+            when DatabaseId :: atom(),
+                 LoadedVersion :: database_version(),
+                 Error :: database_unknown | database_not_loaded.
+get_version(DatabaseId) ->
+    get_info(DatabaseId, version).
 
 %% ------------------------------------------------------------------
 %% CLI-only Function Definitions
@@ -592,7 +707,7 @@ perform_wait(_ReplyRef, [], Successes, Failures, EmulateLegacyBehaviour) ->
             {ok, Successes};
         false ->
             false = EmulateLegacyBehaviour, % an assertion of self-consistency
-            {error, #{successes => Successes, failures => Failures}}
+            {error, {Failures, Successes}}
     end;
 perform_wait(ReplyRef, WaitersLeft, Successes, Failures, EmulateLegacyBehaviour) ->
     case receive_waiter_reply(ReplyRef) of

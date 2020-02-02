@@ -167,8 +167,8 @@ Run `./locus analyze --help' for a description of supported options and argument
 <li>The downloaded databases are cached on the filesystem in order to more quickly achieve readiness
   on future launches of the database loader
   </li>
-<li>Until a HTTP database loader achieves readiness, download attempts are made every minute;
-  once readiness is achieved (either from cache or network), this interval increases to every 6 hours.
+<li>Until a HTTP database loader achieves readiness, download attempts are made, on average, every minute;
+  once readiness is achieved (either from cache or network), this interval increases to an average of 6 hours.
   These can be tweaked using the `pre_readiness_update_period' and `post_readiness_update_period'
   loader settings (in milliseconds.)
   </li>

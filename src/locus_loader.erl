@@ -140,6 +140,12 @@
          }).
 -type settings() :: #settings{}.
 
+-type update_period() :: pos_integer() | uniformly_distributed_update_period().
+-export_type([update_period/0]).
+
+-type uniformly_distributed_update_period() :: #{ min := pos_integer(), max := pos_integer() }.
+-export_type([uniformly_distributed_update_period/0]).
+
 -type blob_format() :: tgz | tarball | gzip | gzipped_mmdb | mmdb | unknown.
 
 -type origin() ::

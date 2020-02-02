@@ -172,10 +172,11 @@ arguments.
     more quickly achieve readiness on future launches of the database
     loader
   - Until a HTTP database loader achieves readiness, download attempts
-    are made every minute; once readiness is achieved (either from cache
-    or network), this interval increases to every 6 hours. These can be
-    tweaked using the `pre_readiness_update_period` and
-    `post_readiness_update_period` loader settings (in milliseconds.)
+    are made, on average, every minute; once readiness is achieved
+    (either from cache or network), this interval increases to an
+    average of 6 hours. These can be tweaked using the
+    `pre_readiness_update_period` and `post_readiness_update_period`
+    loader settings (in milliseconds.)
   - When downloading from a HTTPS URL, the remote certificate will be
     authenticated against a [list of known Certificate
     Authorities](https://github.com/certifi/erlang-certifi) and
