@@ -660,7 +660,7 @@ exponential_error_backoff_interval(Count, Params) ->
       growth_base := GrowthBase, growth_exponent := GrowthExponent} = Params,
 
     MultipliedGrowthExponent = Count * GrowthExponent,
-    Growth = math:pow(GrowthBase, MultipliedGrowthExponent),
+    Growth = 1000 * math:pow(GrowthBase / 1000, MultipliedGrowthExponent),
     min(Max, Min + trunc(Growth)).
 
 -spec decode_database_from_blob(source(), blob_format(), binary())
