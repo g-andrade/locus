@@ -105,7 +105,7 @@ bin_to_hex_str(Bin) ->
 bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) when Nibble < 10 ->
     bin_to_hex_str_recur(Rest, [$0 + Nibble | Acc]);
 bin_to_hex_str_recur(<<Nibble:4, Rest/bits>>, Acc) ->
-    bin_to_hex_str_recur(Rest, [$a + Nibble | Acc]);
+    bin_to_hex_str_recur(Rest, [$a + Nibble - 10 | Acc]);
 bin_to_hex_str_recur(<<>>, Acc) ->
     lists:reverse(Acc).
 

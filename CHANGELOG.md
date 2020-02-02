@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Added
 - rejection of successful HTTP downloads if the body size doesn't match `content-length`
+- checksum verification of databases downloaded from MaxMind
 ### Changed
 - default behaviour upon failing to load a database, as to retry while exponentially backing off
   (using very short intervals at first)
