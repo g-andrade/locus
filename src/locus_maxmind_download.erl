@@ -79,6 +79,7 @@
 
 -type event() ::
     {finished, {error, no_license_key_defined}} |
+    {finished, {error, {checksum_download, term()}}} |
     {finished, {error, {bad_checksum, #{expected := binary(),
                                         actual := binary()}}}} |
     locus_http_download:event().
