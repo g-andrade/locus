@@ -16,7 +16,7 @@ updated automatically.
 > to download MaxMind GeoLite2 databases**.
 > 
 > The existing URLs have been discontinued; you should upgrade `locus`
-> to version `1.9.0` if you used them.
+> to version `1.9.0` or higher if you used them.
 
 #### Usage
 

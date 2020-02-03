@@ -20,7 +20,7 @@ required
 </a> to
 download MaxMind GeoLite2 databases</b>.
 
-The existing URLs have been discontinued; you should upgrade `locus' to version `1.9.0' if you used them.
+The existing URLs have been discontinued; you should upgrade `locus' to version `1.9.0' or higher if you used them.
 </blockquote>
 
 <h4>Usage</h4>
