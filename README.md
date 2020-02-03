@@ -15,6 +15,16 @@ You're encouraged to host your own private copies of the databases when
 using this library in production, both for reliability and netiquette
 towards MaxMind.
 
+> ⚠️ Starting on December 31st, 2019, **a license key is now required to
+> download MaxMind GeoLite2 databases**, and the existing URLs have been
+> discontinued.
+> 
+> \`locus\` versions up to \`1.8.x\` are not license key -aware.
+> 
+> More details on [MaxMind's
+> blog](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
+> .
+
 #### Usage
 
 ##### 1\. Configure your license key
