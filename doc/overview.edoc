@@ -13,16 +13,14 @@ The free <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/geolite2
 you choose are loaded on-demand and, if using HTTP, cached on the filesystem and updated automatically.
 
 <blockquote>
-&#x26a0;&#xfe0f; Starting on December 31st, 2019, <b>a license key is now required to
-download MaxMind GeoLite2 databases</b>, and the existing URLs have been discontinued.
-
-<code>locus</code> versions up to <code>1.8.x</code> are not license key -aware.
-
-More details on <a
+&#x26a0;&#xfe0f; Starting on December 31st, 2019, <b>a license key is now <a
 	target="_parent"
 	href="https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/">
-MaxMind&#39;s blog
-</a>.
+required
+</a> to
+download MaxMind GeoLite2 databases</b>.
+
+The existing URLs have been discontinued; you should upgrade `locus' to version `1.9.0' if you used them.
 </blockquote>
 
 <h4>Usage</h4>

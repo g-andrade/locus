@@ -11,15 +11,12 @@ databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) you choose
 are loaded on-demand and, if using HTTP, cached on the filesystem and
 updated automatically.
 
-> ⚠️ Starting on December 31st, 2019, **a license key is now required to
-> download MaxMind GeoLite2 databases**, and the existing URLs have been
-> discontinued.
+> ⚠️ Starting on December 31st, 2019, **a license key is now
+> [required](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
+> to download MaxMind GeoLite2 databases**.
 > 
-> `locus` versions up to `1.8.x` are not license key -aware.
-> 
-> More details on [MaxMind's
-> blog](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
-> .
+> The existing URLs have been discontinued; you should upgrade `locus`
+> to version `1.9.0` if you used them.
 
 #### Usage
 

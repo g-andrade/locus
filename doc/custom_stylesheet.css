@@ -77,3 +77,6 @@ pre {
     border: 0.5px dotted grey;
     border-radius: 2px;
 }
+blockquote {
+    background-color: #f5f2ed;
+}
