@@ -193,7 +193,7 @@ Run `./locus analyze --help' for a description of supported options and argument
 <ul>
 <li>Caching is a best effort; the system falls back to relying exclusively on the network if needed</li>
 <li>A caching directory named `locus_erlang' is created under the <a target="_parent" href="http://erlang.org/doc/man/filename.html#basedir-3">'user_cache' basedir</a></li>
-<li>Cached databases are named after the MaxMind database edition name, or alternatively after SHA256 hash of their source URL</li>
+<li>Cached databases are named after the MaxMind database edition name, or alternatively after the SHA256 hash of their source URL</li>
 <li>Modification time of the databases is extracted from `last-modified' response header (when present)
   and used to condition downloads on subsequent boots and save bandwidth
   </li>

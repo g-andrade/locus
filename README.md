@@ -197,7 +197,7 @@ arguments.
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
   - Cached databases are named after the MaxMind database edition name,
-    or alternatively after SHA256 hash of their source URL
+    or alternatively after the SHA256 hash of their source URL
   - Modification time of the databases is extracted from `last-modified`
     response header (when present) and used to condition downloads on
     subsequent boots and save bandwidth
