@@ -41,7 +41,8 @@
     filesystem_safe_name/1,
     is_utf8_binary/1,
     is_unicode_string/1,
-    is_date/1
+    is_date/1,
+    purge_term_of_very_large_binaries/1
    ]).
 
 -ignore_xref(
@@ -54,6 +55,8 @@
 
 -define(is_uint8(V), ((V) band 16#FF =:= (V))).
 -define(is_uint16(V), ((V) band 16#FFFF =:= (V))).
+
+-define(TERM_PURGE_LARGE_BINARY_THRESHOLD, (1024 * 1024)).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -165,6 +168,35 @@ is_date(Date) ->
     catch
         _:_ -> false
     end.
+
+-spec purge_term_of_very_large_binaries(term()) -> term().
+purge_term_of_very_large_binaries([H|T]) ->
+    MappedH = purge_term_of_very_large_binaries(H),
+    MappedT = purge_term_of_very_large_binaries(T),
+    [MappedH | MappedT];
+purge_term_of_very_large_binaries(Tuple)
+  when is_tuple(Tuple) ->
+    List = tuple_to_list(Tuple),
+    MappedList = purge_term_of_very_large_binaries(List),
+    list_to_tuple(MappedList);
+purge_term_of_very_large_binaries(Map)
+  when is_map(Map) ->
+    List = maps:to_list(Map),
+    MappedList = purge_term_of_very_large_binaries(List),
+    maps:from_list(MappedList);
+purge_term_of_very_large_binaries(Binary)
+  when is_binary(Binary) ->
+    Size = byte_size(Binary),
+    ReferencedSize = binary:referenced_byte_size(Binary),
+    if Size >= ?TERM_PURGE_LARGE_BINARY_THRESHOLD ->
+           {'__$VERY_LARGE_BINARY', #{size => Size}};
+       ReferencedSize >= ?TERM_PURGE_LARGE_BINARY_THRESHOLD ->
+           binary:copy(Binary);
+       true ->
+           Binary
+    end;
+purge_term_of_very_large_binaries(Other) ->
+    Other.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - rejection of successful HTTP downloads if the body size doesn't match `content-length`
 - checksum verification of databases downloaded from MaxMind
+- purging of very large binaries from internally caught exceptions which are known error cases,
+  as to lower the risk of the VM getting OOM-killed when logging formatters get their hands
+  on those very large chunks of data
 ### Changed
 - default behaviour upon failing to load a database, as to retry while exponentially backing off
   (using very short intervals at first)
