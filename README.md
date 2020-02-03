@@ -19,7 +19,7 @@ towards MaxMind.
 > download MaxMind GeoLite2 databases**, and the existing URLs have been
 > discontinued.
 > 
-> \`locus\` versions up to \`1.8.x\` are not license key -aware.
+> `locus` versions up to `1.8.x` are not license key -aware.
 > 
 > More details on [MaxMind's
 > blog](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)

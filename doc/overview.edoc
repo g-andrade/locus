@@ -19,7 +19,7 @@ both for reliability and netiquette towards MaxMind.
 &#x26a0;&#xfe0f; Starting on December 31st, 2019, <b>a license key is now required to 
 download MaxMind GeoLite2 databases</b>, and the existing URLs have been discontinued.
 
-&#96;locus&#96; versions up to &#96;1.8.x&#96; are not license key -aware.
+<code>locus</code> versions up to <code>1.8.x</code> are not license key -aware.
 
 More details on <a
 	target="_parent"
