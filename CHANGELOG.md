@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2020-02-03
+### Changed
+- documentation as to reflect the recent changes to MaxMind licensing requirements
+
 ## [1.9.0-beta] - 2020-01-02
 ### Added
 - support for loading databases with full awareness of license keys (now mandatory)
