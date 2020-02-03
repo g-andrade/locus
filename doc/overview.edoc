@@ -104,8 +104,8 @@ ok = locus:start_loader(country, 'GeoLite2-Country').
 <li><a href="#supported-file-formats">Supported File Formats</a></li>
 <li><a href="#database-types-and-loading">Database Types and Loading</a></li>
 <li><a href="#database-validation">Database Validation</a></li>
-<li><a href="#maxmind-sources-and-http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</a></li>
-<li><a href="#maxmind-sources-and-http-urls-caching">MaxMind / HTTP URLs: Caching</a></li>
+<li><a href="#maxmind-sources--http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</a></li>
+<li><a href="#maxmind-sources--http-urls-caching">MaxMind sources / HTTP URLs: Caching</a></li>
 <li><a href="#filesystem-urls-loading-and-updating">Filesystem URLs: Loading and Updating</a></li>
 <li><a href="#logging">Logging</a></li>
 <li><a href="#event-subscriptions">Event Subscriptions</a></li>
@@ -165,7 +165,7 @@ Alternatively, they can also be checked from the command line by use of the `loc
 The script will exit with code 1 in case of failure, and 0 otherwise.
 Run `./locus analyze --help' for a description of supported options and arguments.
 
-<h5 id="maxmind-sources-and-http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</h5>
+<h5 id="maxmind-sources--http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</h5>
 
 <ul>
 <li>The downloaded database files, when compressed, are inflated in memory</li>
@@ -188,7 +188,7 @@ Run `./locus analyze --help' for a description of supported options and argument
   </li>
 </ul>
 
-<h5 id="maxmind-sources-and-http-urls-caching">MaxMind sources / HTTP URLs: Caching</h5>
+<h5 id="maxmind-sources---http-urls-caching">MaxMind sources / HTTP URLs: Caching</h5>
 
 <ul>
 <li>Caching is a best effort; the system falls back to relying exclusively on the network if needed</li>

@@ -98,9 +98,9 @@ ok = locus:start_loader(country, 'GeoLite2-Country').
 2.  [Database Types and Loading](#database-types-and-loading)
 3.  [Database Validation](#database-validation)
 4.  [MaxMind sources / HTTP URLs: Downloading and
-    Updating](#maxmind-sources-and-http-urls-downloading-and-updating)
-5.  [MaxMind / HTTP URLs:
-    Caching](#maxmind-sources-and-http-urls-caching)
+    Updating](#maxmind-sources--http-urls-downloading-and-updating)
+5.  [MaxMind sources / HTTP URLs:
+    Caching](#maxmind-sources--http-urls-caching)
 6.  [Filesystem URLs: Loading and
     Updating](#filesystem-urls-loading-and-updating)
 7.  [Logging](#logging)
