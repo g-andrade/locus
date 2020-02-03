@@ -11,9 +11,12 @@ databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) you choose
 are loaded on-demand and, if using HTTP, cached on the filesystem and
 updated automatically.
 
-You're encouraged to host your own private copies of the databases when
-using this library in production, both for reliability and netiquette
-towards MaxMind.
+> ⚠️ Starting on December 31st, 2019, **a license key is now
+> [required](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
+> to download MaxMind GeoLite2 databases**.
+> 
+> The existing URLs have been discontinued; you should upgrade `locus`
+> to version `1.9.0` or higher if you used them.
 
 #### Usage
 
@@ -94,9 +97,10 @@ ok = locus:start_loader(country, 'GeoLite2-Country').
 1.  [Supported File Formats](#supported-file-formats)
 2.  [Database Types and Loading](#database-types-and-loading)
 3.  [Database Validation](#database-validation)
-4.  [HTTP URLs: Downloading and
-    Updating](#http-urls-downloading-and-updating)
-5.  [HTTP URLs: Caching](#http-urls-caching)
+4.  [MaxMind sources / HTTP URLs: Downloading and
+    Updating](#maxmind-sources--http-urls-downloading-and-updating)
+5.  [MaxMind sources / HTTP URLs:
+    Caching](#maxmind-sources--http-urls-caching)
 6.  [Filesystem URLs: Loading and
     Updating](#filesystem-urls-loading-and-updating)
 7.  [Logging](#logging)
@@ -161,7 +165,7 @@ The script will exit with code 1 in case of failure, and 0 otherwise.
 Run `./locus analyze --help` for a description of supported options and
 arguments.
 
-##### HTTP URLs: Downloading and Updating
+##### MaxMind sources / HTTP URLs: Downloading and Updating
 
   - The downloaded database files, when compressed, are inflated in
     memory
@@ -171,28 +175,29 @@ arguments.
   - The downloaded databases are cached on the filesystem in order to
     more quickly achieve readiness on future launches of the database
     loader
-  - Until a HTTP database loader achieves readiness, download attempts
-    are made, on average, every minute; once readiness is achieved
-    (either from cache or network), this interval increases to an
-    average of 6 hours. These can be tweaked using the
-    `pre_readiness_update_period` and `post_readiness_update_period`
-    loader settings (in milliseconds.)
-  - When downloading from a HTTPS URL, the remote certificate will be
-    authenticated against a [list of known Certificate
-    Authorities](https://github.com/certifi/erlang-certifi) and
-    connection negotiation will fail in case of an expired certificate,
-    mismatched hostname, self-signed certificate or unknown certificate
-    authority. These checks can be disabled by specifying the `insecure`
-    loader option.
+  - Until a MaxMind or HTTP URL database loader achieves readiness,
+    download attempts are made every minute; once readiness is achieved
+    (either from cache or network), this interval increases to every 6
+    hours. These can be tweaked using the `pre_readiness_update_period`
+    and `post_readiness_update_period` loader settings (in
+    milliseconds.)
+  - When downloading from a MaxMind edition or HTTPS URL, the remote
+    certificate will be authenticated against a [list of known
+    Certificate Authorities](https://github.com/certifi/erlang-certifi)
+    and connection negotiation will fail in case of an expired
+    certificate, mismatched hostname, self-signed certificate or unknown
+    certificate authority. These checks can be disabled by specifying
+    the `insecure` loader option.
 
-##### HTTP URLs: Caching
+##### MaxMind sources / HTTP URLs: Caching
 
   - Caching is a best effort; the system falls back to relying
     exclusively on the network if needed
   - A caching directory named `locus_erlang` is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
-  - Cached databases are named after the SHA256 hash of their source URL
+  - Cached databases are named after the MaxMind database edition name,
+    or alternatively after the SHA256 hash of their source URL
   - Modification time of the databases is extracted from `last-modified`
     response header (when present) and used to condition downloads on
     subsequent boots and save bandwidth

@@ -12,14 +12,22 @@ of IP addresses using MaxMind GeoIP2.
 The free <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/geolite2/">MaxMind databases</a>
 you choose are loaded on-demand and, if using HTTP, cached on the filesystem and updated automatically.
 
-You're encouraged to host your own private copies of the databases when using this library in production,
-both for reliability and netiquette towards MaxMind.
+<blockquote>
+&#x26a0;&#xfe0f; Starting on December 31st, 2019, <b>a license key is now <a
+	target="_parent"
+	href="https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/">
+required
+</a> to
+download MaxMind GeoLite2 databases</b>.
+
+The existing URLs have been discontinued; you should upgrade `locus' to version `1.9.0' or higher if you used them.
+</blockquote>
 
 <h4>Usage</h4>
 
 <h5>1. Configure your license key</h5>
 
-Get a free <a href="https://www.maxmind.com/en/geolite2/signup">license key</a> from MaxMind
+Get a free <a target="_parent" href="https://www.maxmind.com/en/geolite2/signup">license key</a> from MaxMind
 if you haven't one already. Once logged in, you'll find the page to generate it
 on the left menu, under "My License Key".
 
@@ -96,8 +104,8 @@ ok = locus:start_loader(country, 'GeoLite2-Country').
 <li><a href="#supported-file-formats">Supported File Formats</a></li>
 <li><a href="#database-types-and-loading">Database Types and Loading</a></li>
 <li><a href="#database-validation">Database Validation</a></li>
-<li><a href="#http-urls-downloading-and-updating">HTTP URLs: Downloading and Updating</a></li>
-<li><a href="#http-urls-caching">HTTP URLs: Caching</a></li>
+<li><a href="#maxmind-sources--http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</a></li>
+<li><a href="#maxmind-sources--http-urls-caching">MaxMind sources / HTTP URLs: Caching</a></li>
 <li><a href="#filesystem-urls-loading-and-updating">Filesystem URLs: Loading and Updating</a></li>
 <li><a href="#logging">Logging</a></li>
 <li><a href="#event-subscriptions">Event Subscriptions</a></li>
@@ -157,7 +165,7 @@ Alternatively, they can also be checked from the command line by use of the `loc
 The script will exit with code 1 in case of failure, and 0 otherwise.
 Run `./locus analyze --help' for a description of supported options and arguments.
 
-<h5 id="http-urls-downloading-and-updating">HTTP URLs: Downloading and Updating</h5>
+<h5 id="maxmind-sources--http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</h5>
 
 <ul>
 <li>The downloaded database files, when compressed, are inflated in memory</li>
@@ -167,25 +175,25 @@ Run `./locus analyze --help' for a description of supported options and argument
 <li>The downloaded databases are cached on the filesystem in order to more quickly achieve readiness
   on future launches of the database loader
   </li>
-<li>Until a HTTP database loader achieves readiness, download attempts are made, on average, every minute;
-  once readiness is achieved (either from cache or network), this interval increases to an average of 6 hours.
+<li>Until a MaxMind or HTTP URL database loader achieves readiness, download attempts are made every minute;
+  once readiness is achieved (either from cache or network), this interval increases to every 6 hours.
   These can be tweaked using the `pre_readiness_update_period' and `post_readiness_update_period'
   loader settings (in milliseconds.)
   </li>
-<li>When downloading from a HTTPS URL, the remote certificate will be authenticated
-  against a <a href="https://github.com/certifi/erlang-certifi">list of known Certificate Authorities</a>
+<li>When downloading from a MaxMind edition or HTTPS URL, the remote certificate will be authenticated
+  against a <a target="_parent" href="https://github.com/certifi/erlang-certifi">list of known Certificate Authorities</a>
   and connection negotiation will fail in case of an expired certificate, mismatched hostname,
   self-signed certificate or unknown certificate authority.
   These checks can be disabled by specifying the `insecure' loader option.
   </li>
 </ul>
 
-<h5 id="http-urls-caching">HTTP URLs: Caching</h5>
+<h5 id="maxmind-sources---http-urls-caching">MaxMind sources / HTTP URLs: Caching</h5>
 
 <ul>
 <li>Caching is a best effort; the system falls back to relying exclusively on the network if needed</li>
 <li>A caching directory named `locus_erlang' is created under the <a target="_parent" href="http://erlang.org/doc/man/filename.html#basedir-3">'user_cache' basedir</a></li>
-<li>Cached databases are named after the SHA256 hash of their source URL</li>
+<li>Cached databases are named after the MaxMind database edition name, or alternatively after the SHA256 hash of their source URL</li>
 <li>Modification time of the databases is extracted from `last-modified' response header (when present)
   and used to condition downloads on subsequent boots and save bandwidth
   </li>

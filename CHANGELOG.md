@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - default behaviour upon failing to load a database, as to retry while exponentially backing off
   (using very short intervals at first)
 
+## [1.9.0] - 2020-02-03
+### Changed
+- documentation as to reflect the recent changes to MaxMind licensing requirements
+
 ## [1.9.0-beta] - 2020-01-02
 ### Added
 - support for loading databases with full awareness of license keys (now mandatory)
