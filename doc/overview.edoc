@@ -19,7 +19,7 @@ both for reliability and netiquette towards MaxMind.
 
 <h5>1. Configure your license key</h5>
 
-Get a free <a href="https://www.maxmind.com/en/geolite2/signup">license key</a> from MaxMind
+Get a free <a target="_parent" href="https://www.maxmind.com/en/geolite2/signup">license key</a> from MaxMind
 if you haven't one already. Once logged in, you'll find the page to generate it
 on the left menu, under "My License Key".
 
@@ -173,7 +173,7 @@ Run `./locus analyze --help' for a description of supported options and argument
   loader settings (in milliseconds.)
   </li>
 <li>When downloading from a HTTPS URL, the remote certificate will be authenticated
-  against a <a href="https://github.com/certifi/erlang-certifi">list of known Certificate Authorities</a>
+  against a <a target="_parent" href="https://github.com/certifi/erlang-certifi">list of known Certificate Authorities</a>
   and connection negotiation will fail in case of an expired certificate, mismatched hostname,
   self-signed certificate or unknown certificate authority.
   These checks can be disabled by specifying the `insecure' loader option.
