@@ -24,6 +24,10 @@
 -module(locus_loader).
 -behaviour(gen_server).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -334,7 +338,7 @@ is_error_retry_behaviour({exponential_backoff, #{min_interval := MinInterval,
                                                  growth_exponent := GrowthExponent}}) ->
     ?is_pos_integer(MinInterval)
     andalso ?is_pos_integer(MaxInterval)
-    andalso ?is_pos_integer(GrowthBase)
+    andalso ?is_pos_integer(GrowthBase) andalso GrowthBase >= 1
     andalso is_number(GrowthExponent) andalso GrowthExponent >= 0
     andalso MaxInterval >= MinInterval;
 is_error_retry_behaviour(_) ->
@@ -652,15 +656,12 @@ error_backoff_interval(_, {backoff, Interval}) ->
 error_backoff_interval(Count, {exponential_backoff, Params}) ->
     exponential_error_backoff_interval(Count, Params).
 
-exponential_error_backoff_interval(1, Params) ->
-    #{min_interval := Min} = Params,
-    Min;
 exponential_error_backoff_interval(Count, Params) ->
     #{min_interval := Min, max_interval := Max,
       growth_base := GrowthBase, growth_exponent := GrowthExponent} = Params,
 
-    MultipliedGrowthExponent = Count * GrowthExponent,
-    Growth = 1000 * math:pow(GrowthBase / 1000, MultipliedGrowthExponent),
+    MultipliedGrowthExponent = (Count - 1) * GrowthExponent,
+    Growth = (1000 * math:pow(GrowthBase / 1000, MultipliedGrowthExponent)) - Min,
     min(Max, Min + trunc(Growth)).
 
 -spec decode_database_from_blob(source(), blob_format(), binary())
@@ -898,3 +899,132 @@ notify_owner(Msg, State) ->
     #state{owner_pid = OwnerPid} = State,
     _ = erlang:send(OwnerPid, {self(),Msg}, [noconnect]),
     ok.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Unit Tests
+%% ------------------------------------------------------------------
+-ifdef(TEST).
+
+constant_error_backoff_test() ->
+    lists:foreach(
+      fun (_) ->
+              Interval = rand:uniform(10000),
+              RetryBehaviour = {backoff, Interval},
+              lists:foreach(
+                fun (ConsecutiveErrors) ->
+                        ?assertEqual(Interval, error_backoff_interval(ConsecutiveErrors, RetryBehaviour))
+                end,
+                lists:seq(1, 1000))
+      end,
+      lists:seq(1, 100)).
+
+exponential_error_backoff_test() ->
+    Trial1 = {exponential_backoff,
+              #{min_interval => timer:seconds(1),
+                max_interval => timer:hours(24),
+                growth_base => timer:seconds(2),
+                growth_exponent => 0.625}},
+	?assertEqual(1000, error_backoff_interval(1, Trial1)),
+	?assertEqual(1542, error_backoff_interval(2, Trial1)),
+	?assertEqual(2378, error_backoff_interval(3, Trial1)),
+	?assertEqual(3668, error_backoff_interval(4, Trial1)),
+	?assertEqual(5656, error_backoff_interval(5, Trial1)),
+	?assertEqual(8724, error_backoff_interval(6, Trial1)),
+	?assertEqual(13454, error_backoff_interval(7, Trial1)),
+	?assertEqual(20749, error_backoff_interval(8, Trial1)),
+	?assertEqual(32000, error_backoff_interval(9, Trial1)),
+	?assertEqual(49350, error_backoff_interval(10, Trial1)),
+	?assertEqual(76109, error_backoff_interval(11, Trial1)),
+	?assertEqual(117376, error_backoff_interval(12, Trial1)),
+	?assertEqual(181019, error_backoff_interval(13, Trial1)),
+	?assertEqual(279169, error_backoff_interval(14, Trial1)),
+	?assertEqual(430538, error_backoff_interval(15, Trial1)),
+	?assertEqual(663981, error_backoff_interval(16, Trial1)),
+	?assertEqual(1024000, error_backoff_interval(17, Trial1)),
+	?assertEqual(1579223, error_backoff_interval(18, Trial1)),
+	?assertEqual(2435496, error_backoff_interval(19, Trial1)),
+	?assertEqual(3756048, error_backoff_interval(20, Trial1)),
+	?assertEqual(5792618, error_backoff_interval(21, Trial1)),
+	?assertEqual(8933439, error_backoff_interval(22, Trial1)),
+	?assertEqual(13777246, error_backoff_interval(23, Trial1)),
+	?assertEqual(21247419, error_backoff_interval(24, Trial1)),
+	?assertEqual(32768000, error_backoff_interval(25, Trial1)),
+	?assertEqual(50535164, error_backoff_interval(26, Trial1)),
+	?assertEqual(77935877, error_backoff_interval(27, Trial1)),
+	?assertEqual(86400000, error_backoff_interval(28, Trial1)),
+	?assertEqual(86400000, error_backoff_interval(29, Trial1)),
+	?assertEqual(86400000, error_backoff_interval(30, Trial1)),
+
+    Trial2 = {exponential_backoff,
+              #{min_interval => timer:seconds(1),
+                max_interval => timer:hours(24),
+                growth_base => timer:seconds(3),
+                growth_exponent => 0.5}},
+	?assertEqual(1000, error_backoff_interval(1, Trial2)),
+	?assertEqual(1732, error_backoff_interval(2, Trial2)),
+	?assertEqual(3000, error_backoff_interval(3, Trial2)),
+	?assertEqual(5196, error_backoff_interval(4, Trial2)),
+	?assertEqual(9000, error_backoff_interval(5, Trial2)),
+	?assertEqual(15588, error_backoff_interval(6, Trial2)),
+	?assertEqual(27000, error_backoff_interval(7, Trial2)),
+	?assertEqual(46765, error_backoff_interval(8, Trial2)),
+	?assertEqual(81000, error_backoff_interval(9, Trial2)),
+	?assertEqual(140296, error_backoff_interval(10, Trial2)),
+	?assertEqual(243000, error_backoff_interval(11, Trial2)),
+	?assertEqual(420888, error_backoff_interval(12, Trial2)),
+	?assertEqual(729000, error_backoff_interval(13, Trial2)),
+	?assertEqual(1262665, error_backoff_interval(14, Trial2)),
+	?assertEqual(2187000, error_backoff_interval(15, Trial2)),
+	?assertEqual(3787995, error_backoff_interval(16, Trial2)),
+	?assertEqual(6561000, error_backoff_interval(17, Trial2)),
+	?assertEqual(11363985, error_backoff_interval(18, Trial2)),
+	?assertEqual(19683000, error_backoff_interval(19, Trial2)),
+	?assertEqual(34091956, error_backoff_interval(20, Trial2)),
+	?assertEqual(59049000, error_backoff_interval(21, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(22, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(23, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(24, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(25, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(26, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(27, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(28, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(29, Trial2)),
+	?assertEqual(86400000, error_backoff_interval(30, Trial2)),
+
+    Trial3 = {exponential_backoff,
+              #{min_interval => timer:seconds(1),
+                max_interval => timer:hours(24),
+                growth_base => timer:seconds(1.5),
+                growth_exponent => 2.0}},
+	?assertEqual(1000, error_backoff_interval(1, Trial3)),
+	?assertEqual(2250, error_backoff_interval(2, Trial3)),
+	?assertEqual(5062, error_backoff_interval(3, Trial3)),
+	?assertEqual(11390, error_backoff_interval(4, Trial3)),
+	?assertEqual(25628, error_backoff_interval(5, Trial3)),
+	?assertEqual(57665, error_backoff_interval(6, Trial3)),
+	?assertEqual(129746, error_backoff_interval(7, Trial3)),
+	?assertEqual(291929, error_backoff_interval(8, Trial3)),
+	?assertEqual(656840, error_backoff_interval(9, Trial3)),
+	?assertEqual(1477891, error_backoff_interval(10, Trial3)),
+	?assertEqual(3325256, error_backoff_interval(11, Trial3)),
+	?assertEqual(7481827, error_backoff_interval(12, Trial3)),
+	?assertEqual(16834112, error_backoff_interval(13, Trial3)),
+	?assertEqual(37876752, error_backoff_interval(14, Trial3)),
+	?assertEqual(85222692, error_backoff_interval(15, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(16, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(17, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(18, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(19, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(20, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(21, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(22, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(23, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(24, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(25, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(26, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(27, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(28, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(29, Trial3)),
+	?assertEqual(86400000, error_backoff_interval(30, Trial3)).
+
+-endif.
