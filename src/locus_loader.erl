@@ -165,6 +165,7 @@
 -export_type([maxmind_origin_params/0]).
 
 -type event() ::
+    locus_maxmind_download:event() |
     locus_http_download:event() |
     locus_filesystem_load:event() |
     event_cache_attempt_finished().

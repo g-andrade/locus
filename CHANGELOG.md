@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - default behaviour upon failing to load a database, as to retry while exponentially backing off
   (using very short intervals at first)
 ### Fixed
+- incomplete spec for `locus_loader:event()` type
 - wrong spec for `locus_maxmind_download:msg()` and `locus_maxmind_download:event()` types
 
 ## [1.9.0] - 2020-02-03
