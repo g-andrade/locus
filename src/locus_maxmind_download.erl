@@ -74,15 +74,14 @@
 
 -type msg() ::
     {event, event()} |
-    locus_http_download:msg().
--export_type([msg/0]).
-
--type event() ::
     {finished, {error, no_license_key_defined}} |
     {finished, {error, {checksum_download, term()}}} |
     {finished, {error, {bad_checksum, #{expected := binary(),
                                         actual := binary()}}}} |
-    locus_http_download:event().
+    locus_http_download:msg().
+-export_type([msg/0]).
+
+-type event() :: locus_http_download:event().
 -export_type([event/0]).
 
 -type success() :: locus_http_download:success().
