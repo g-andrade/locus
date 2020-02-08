@@ -81,7 +81,9 @@
     locus_http_download:msg().
 -export_type([msg/0]).
 
--type event() :: locus_http_download:event().
+-type event() ::
+    locus_http_download:event() |
+    {checksum, locus_http_download:event()}.
 -export_type([event/0]).
 
 -type success() :: locus_http_download:success().
@@ -379,8 +381,8 @@ handle_checksum_download_msg({finished, Result}, State) ->
             notify_owner({finished, {error, {checksum_download, Reason}}}, State),
             {stop, normal, State}
     end;
-handle_checksum_download_msg(Msg, State) ->
-    notify_owner(Msg, State),
+handle_checksum_download_msg({event, Event}, State) ->
+    notify_owner({event, {checksum, Event}}, State),
     {noreply, State}.
 
 -spec handle_checksum_download_success(locus_http_download:success(), state())
