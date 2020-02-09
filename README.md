@@ -154,9 +154,9 @@ the `locus` CLI utility:
 2.  Run analysis:
     
     ``` shell
-    ./locus analyze https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz
-    # Loading database from "https://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz"...
-    # Database version {{2019,1,22},{11,42,28}} successfully loaded
+    ./locus analyze GeoLite2-City.mmdb
+    # Loading database from "GeoLite2-City.mmdb"...
+    # Database version {{2019,11,6},{11,58,0}} successfully loaded
     # Analyzing database for flaws...
     # Database is wholesome.
     ```
