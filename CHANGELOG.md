@@ -6,15 +6,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
+- `:await_loader` API function which, contrary to `:wait_for_loader`, will await readiness
+up to the entire specified interval (rather than return upon the first encountered failure)
+- checksum verification of databases downloaded directly from MaxMind
 - rejection of successful HTTP downloads if the body size doesn't match `content-length`
-- checksum verification of databases downloaded from MaxMind
 - censorsip of license key from database URLs mentioned in logs
 - purging of very large binaries from internally caught exceptions which are known error cases,
-  as to lower the risk of the VM getting OOM-killed when logging formatters get their hands
-  on those very large chunks of data
+as to lower the risk of the VM getting OOM-killed when logging formatters get their hands
+on those very large chunks of data
 ### Changed
-- default behaviour upon failing to load a database, as to retry while exponentially backing off
-  (using very short intervals at first)
+- default behaviour upon failing to load a database, as to retry loading while exponentially backing off
+(using very short intervals at first)
+### Deprecated
+- `:wait_for_loader` and `:wait_for_loaders` API functions (use `:await_loader` and `:await_loaders`
+instead)
 ### Fixed
 - incomplete spec for `locus_loader:event()` type
 - wrong spec for `locus_maxmind_download:msg()` and `locus_maxmind_download:event()` types
