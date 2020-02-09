@@ -550,7 +550,7 @@ wait_for_loader(DatabaseId, Timeout) ->
     end.
 
 %% @doc Like `wait_for_loader/2' but it can concurrently await status from more than one database.
-%% @deprecated Use {@link wait_for_loaders/2} instead.
+%% @deprecated Use {@link await_loaders/2} instead.
 %%
 %% <ul>
 %% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
