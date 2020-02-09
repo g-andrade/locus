@@ -30,7 +30,8 @@
 
 -export(
    [validate_opts/1,
-    start_link/3
+    start_link/3,
+    maybe_censor_license_key_in_url/1
    ]).
 
 -ignore_xref(
@@ -137,6 +138,17 @@ validate_opts(MixedOpts) ->
 %% @private
 start_link(Edition, RequestHeaders, Opts) ->
     proc_lib:start_link(?MODULE, init_, [[self(), Edition, RequestHeaders, Opts]]).
+
+-spec maybe_censor_license_key_in_url(nonempty_string()) -> nonempty_string().
+%% @private
+maybe_censor_license_key_in_url(URL) ->
+    case http_uri:parse(URL, [{fragment, true}]) of
+		{ok, {https, [], "download.maxmind.com", 443, "/app/geoip_download", QueryString, Fragment}} ->
+            CensoredQueryString = censor_license_key_in_query_string(QueryString),
+            "https://download.maxmind.com/app/geoip_download" ++ CensoredQueryString ++ Fragment;
+        {ok, _} ->
+            URL
+    end.
 
 %% ------------------------------------------------------------------
 %% proc_lib Function Definitions
@@ -429,3 +441,10 @@ handle_linked_process_death(Pid, Reason, State)
 handle_linked_process_death(Pid, Reason, State)
   when Pid =:= State#state.checksum_download_pid ->
     {stop, {checksum_download_stopped, Pid, Reason}, State}.
+
+-spec censor_license_key_in_query_string(string()) -> string().
+censor_license_key_in_query_string(QueryString) ->
+    Regex = "(^|&)license_key=[^&]+",
+    Replacement = "\\1license_key=XXXXXXXXXXXXXXXX\\2",
+    Opts = [unicode, global, {return,list}],
+    re:replace(QueryString, Regex, Replacement, Opts).

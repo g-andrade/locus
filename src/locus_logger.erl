@@ -179,24 +179,30 @@ report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Reason}
                                  locus_http_download:event()) -> ok.
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {request_sent, URL, Headers}) ->
     if MinWeight =< ?debug ->
+           MaybeCensoredURL = locus_maxmind_download:maybe_censor_license_key_in_url(URL),
            log_info("[~ts] ~s download request sent (url \"~ts\", headers ~p)",
-                    [DatabaseId, DownloadType, URL, Headers]);
+                    [DatabaseId, DownloadType, MaybeCensoredURL, Headers]);
        MinWeight =< ?info ->
-           log_info("[~ts] ~s download request sent", [DatabaseId, DownloadType]);
+           MaybeCensoredURL = locus_maxmind_download:maybe_censor_license_key_in_url(URL),
+           log_info("[~ts] ~s download request sent (\"~ts\")",
+                    [DatabaseId, DownloadType, MaybeCensoredURL]);
        true ->
            ok
     end;
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_dismissed, HttpResponse}) ->
     if MinWeight =< ?debug ->
-           log_info("[~ts] ~s download canceled: ~p", [DatabaseId, DownloadType, HttpResponse]);
+           log_info("[~ts] ~s download dismissed: ~p", [DatabaseId, DownloadType, HttpResponse]);
        MinWeight =< ?info ->
-           log_info("[~ts] ~s download canceled", [DatabaseId, DownloadType]);
+           log_info("[~ts] ~s download dismissed", [DatabaseId, DownloadType]);
        true ->
            ok
     end;
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_failed_to_start, Reason}) ->
-    if MinWeight =< ?error ->
-           log_error("[~ts] ~s download failed to start: ~p", [DatabaseId, DownloadType, Reason]);
+    if MinWeight =< ?debug ->
+           log_info("[~ts] ~s download failed to start: ~p", [DatabaseId, DownloadType, Reason]);
+       MinWeight =< ?info ->
+           FormattedReason = simpler_reason_for_download_failing_to_start(Reason),
+           log_info("[~ts] ~s download failed to start: ~p", [DatabaseId, DownloadType, FormattedReason]);
        true ->
            ok
     end;
@@ -221,9 +227,9 @@ report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_finish
     end;
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_finished, BodySize,
                                                                  {error, Reason}}) ->
-    if MinWeight =< ?error ->
-           log_error("[~ts] ~s download failed after ~b bytes: ~p",
-                     [DatabaseId, DownloadType, BodySize, Reason]);
+    if MinWeight =< ?info ->
+           log_info("[~ts] ~s download failed after ~b bytes: ~p",
+                    [DatabaseId, DownloadType, BodySize, Reason]);
        true ->
            ok
     end.
@@ -290,3 +296,16 @@ log_to_error_logger(Fun, Fmt, Args) ->
 -spec resumed_source(locus_loader:source()) -> cache | remote | filesystem.
 resumed_source({SourceType, _SourceLocation}) ->
     SourceType.
+
+-spec simpler_reason_for_download_failing_to_start(
+        locus_http_download:reason_for_download_failing_to_start()
+       ) -> _.
+simpler_reason_for_download_failing_to_start(Reason) ->
+    case Reason of
+        {http, Status, _Headers, Body} ->
+            {Status, Body};
+        {error, _} = Error ->
+            Error;
+        timeout ->
+            timeout
+    end.
