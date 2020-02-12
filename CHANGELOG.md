@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `:await_loader` API function which, contrary to `:wait_for_loader`, will await readiness
 up to the entire specified interval (rather than return upon the first encountered failure)
 - checksum verification of databases downloaded directly from MaxMind
-- rejection of successful HTTP downloads if the body size doesn't match `content-length`
+- rejection of successful HTTP downloads if body size doesn't match `content-length`
 - censorsip of license key from database URLs mentioned in logs
 - purging of very large binaries from internally caught exceptions which are known error cases,
 as to lower the risk of the VM getting OOM-killed when logging formatters get their hands
