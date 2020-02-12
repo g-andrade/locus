@@ -143,7 +143,7 @@ start_link(Edition, RequestHeaders, Opts) ->
 %% @private
 maybe_censor_license_key_in_url(URL) ->
     case http_uri:parse(URL, [{fragment, true}]) of
-		{ok, {https, [], "download.maxmind.com", 443, "/app/geoip_download", QueryString, Fragment}} ->
+        {ok, {https, [], "download.maxmind.com", 443, "/app/geoip_download", QueryString, Fragment}} ->
             CensoredQueryString = censor_license_key_in_query_string(QueryString),
             "https://download.maxmind.com/app/geoip_download" ++ CensoredQueryString ++ Fragment;
         {ok, _} ->
