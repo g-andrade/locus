@@ -444,7 +444,7 @@ handle_linked_process_death(Pid, Reason, State)
 
 -spec censor_license_key_in_query_string(string()) -> string().
 censor_license_key_in_query_string(QueryString) ->
-    Regex = "(^|&)license_key=[^&]+",
+    Regex = "(^|&|\\?)license_key=[^&#]+",
     Replacement = "\\1license_key=XXXXXXXXXXXXXXXX\\2",
     Opts = [unicode, global, {return,list}],
     re:replace(QueryString, Regex, Replacement, Opts).
