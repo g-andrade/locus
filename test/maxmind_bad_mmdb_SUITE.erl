@@ -89,8 +89,11 @@ expect_database_decode_failure(TailPath) ->
             error(unexpected_success)
     catch
         Class:Reason ->
+            Stacktrace = erlang:get_stacktrace(),
+            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
+            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             ct:pal("Unable to decode database because of ~p:~p on ~p",
-                   [Class, Reason, erlang:get_stacktrace()])
+                   [Class, SaferReason, SaferStacktrace])
     end.
 
 read_database(TailPath) ->

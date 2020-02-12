@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2020-02-12
+### Added
+- `:await_loader` API function which, contrary to `:wait_for_loader`, will await readiness
+up to the entire specified interval (rather than return upon the first encountered failure)
+- checksum verification of databases downloaded directly from MaxMind
+- rejection of successful HTTP downloads if body size doesn't match `content-length`
+- censorsip of license key from database URLs mentioned in logs
+- purging of very large binaries from internally caught exceptions which are known error cases,
+as to lower the risk of the VM getting OOM-killed when logging formatters get their hands
+on those very large chunks of data
+
+### Changed
+- default behaviour upon failing to load a database, as to retry loading while exponentially backing off
+(using very short intervals at first)
+
+### Deprecated
+- `:wait_for_loader` and `:wait_for_loaders` API functions (use `:await_loader` and `:await_loaders`
+instead)
+
+### Fixed
+- incomplete spec for `locus_loader:event()` type
+- wrong spec for `locus_maxmind_download:msg()` and `locus_maxmind_download:event()` types
+
 ## [1.9.0] - 2020-02-03
 ### Changed
 - documentation as to reflect the recent changes to MaxMind licensing requirements
@@ -11,17 +34,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [1.9.0-beta] - 2020-01-02
 ### Added
 - support for loading databases with full awareness of license keys (now mandatory)
+
 ### Deprecated
 - the use of discontinued "https://geolite.maxmind.com/download/geoip/database/GeoLite2-..." database URLs
 
 ## [1.8.0] - 2019-11-05
 ### Added
 - support for returning types other than map upon successful lookups
+
 ### Changed
 - MMDB decoder, which was split into separate tree, data section and analysis modules
 - imported `stacktrace_compat` version [1.0.2 => 1.1.1]
+
 ### Removed
 - support for OTP 18
+
 ### Fixed
 - incidents of `locus` managerial processes keeping references to old binaries, upon a database update,
   for a potentially unlimited time (OTP 20+ only)
@@ -34,6 +61,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - stacktrace of caught exceptions to event reporting (including custom logger)
 - ability of launching database loaders under library consumers' own supervisors
 - `wait_for_loaders/2` API method for concurrently awaiting multiple database loaders
+
 ### Changed
 - log level of HTTP and filesystem database loading failures from warning to error
 - HTTP and filesystem loaders into a common loader codebase
@@ -42,10 +70,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - dependency versions:
     - `certifi` [2.4.2 => 2.5.1]
     - `ssl_verify_fun` [1.1.4 => 1.1.5]
+
 ### Removed
 - support for OTP 17.4 and 17.5
 - undocumented support for rebar 2
 - half-baked and unwarranted support for `file://`-prefixed URLs
+
 ### Fixed
 - case-sensitive patterning of `.mmdb` file extensions within tarballs
 - overly verbose `logger` messages on OTP 21.1+
@@ -68,13 +98,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     - `certifi` 2.4.2
     - `ssl_verify_fun` 1.1.4
     - `stacktrace_transform` 1.0.2
+
 ### Changed
-- test coverage using MaxMind`s test data was greatly extended
+- test coverage using MaxMind's test data was greatly extended
 - database decoder was thoroughly optimized
 - documentation was mildly improved
+
 ### Fixed
 - misguided rejection of UTF-8 strings with non-printable (but valid) codepoints
 - unnecessarily strict refusal to load 2.x database formats succeeding 2.0
+
 ### Security
 - safety of database HTTPS downloads was substantially improved by now
   rejecting expired certificates, mismatched hostnames, self-signed
@@ -90,14 +123,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - ability of tweaking pre- and post-readiness database update periods
 - test coverage of HTTP-loaded database updates
+
 ### Fixed
 - undeterministic test cases which sometimes broke
 
 ## [1.4.0] - 2018-06-20
 ### Added
 - official test cases for good data at https://github.com/maxmind/MaxMind-DB/
+
 ### Changed
 - string and binary IP address parsing to handle ranges and shortened addresses
+
 ### Deprecated
 - :get_version/1 (use :get_info/2)
 
@@ -121,6 +157,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - ability of loading databases from local file system
 - type spec of database entries
+
 ### Fixed
 - wrong handling of timezones on cached tarballs
 - wrong handling of daylight saving time on conditional HTTP requests

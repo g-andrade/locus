@@ -194,13 +194,19 @@ lookup_(Address, DatabaseParts) ->
     #{data_section := DataSection, ipv4_root_index := IPv4RootIndex,
       metadata := Metadata, tree := Tree} = DatabaseParts,
 
-    case locus_mmdb_tree:lookup(Address, IPv4RootIndex, Metadata, Tree) of
+    try locus_mmdb_tree:lookup(Address, IPv4RootIndex, Metadata, Tree) of
         {ok, {DataIndex, Prefix}} ->
             {Entry, _} = locus_mmdb_data:decode_on_index(DataIndex, DataSection),
             Success = lookup_success(Entry, #{ prefix => Prefix }),
             {ok, Success};
         {error, Reason} ->
             {error, Reason}
+    catch
+        Class:Reason ->
+            Stacktrace = erlang:get_stacktrace(),
+            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
+            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
+            erlang:raise(Class, SaferReason, SaferStacktrace)
     end.
 
 lookup_success(Entry, ExtraAttributes)

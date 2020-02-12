@@ -30,7 +30,8 @@
 
 -export(
    [validate_opts/1,
-    start_link/3
+    start_link/3,
+    maybe_censor_license_key_in_url/1
    ]).
 
 -ignore_xref(
@@ -74,12 +75,16 @@
 
 -type msg() ::
     {event, event()} |
+    {finished, {error, no_license_key_defined}} |
+    {finished, {error, {checksum_download, term()}}} |
+    {finished, {error, {bad_checksum, #{expected := binary(),
+                                        actual := binary()}}}} |
     locus_http_download:msg().
 -export_type([msg/0]).
 
 -type event() ::
-    {finished, {error, no_license_key_defined}} |
-    locus_http_download:event().
+    locus_http_download:event() |
+    {checksum, locus_http_download:event()}.
 -export_type([event/0]).
 
 -type success() :: locus_http_download:success().
@@ -89,7 +94,11 @@
           owner_pid :: pid(),
           edition :: atom(),
           opts :: [opt()],
-          http_download_pid :: pid()
+          http_download_opts :: [locus_http_download:opt()],
+          license_key :: binary(),
+          database_download_pid :: undefined | pid(),
+          database_download_success :: undefined | locus_http_download:success(),
+          checksum_download_pid :: undefined | pid()
          }).
 -type state() :: #state{}.
 
@@ -130,6 +139,17 @@ validate_opts(MixedOpts) ->
 start_link(Edition, RequestHeaders, Opts) ->
     proc_lib:start_link(?MODULE, init_, [[self(), Edition, RequestHeaders, Opts]]).
 
+-spec maybe_censor_license_key_in_url(nonempty_string()) -> nonempty_string().
+%% @private
+maybe_censor_license_key_in_url(URL) ->
+    case http_uri:parse(URL, [{fragment, true}]) of
+		{ok, {https, [], "download.maxmind.com", 443, "/app/geoip_download", QueryString, Fragment}} ->
+            CensoredQueryString = censor_license_key_in_query_string(QueryString),
+            "https://download.maxmind.com/app/geoip_download" ++ CensoredQueryString ++ Fragment;
+        {ok, _} ->
+            URL
+    end.
+
 %% ------------------------------------------------------------------
 %% proc_lib Function Definitions
 %% ------------------------------------------------------------------
@@ -155,14 +175,16 @@ init_([OwnerPid, Edition, RequestHeaders, Opts]) ->
 
     case get_license_key(Opts) of
         {ok, LicenseKey} ->
-            URL = build_download_url(Edition, LicenseKey, Opts),
-            {ok, HttpDownloadPid} = locus_http_download:start_link(URL, RequestHeaders, HttpDownloadOpts),
+            URL = build_download_url(Edition, LicenseKey, Opts, "tar.gz"),
+            {ok, DatabaseDownloadPid} = locus_http_download:start_link(URL, RequestHeaders, HttpDownloadOpts),
             State =
                 #state{
                    owner_pid = OwnerPid,
                    edition = Edition,
                    opts = MyOpts,
-                   http_download_pid = HttpDownloadPid
+                   http_download_opts = HttpDownloadOpts,
+                   license_key = LicenseKey,
+                   database_download_pid = DatabaseDownloadPid
                   },
             gen_server:enter_loop(?MODULE, [], State);
         {error, Reason} ->
@@ -196,9 +218,12 @@ handle_cast(_Cast, State) ->
            {stop, normal, state()} |
            {stop, unexpected_info, state()}.
 %% @private
-handle_info({HttpDownloadPid, Msg}, State)
-  when HttpDownloadPid =:= State#state.http_download_pid ->
-    handle_http_download_msg(Msg, State);
+handle_info({DatabaseDownloadPid, Msg}, State)
+  when DatabaseDownloadPid =:= State#state.database_download_pid ->
+    handle_database_download_msg(Msg, State);
+handle_info({ChecksumDownloadPid, Msg}, State)
+  when ChecksumDownloadPid =:= State#state.checksum_download_pid ->
+    handle_checksum_download_msg(Msg, State);
 handle_info({'EXIT', Pid, Reason}, State) ->
     handle_linked_process_death(Pid, Reason, State);
 handle_info(_Info, State) ->
@@ -243,12 +268,11 @@ get_license_key(Opts) ->
            {error, no_license_key_defined}
     end.
 
--spec build_download_url(atom(), binary(), [opt()]) -> string().
-build_download_url(Edition, LicenseKey, Opts) ->
+build_download_url(Edition, LicenseKey, Opts, Suffix) ->
     BinEdition = atom_to_binary(Edition, utf8),
     BaseQueryIoPairs = [["edition_id=", locus_util:url_query_encode(BinEdition)],
                         ["license_key=", locus_util:url_query_encode(LicenseKey)],
-                        ["suffix=tar.gz"]],
+                        ["suffix=", locus_util:url_query_encode(Suffix)]],
     QueryIoPairs =
         lists:foldl(
           fun ({date, Date}, Acc) ->
@@ -264,15 +288,138 @@ build_download_url(Edition, LicenseKey, Opts) ->
     Binary = iolist_to_binary(["https://download.maxmind.com/app/geoip_download?", QueryIoString]),
     binary_to_list(Binary).
 
--spec handle_http_download_msg(locus_http_download:msg(), state())
+-spec handle_database_download_msg(locus_http_download:msg(), state())
         -> {noreply, state()} | {stop, normal, state()}.
-handle_http_download_msg({finished,_} = Msg, State) ->
-    locus_util:expect_linked_process_termination(State#state.http_download_pid),
-    notify_owner(Msg, State),
-    {stop, normal, State};
-handle_http_download_msg(Msg, State) ->
+handle_database_download_msg({finished, Result} = Msg, State) ->
+    locus_util:expect_linked_process_termination(State#state.database_download_pid),
+    UpdatedState = State#state{ database_download_pid = undefined },
+    case Result of
+        {success, Success} ->
+            handle_database_download_success(Success, UpdatedState);
+        _ ->
+            notify_owner(Msg, UpdatedState),
+            {stop, normal, State}
+    end;
+handle_database_download_msg(Msg, State) ->
     notify_owner(Msg, State),
     {noreply, State}.
+
+-spec handle_database_download_success(locus_http_download:success(), state())
+        -> {noreply, state()}.
+handle_database_download_success(Success, State) ->
+    ChecksumURL = build_checksum_download_url(Success, State),
+    ChecksumDownloadRequestHeaders = [],
+    ChecksumDownloadHttpOpts = State#state.http_download_opts,
+    {ok, ChecksumDownloadPid} =
+        locus_http_download:start_link(ChecksumURL, ChecksumDownloadRequestHeaders,
+                                       ChecksumDownloadHttpOpts),
+
+    UpdatedState = State#state{ database_download_success = Success,
+                                checksum_download_pid = ChecksumDownloadPid },
+    {noreply, UpdatedState}.
+
+-spec build_checksum_download_url(locus_http_download:success(), state()) -> string().
+build_checksum_download_url(DatabaseDownloadSuccess, State) ->
+    #state{edition = Edition, license_key = LicenseKey} = State,
+    ChecksumDownloadOpts = checksum_download_opts(DatabaseDownloadSuccess, State),
+    build_download_url(Edition, LicenseKey, ChecksumDownloadOpts, "tar.gz.md5").
+
+checksum_download_opts(DatabaseDownloadSuccess, State) ->
+    #state{edition = Edition, opts = BaseOpts} = State,
+    case proplists:get_value(date, BaseOpts) =:= undefined
+         andalso date_of_downloaded_database(Edition, DatabaseDownloadSuccess)
+    of
+        {_, _, _} = DateFromHeaders ->
+            [{date, DateFromHeaders} | BaseOpts];
+        _ ->
+            BaseOpts
+    end.
+
+-spec date_of_downloaded_database(atom(), locus_http_download:success()) -> calendar:date() | unknown.
+date_of_downloaded_database(Edition, DownloadSuccess) ->
+    #{headers := Headers} = DownloadSuccess,
+    ParseSuccesses =
+        lists:filtermap(
+          fun (Pair) -> date_of_downloaded_database_from_header(Pair, Edition) end,
+          Headers),
+
+    case maps:from_list(ParseSuccesses) of
+        #{"content-disposition" := Date} ->
+            Date;
+        #{"last-modified" := Date} ->
+            Date;
+        #{} ->
+            unknown
+    end.
+
+date_of_downloaded_database_from_header({"content-disposition", Value}, Edition) ->
+    EditionStr = atom_to_list(Edition),
+    Regex = "filename=" ++ EditionStr ++ "_([0-9]{4})([0-9]{2})([0-9]{2}).tar.gz",
+    RegexOpts = [{capture, all_but_first, list}],
+
+    case re:run(Value, Regex, RegexOpts) of
+        {match, [_,_,_] = Parts} ->
+            date_of_downloaded_database_from_header_str_parts("content-disposition", Parts);
+        nomatch ->
+            false
+    end;
+date_of_downloaded_database_from_header({"last-modified", Value}, _) ->
+    try httpd_util:convert_request_date(Value) of
+        {{_,_,_} = Date, _} ->
+            {true, {"last-modified", Date}}
+    catch
+        _:_ ->
+            false
+    end;
+date_of_downloaded_database_from_header({_,_}, _) ->
+    false.
+
+date_of_downloaded_database_from_header_str_parts(HeaderName, Parts) ->
+    [Year, Month, Day] = lists:map(fun list_to_integer/1, Parts),
+    case calendar:valid_date(Year, Month, Day) of
+        true -> {true, {HeaderName, {Year, Month, Day}}};
+        false -> false
+    end.
+
+-spec handle_checksum_download_msg(locus_http_download:msg(), state())
+        -> {noreply, state()} | {stop, normal, state()}.
+handle_checksum_download_msg({finished, Result}, State) ->
+    locus_util:expect_linked_process_termination(State#state.checksum_download_pid),
+    UpdatedState = State#state{ checksum_download_pid = undefined },
+    case Result of
+        {success, Success} ->
+            handle_checksum_download_success(Success, UpdatedState);
+        {error, Reason} ->
+            notify_owner({finished, {error, {checksum_download, Reason}}}, State),
+            {stop, normal, State}
+    end;
+handle_checksum_download_msg({event, Event}, State) ->
+    notify_owner({event, {checksum, Event}}, State),
+    {noreply, State}.
+
+-spec handle_checksum_download_success(locus_http_download:success(), state())
+        -> {stop, normal, state()}.
+handle_checksum_download_success(Success, State) ->
+    #{body := ExpectedDatabaseChecksum} = Success,
+    case actual_database_checksum(State) of
+        ExpectedDatabaseChecksum ->
+            #state{database_download_success = DatabaseDownloadSuccess} = State,
+            notify_owner({finished, {success, DatabaseDownloadSuccess}}, State),
+            {stop, normal, State};
+        ActualDatabaseChecksum ->
+            ErrorReason = {bad_checksum, #{expected => ExpectedDatabaseChecksum,
+                                           actual => ActualDatabaseChecksum}},
+            notify_owner({finished, {error, ErrorReason}}, State),
+            {stop, normal, State}
+    end.
+
+-spec actual_database_checksum(state()) -> binary().
+actual_database_checksum(State) ->
+    #state{database_download_success = DownloadSuccess} = State,
+    #{body := ResponseBody} = DownloadSuccess,
+    Hash = crypto:hash(md5, ResponseBody),
+    ChecksumStr = locus_util:bin_to_hex_str(Hash),
+    list_to_binary(ChecksumStr).
 
 -spec notify_owner(msg(), state()) -> ok.
 notify_owner(Msg, State) ->
@@ -289,5 +436,15 @@ handle_linked_process_death(Pid, _, State)
   when Pid =:= State#state.owner_pid ->
     {stop, normal, State};
 handle_linked_process_death(Pid, Reason, State)
-  when Pid =:= State#state.http_download_pid ->
-    {stop, {http_download_stopped, Pid, Reason}, State}.
+  when Pid =:= State#state.database_download_pid ->
+    {stop, {database_download_stopped, Pid, Reason}, State};
+handle_linked_process_death(Pid, Reason, State)
+  when Pid =:= State#state.checksum_download_pid ->
+    {stop, {checksum_download_stopped, Pid, Reason}, State}.
+
+-spec censor_license_key_in_query_string(string()) -> string().
+censor_license_key_in_query_string(QueryString) ->
+    Regex = "(^|&)license_key=[^&]+",
+    Replacement = "\\1license_key=XXXXXXXXXXXXXXXX\\2",
+    Opts = [unicode, global, {return,list}],
+    re:replace(QueryString, Regex, Replacement, Opts).

@@ -92,13 +92,11 @@
 -export_type([event_request_sent/0]).
 
 -type event_download_dismissed() ::
-    {download_dismissed, {http, response_status(), headers(), body()}}.
+    {download_dismissed, full_http_response()}.
 -export_type([event_download_dismissed/0]).
 
 -type event_download_failed_to_start() ::
-    {download_failed_to_start, {http, response_status(), headers(), body()}} |
-    {download_failed_to_start, {error, term()}} |
-    {download_failed_to_start, timeout}.
+    {download_failed_to_start, reason_for_download_failing_to_start()}.
 -export_type([event_download_failed_to_start/0]).
 
 -type event_download_started() ::
@@ -110,6 +108,16 @@
     {download_finished, BodySize :: non_neg_integer(), {error, term()}} |
     {download_finished, BodySize :: non_neg_integer(), {error, timeout}}.
 -export_type([event_download_finished/0]).
+
+-type reason_for_download_failing_to_start() ::
+    full_http_response() |
+    {error, term()} |
+    timeout.
+-export_type([reason_for_download_failing_to_start/0]).
+
+-type full_http_response() ::
+    {http, response_status(), headers(), body()}.
+-export_type([full_http_response/0]).
 
 -type success() ::
     #{ headers := headers(),
@@ -322,14 +330,27 @@ handle_httpc_message(Msg, State)
             Body = iolist_to_binary(BodyAcc),
             BodySize = byte_size(Body),
             report_event({download_finished, BodySize, {ok,CiTrailingHeaders}}, State),
-            Success = #{headers => Headers, body => Body},
-            notify_owner({finished, {success, Success}}, State),
-            {stop, normal, State};
+            handle_successful_download_conclusion(Headers, Body, State);
         {_, {error, Reason}} ->
             #state{response_body = BodyAcc} = State,
             BodySizeSoFar = iolist_size(BodyAcc),
             report_event({download_finished, BodySizeSoFar, {error, Reason}}, State),
             notify_owner({finished, {error, {http,Reason}}}, State),
+            {stop, normal, State}
+    end.
+
+handle_successful_download_conclusion(Headers, Body, State) ->
+    ActualContentLength = integer_to_list( byte_size(Body) ),
+
+    case lists:keyfind("content-length", 1, Headers) of
+        {_, DeclaredContentLength} when DeclaredContentLength =/= ActualContentLength ->
+            ErrorReason = {body_size_mismatch, #{declared_content_length => DeclaredContentLength,
+                                                 actual_content_length => ActualContentLength}},
+            notify_owner({finished, {error, ErrorReason}}, State),
+            {stop, normal, State};
+        _ ->
+            Success = #{headers => Headers, body => Body},
+            notify_owner({finished, {success, Success}}, State),
             {stop, normal, State}
     end.
 

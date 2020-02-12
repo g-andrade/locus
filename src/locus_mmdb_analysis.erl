@@ -95,8 +95,11 @@ run(DatabaseParts) ->
         end
     catch
         ExcClass:ExcReason ->
+            Stacktrace = erlang:get_stacktrace(),
+            SaferReason = locus_util:purge_term_of_very_large_binaries(ExcReason),
+            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             true = process_flag(trap_exit, PrevTrapExit),
-            erlang:raise(ExcClass, ExcReason, erlang:get_stacktrace())
+            erlang:raise(ExcClass, SaferReason, SaferStacktrace)
     end.
 
 %% ------------------------------------------------------------------

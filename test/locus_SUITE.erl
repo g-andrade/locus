@@ -166,10 +166,6 @@ end_per_group(GroupName, Config) ->
     end.
 
 %% ------------------------------------------------------------------
-%% Filesystem Test Cases
-%% ------------------------------------------------------------------
-
-%% ------------------------------------------------------------------
 %% Test Cases
 %% ------------------------------------------------------------------
 
@@ -178,8 +174,7 @@ cacheless_loading_httptest(Config) ->
     Loader = cacheless_loading_httptest,
     LoaderOpts = [no_cache, {event_subscriber, self()}],
     ok = locus:start_loader(Loader, URLOrEdition, LoaderOpts),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    LoadedVersion = test_successful_loader_await(Loader),
     % check events
     ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
@@ -193,14 +188,12 @@ cacheless_loading_httptest(Config) ->
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
 
-
 cold_remote_loading_httptest(Config) ->
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Loader = cold_regular_loading_httptest,
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URLOrEdition, LoaderOpts),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    LoadedVersion = test_successful_loader_await(Loader),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {error,_}}}),
     ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
@@ -221,8 +214,7 @@ warm_remote_loading_httptest(Config) ->
     Loader = warm_regular_loading_httptest,
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, URLOrEdition, LoaderOpts),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    LoadedVersion = test_successful_loader_await(Loader),
     CacheFilename = cached_database_path(URLOrEdition),
     % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {ok,LoadedVersion}}}),
@@ -246,8 +238,9 @@ update_works_httptest(_IsRemote, Config) ->
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Path = proplists:get_value(path, Config),
     Loader = update_works_httptest,
-    PostReadinessUpdatePeriod = 200,
-    LoaderOpts = [no_cache, {post_readiness_update_period, PostReadinessUpdatePeriod},
+    UpdatePeriod = 200,
+    LoaderOpts = [no_cache,
+                  {update_period, UpdatePeriod},
                   {event_subscriber, self()}],
     %%
     ok = set_file_mtime(Path, ?VERSION1_TIMESTAMP),
@@ -264,13 +257,13 @@ update_works_httptest(_IsRemote, Config) ->
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
     ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
-    ?assert(MillisecondsElapsedA / PostReadinessUpdatePeriod >= 0.90),
+    ?assert(MillisecondsElapsedA / UpdatePeriod >= 0.90),
     %%
     {TimeElapsedB, _} = timer:tc(fun () -> ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}) end),
     MillisecondsElapsedB = TimeElapsedB / 1000,
     ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedB]),
     ?assertRecv({locus, Loader, {download_dismissed, {http, {304,_}, _Headers, _Body}}}),
-    ?assert(MillisecondsElapsedB / PostReadinessUpdatePeriod >= 0.90),
+    ?assert(MillisecondsElapsedB / UpdatePeriod >= 0.90),
     %%
     ok = locus:stop_loader(Loader).
 
@@ -278,8 +271,7 @@ ipv4_country_lookup_test(Config) ->
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Loader = ipv4_country_lookup_test,
     ok = locus:start_loader(Loader, URLOrEdition),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    test_successful_loader_await(Loader),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV4_STR_ADDR),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
@@ -290,8 +282,7 @@ ipv4_invalid_addr_test(Config) ->
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Loader = ipv4_invalid_addr_test,
     ok = locus:start_loader(Loader, URLOrEdition),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    test_successful_loader_await(Loader),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
 
@@ -299,8 +290,7 @@ ipv6_country_lookup_test(Config) ->
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Loader = ipv6_country_lookup_test,
     ok = locus:start_loader(Loader, URLOrEdition),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    test_successful_loader_await(Loader),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV6_STR_ADDR),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
     ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
@@ -311,8 +301,7 @@ ipv6_invalid_addr_test(Config) ->
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Loader = ipv6_invalid_addr_test,
     ok = locus:start_loader(Loader, URLOrEdition),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader, timer:seconds(30)),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    test_successful_loader_await(Loader),
     ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
 
@@ -479,36 +468,13 @@ subscriber_death_test(Config) ->
     ?assertEqual(OriginalPid, locus_database:whereis(Loader)),
     ok = locus:stop_loader(Loader).
 
-async_waiter_success_test(Config) ->
-    URLOrEdition = proplists:get_value(url_or_edition, Config),
-    Loader = async_waiter_success_test,
-    Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
-    ok = locus:start_loader(Loader, URLOrEdition, LoaderOpts),
-    ?assertRecv({Ref, {ok, _LoadedVersion}}),
-    ok = locus:stop_loader(Loader).
-
-async_waiter_failure_fstest(Config) ->
-    async_waiter_failure_localhttptest(Config).
-
-async_waiter_failure_localhttptest(Config) ->
-    BaseURL = proplists:get_value(base_url, Config),
-    URL = BaseURL ++ "/foobarbarfoofoobar",
-    Loader = async_waiter_failure_test,
-    Ref = make_ref(),
-    LoaderOpts = [{internal, {async_waiter, Ref, self()}}],
-    ok = locus:start_loader(Loader, URL, LoaderOpts),
-    ?assertRecv({Ref, {error, _Reason}}),
-    ok = locus:stop_loader(Loader).
-
 loader_child_spec_test(Config) ->
     _ = process_flag(trap_exit, true),
     URLOrEdition = proplists:get_value(url_or_edition, Config),
     Loader = loader_child_spec_test,
 
     {ok, Supervisor} = custom_loader_sup:start_link(Loader, URLOrEdition),
-    {ok, LoadedVersion} = locus:wait_for_loader(Loader, 10000),
-    {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+    test_successful_loader_await(Loader),
 
     % it conflicts with supervisor-spawned loaders under the same name
     ?assertMatch({error, {shutdown, {failed_to_start_child,_,{already_started,_}}}},
@@ -538,6 +504,17 @@ loader_child_spec_test(Config) ->
 
     ok.
 
+await_loader_failures_test(_Config) ->
+    Loader = await_loader_failures_test,
+
+    ?assertEqual({error, database_unknown},
+                 locus:await_loader(Loader)),
+
+    ?assertMatch({error, {#{Loader := database_unknown}, PartialSuccesses}}
+                   when map_size(PartialSuccesses) =:= 0,
+                 locus:await_loaders([Loader], 500)),
+    ok.
+
 wait_for_loader_failures_test(_Config) ->
     Loader = wait_for_loader_failures_test,
 
@@ -556,6 +533,22 @@ wait_for_loader_failures_test(_Config) ->
     ok.
 
 %%%
+
+test_successful_loader_await(Loader) ->
+    case rand:uniform(2) of
+        1 ->
+            {ok, LoadedVersion} = locus:await_loader(Loader),
+            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
+            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
+            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+            LoadedVersion;
+        2 ->
+            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
+            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
+            {ok, LoadedVersion} = locus:await_loader(Loader),
+            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
+            LoadedVersion
+    end.
 
 address_forms(StrAddr) ->
     BinAddr = list_to_binary(StrAddr),

@@ -43,15 +43,14 @@ xref: $(REBAR3)
 	@$(REBAR3) xref
 
 test: $(REBAR3) cli test/MaxMind-DB/test-data
-	@$(REBAR3) ct
+	@$(REBAR3) as test eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 ci_test: $(REBAR3) cli
-	@$(REBAR3) as ci_test ct
+	@$(REBAR3) as ci_test eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
-cover: $(REBAR3) test
-	@$(REBAR3) cover
+cover: test
 
 shell: export ERL_FLAGS =? +pc unicode
 shell:

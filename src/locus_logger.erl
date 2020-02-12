@@ -69,6 +69,13 @@
 -define(case_match(Value, Pattern, Then, OrElse),
         (case (Value) of (Pattern) -> (Then); _ -> (OrElse) end)).
 
+-define(is_http_download_event(Event),
+        (element(1, (Event)) =:= request_sent orelse
+         element(1, (Event)) =:= download_dismissed orelse
+         element(1, (Event)) =:= download_failed_to_start orelse
+         element(1, (Event)) =:= download_started orelse
+         element(1, (Event)) =:= download_finished)).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -114,97 +121,115 @@ report(DatabaseId, Event) ->
 %% ------------------------------------------------------------------
 
 -spec report(non_neg_integer() | infinity, atom(), locus_event_subscriber:event()) -> ok.
-report(MinWeight, DatabaseId, {request_sent, URL, Headers}) ->
-    if MinWeight =< ?debug ->
-           log_info("~p database download request sent (url ~p, headers ~p)", [DatabaseId, URL, Headers]);
-       MinWeight =< ?info ->
-           log_info("~p database download request sent", [DatabaseId]);
-       true ->
-           ok
-    end;
-report(MinWeight, DatabaseId, {download_dismissed, HttpResponse}) ->
-    if MinWeight =< ?debug ->
-           log_info("~p database download canceled: ~p", [DatabaseId, HttpResponse]);
-       MinWeight =< ?info ->
-           log_info("~p database download canceled", [DatabaseId]);
-       true ->
-           ok
-    end;
-report(MinWeight, DatabaseId, {download_failed_to_start, Reason}) ->
-    if MinWeight =< ?error ->
-           log_error("~p database download failed to start: ~p", [DatabaseId, Reason]);
-       true ->
-           ok
-    end;
-report(MinWeight, DatabaseId, {download_started, Headers}) ->
-    if MinWeight =< ?debug ->
-           log_info("~p database download started (headers ~p)", [DatabaseId, Headers]);
-       MinWeight =< ?info ->
-           log_info("~p database download started", [DatabaseId]);
-       true ->
-           ok
-    end;
-report(MinWeight, DatabaseId, {download_finished, BodySize, {ok, TrailingHeaders}}) ->
-    if MinWeight =< ?debug ->
-           log_info("~p database download succeeded after ~p bytes (trailing headers ~p)",
-                     [DatabaseId, BodySize, TrailingHeaders]);
-       MinWeight =< ?info ->
-           log_info("~p database download succeeded after ~p bytes",
-                     [DatabaseId, BodySize]);
-       true ->
-           ok
-    end;
-report(MinWeight, DatabaseId, {download_finished, BodySize, {error, Error}}) ->
-    if MinWeight =< ?error ->
-           log_error("~p database download failed after ~p bytes: ~p",
-                     [DatabaseId, BodySize, Error]);
-       true ->
-           ok
-    end;
+report(MinWeight, DatabaseId, Event)
+  when ?is_http_download_event(Event) ->
+    report_http_download_event(MinWeight, DatabaseId, database, Event);
+report(MinWeight, DatabaseId, {checksum, ChecksumEvent})
+  when ?is_http_download_event(ChecksumEvent) ->
+    report_http_download_event(MinWeight, DatabaseId, checksum, ChecksumEvent);
 report(MinWeight, DatabaseId, {load_attempt_started, Source}) ->
     if MinWeight =< ?debug ->
-           log_info("~p database load attempt started from ~p", [DatabaseId, Source]);
+           log_info("[~ts] database load attempt started from ~p", [DatabaseId, Source]);
        MinWeight =< ?info ->
-           log_info("~p database load attempt started (~p)", [DatabaseId, resumed_source(Source)]);
+           log_info("[~ts] database load attempt started (~p)", [DatabaseId, resumed_source(Source)]);
        true ->
            ok
     end;
 report(MinWeight, DatabaseId, {load_attempt_dismissed, _Source}) ->
     if MinWeight =< ?info ->
-           log_info("~p database load attempt dismissed", [DatabaseId]);
+           log_info("[~ts] database load attempt dismissed", [DatabaseId]);
        true ->
            ok
     end;
 report(MinWeight, DatabaseId, {load_attempt_finished, Source, {ok, Version}}) ->
     if MinWeight =< ?debug ->
-           log_info("~p database version ~p loaded from ~p", [DatabaseId, Version, Source]);
+           log_info("[~ts] database version ~p loaded from ~p", [DatabaseId, Version, Source]);
        MinWeight =< ?info ->
-           log_info("~p database version ~p loaded (~p)", [DatabaseId, Version, resumed_source(Source)]);
+           log_info("[~ts] database version ~p loaded (~p)", [DatabaseId, Version, resumed_source(Source)]);
        true ->
            ok
     end;
-report(MinWeight, DatabaseId, {load_attempt_finished, Source, {error, Error}}) ->
+report(MinWeight, DatabaseId, {load_attempt_finished, Source, {error, Reason}}) ->
     {Weight,LogFun}= ?case_match(Source, {cache,_}, {?warning,fun log_warning/2}, {?error,fun log_error/2}),
     if MinWeight =< ?debug ->
-           LogFun("~p database failed to load from ~p: ~p", [DatabaseId, Source, Error]);
+           LogFun("[~ts] database failed to load from ~p: ~p", [DatabaseId, Source, Reason]);
        MinWeight =< Weight ->
-           LogFun("~p database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Error]);
+           LogFun("[~ts] database failed to load (~p): ~p", [DatabaseId, resumed_source(Source), Reason]);
        true ->
            ok
     end;
 report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, ok}) ->
     if MinWeight =< ?debug ->
-           log_info("~p database cached at ~p", [DatabaseId, Filename]);
+           log_info("[~ts] database cached at \"~ts\"", [DatabaseId, Filename]);
        MinWeight =< ?info ->
-           log_info("~p database cached", [DatabaseId]);
+           log_info("[~ts] database cached", [DatabaseId]);
        true ->
            ok
     end;
-report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Error}}) ->
+report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Reason}}) ->
     if MinWeight =< ?debug ->
-           log_error("~p database failed to cache in ~p: ~p", [DatabaseId, Filename, Error]);
+           log_error("[~ts] database failed to cache in \"~ts\": ~p", [DatabaseId, Filename, Reason]);
        MinWeight =< ?error  ->
-           log_error("~p database failed to cache: ~p", [DatabaseId, Error]);
+           log_error("[~ts] database failed to cache: ~p", [DatabaseId, Reason]);
+       true ->
+           ok
+    end.
+
+-spec report_http_download_event(non_neg_integer() | infinity, atom(), checksum | database,
+                                 locus_http_download:event()) -> ok.
+report_http_download_event(MinWeight, DatabaseId, DownloadType, {request_sent, URL, Headers}) ->
+    if MinWeight =< ?debug ->
+           MaybeCensoredURL = locus_maxmind_download:maybe_censor_license_key_in_url(URL),
+           log_info("[~ts] ~s download request sent (url \"~ts\", headers ~p)",
+                    [DatabaseId, DownloadType, MaybeCensoredURL, Headers]);
+       MinWeight =< ?info ->
+           MaybeCensoredURL = locus_maxmind_download:maybe_censor_license_key_in_url(URL),
+           log_info("[~ts] ~s download request sent (\"~ts\")",
+                    [DatabaseId, DownloadType, MaybeCensoredURL]);
+       true ->
+           ok
+    end;
+report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_dismissed, HttpResponse}) ->
+    if MinWeight =< ?debug ->
+           log_info("[~ts] ~s download dismissed: ~p", [DatabaseId, DownloadType, HttpResponse]);
+       MinWeight =< ?info ->
+           log_info("[~ts] ~s download dismissed", [DatabaseId, DownloadType]);
+       true ->
+           ok
+    end;
+report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_failed_to_start, Reason}) ->
+    if MinWeight =< ?debug ->
+           log_info("[~ts] ~s download failed to start: ~p", [DatabaseId, DownloadType, Reason]);
+       MinWeight =< ?info ->
+           FormattedReason = simpler_reason_for_download_failing_to_start(Reason),
+           log_info("[~ts] ~s download failed to start: ~p", [DatabaseId, DownloadType, FormattedReason]);
+       true ->
+           ok
+    end;
+report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_started, Headers}) ->
+    if MinWeight =< ?debug ->
+           log_info("[~ts] ~s download started (headers ~p)", [DatabaseId, DownloadType, Headers]);
+       MinWeight =< ?info ->
+           log_info("[~ts] ~s download started", [DatabaseId, DownloadType]);
+       true ->
+           ok
+    end;
+report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_finished, BodySize,
+                                                                 {ok, TrailingHeaders}}) ->
+    if MinWeight =< ?debug ->
+           log_info("[~ts] ~s download succeeded after ~b bytes (trailing headers ~p)",
+                     [DatabaseId, DownloadType, BodySize, TrailingHeaders]);
+       MinWeight =< ?info ->
+           log_info("[~ts] ~s download succeeded after ~b bytes",
+                     [DatabaseId, DownloadType, BodySize]);
+       true ->
+           ok
+    end;
+report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_finished, BodySize,
+                                                                 {error, Reason}}) ->
+    if MinWeight =< ?info ->
+           log_info("[~ts] ~s download failed after ~b bytes: ~p",
+                    [DatabaseId, DownloadType, BodySize, Reason]);
        true ->
            ok
     end.
@@ -271,3 +296,16 @@ log_to_error_logger(Fun, Fmt, Args) ->
 -spec resumed_source(locus_loader:source()) -> cache | remote | filesystem.
 resumed_source({SourceType, _SourceLocation}) ->
     SourceType.
+
+-spec simpler_reason_for_download_failing_to_start(
+        locus_http_download:reason_for_download_failing_to_start()
+       ) -> _.
+simpler_reason_for_download_failing_to_start(Reason) ->
+    case Reason of
+        {http, Status, _Headers, Body} ->
+            {Status, Body};
+        {error, _} = Error ->
+            Error;
+        timeout ->
+            timeout
+    end.
