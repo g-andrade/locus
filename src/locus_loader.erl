@@ -364,7 +364,7 @@ default_http_origin_settings() ->
 
 default_http_origin_error_retry_behaviour() ->
     {exponential_backoff, #{min_interval => timer:seconds(1),
-                            max_interval => timer:minutes(2),
+                            max_interval => timer:minutes(15),
                             growth_base => timer:seconds(2),
                             growth_exponent => 0.625}}.
 
