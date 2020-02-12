@@ -45,7 +45,6 @@ instead)
 ### Changed
 - MMDB decoder, which was split into separate tree, data section and analysis modules
 - imported `stacktrace_compat` version [1.0.2 => 1.1.1]
-- default update periods of HTTP-sourced databases as to randomize them
 
 ### Removed
 - support for OTP 18
