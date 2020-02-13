@@ -412,7 +412,7 @@ log_warning_on_use_of_legacy_opt(DatabaseId, {pre_readiness_update_period, Inter
       "However, the default behaviour is now exponential backoff, and therefore much improved.~n"
       "If you don't want to give it a chance and prefer to keep constant backoffs~n"
       "while silencing this warning, use `{error_retries, {backoff, ~b}}` instead.",
-      [DatabaseId, Interval]);
+      [DatabaseId, Interval, Interval]);
 log_warning_on_use_of_legacy_opt(DatabaseId, {post_readiness_update_period, Interval}) ->
     locus_logger:log_warning(
       "[~ts] You've specified the following legacy option: {post_readiness_update_period, ~b}.~n"
