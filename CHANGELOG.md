@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - CA bundles, based on the latest Mozilla Included CA Certificate List [Paulo Oliveira]
 
+### Fixed
+- use of deprecated function in README example of how to use the library
+
 ## [1.10.0] - 2020-02-12
 ### Added
 - `:await_loader` API function which, contrary to `:wait_for_loader`, will await readiness

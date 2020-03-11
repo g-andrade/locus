@@ -42,8 +42,7 @@ ok = locus:start_loader(country, 'GeoLite2-Country').
 ##### 3\. Wait for the database to load (optional)
 
 ``` erlang
-% Give up after 30 seconds
-{ok, _DatabaseVersion} = locus:wait_for_loader(country, 30000). % {error,timeout}
+{ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
 ```
 
 ##### 4\. Look up IP addresses
