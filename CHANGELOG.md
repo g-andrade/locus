@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Changed
+- CA bundles, based on the latest Mozilla Included CA Certificate List
+
 ## [1.10.0] - 2020-02-12
 ### Added
 - `:await_loader` API function which, contrary to `:wait_for_loader`, will await readiness
