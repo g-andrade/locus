@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Changed
-- CA bundles, based on the latest Mozilla Included CA Certificate List
+- CA bundles, based on the latest Mozilla Included CA Certificate List [Paulo Oliveira]
 
 ## [1.10.0] - 2020-02-12
 ### Added
