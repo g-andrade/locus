@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - CA bundles, based on the latest Mozilla Included CA Certificate List [Paulo Oliveira]
 
 ### Fixed
+- misformatted log warning
 - use of deprecated function in README example of how to use the library
 - display of private function in generated function reference
 
