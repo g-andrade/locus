@@ -81,10 +81,11 @@
 %% ------------------------------------------------------------------
 
 -spec on_app_start() -> ok.
-%% @private
 -ifdef(NO_LOGGER).
+%% @private
 on_app_start() -> ok.
 -else.
+%% @private
 on_app_start() ->
     CurrentLevel = application:get_env(locus, log_level, undefined),
     _ = logger:set_application_level(locus, CurrentLevel),

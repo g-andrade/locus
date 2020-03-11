@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 - use of deprecated function in README example of how to use the library
+- display of private function in generated function reference
 
 ## [1.10.0] - 2020-02-12
 ### Added
