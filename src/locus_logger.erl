@@ -73,6 +73,7 @@
         (element(1, (Event)) =:= request_sent orelse
          element(1, (Event)) =:= download_dismissed orelse
          element(1, (Event)) =:= download_failed_to_start orelse
+         element(1, (Event)) =:= download_redirected orelse
          element(1, (Event)) =:= download_started orelse
          element(1, (Event)) =:= download_finished)).
 
@@ -198,6 +199,20 @@ report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_dismis
        true ->
            ok
     end;
+report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_redirected, Redirection}) ->
+    #{permanence := Permanence, url := NewURL} = Redirection,
+    case Permanence of
+        permanent when MinWeight =< ?warning ->
+            MaybeCensoredNewURL = locus_maxmind_download:maybe_censor_license_key_in_url(NewURL),
+            log_warning("[~ts] ~s download permanently redirected to \"~p\"",
+                        [DatabaseId, DownloadType, MaybeCensoredNewURL]);
+        temporary when MinWeight =< ?info ->
+            MaybeCensoredNewURL = locus_maxmind_download:maybe_censor_license_key_in_url(NewURL),
+            log_warning("[~ts] ~s download temporarily redirected to \"~p\"",
+                        [DatabaseId, DownloadType, MaybeCensoredNewURL]);
+        _ ->
+            ok
+    end;
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_failed_to_start, Reason}) ->
     if MinWeight =< ?debug ->
            log_info("[~ts] ~s download failed to start: ~p", [DatabaseId, DownloadType, Reason]);
@@ -305,6 +320,10 @@ simpler_reason_for_download_failing_to_start(Reason) ->
     case Reason of
         {http, Status, _Headers, Body} ->
             {Status, Body};
+        too_many_redirections ->
+            Reason;
+        {invalid_redirection, _} ->
+            Reason;
         {error, _} = Error ->
             Error;
         timeout ->

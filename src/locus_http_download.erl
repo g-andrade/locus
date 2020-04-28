@@ -57,6 +57,7 @@
 -define(DEFAULT_CONNECT_TIMEOUT, (timer:seconds(8))).
 -define(DEFAULT_DOWNLOAD_START_TIMEOUT, (timer:seconds(5))).
 -define(DEFAULT_IDLE_DOWNLOAD_TIMEOUT, (timer:seconds(5))).
+-define(MAX_REDIRECTIONS, 5).
 
 -define(is_timeout(V), ((is_integer((V)) andalso ((V) >= 0)) orelse ((V) =:= infinity))).
 
@@ -82,6 +83,7 @@
 -type event() ::
     event_request_sent() |
     event_download_dismissed() |
+    event_download_redirected() |
     event_download_failed_to_start() |
     event_download_started() |
     event_download_finished().
@@ -94,6 +96,10 @@
 -type event_download_dismissed() ::
     {download_dismissed, full_http_response()}.
 -export_type([event_download_dismissed/0]).
+
+-type event_download_redirected() ::
+    {download_redirected, redirection()}.
+-export_type([event_download_redirected/0]).
 
 -type event_download_failed_to_start() ::
     {download_failed_to_start, reason_for_download_failing_to_start()}.
@@ -111,6 +117,8 @@
 
 -type reason_for_download_failing_to_start() ::
     full_http_response() |
+    too_many_redirections |
+    {invalid_redirection, term()} |
     {error, term()} |
     timeout.
 -export_type([reason_for_download_failing_to_start/0]).
@@ -138,12 +146,19 @@
 -type body() :: binary().
 -export_type([body/0]).
 
+-type redirection() ::
+    #{ url := url(),
+       permanence := permanent | temporary
+     }.
+-export_type([redirection/0]).
+
 -record(state, {
           owner_pid :: pid(),
           url :: url(),
           headers :: headers(),
           opts :: [opt()],
           timeouts :: #{ term() => infinity | reference() },
+          redirections :: non_neg_integer(),
           request_id :: reference() | undefined,
           response_headers :: headers() | undefined,
           response_body :: iodata() | undefined
@@ -208,7 +223,8 @@ init([OwnerPid, URL, Headers, Opts]) ->
             url = URL,
             headers = CiHeaders,
             opts = Opts,
-            timeouts = #{}
+            timeouts = #{},
+            redirections = 0
            }}.
 
 -spec handle_call(term(), {pid(),reference()}, state())
@@ -277,7 +293,11 @@ send_request(State)
             {ok, ParsedURL} when element(1, ParsedURL) =:= https ->
                 [{ssl,locus_https_requests:ssl_opts_for_ca_authentication(URL)}]
         end,
-    HTTPOpts = BaseHTTPOpts  ++ ExtraHTTPOpts,
+    % Autoredirect causes issues for HTTPS downloads,
+    % since the TLS validation set up in `ExtraHTTPOpts'
+    % can only account for the current URL's hostname.
+    NoRedirectHTTPOpts = [{autoredirect, false}],
+    HTTPOpts = BaseHTTPOpts  ++ ExtraHTTPOpts ++ NoRedirectHTTPOpts,
 
     RequestOpts = [{sync, false}, {stream, self}],
     {ok, RequestId} = httpc:request(get, Request, HTTPOpts, RequestOpts),
@@ -299,16 +319,9 @@ handle_httpc_message(Msg, State)
             State4 = State3#state{ response_headers = CiHeaders, response_body = <<>> },
             report_event({download_started, CiHeaders}, State4),
             {noreply, State4};
-        {_, {{_,StatusCode,StatusDesc}, Headers, Body}} when StatusCode =:= 304 ->
-            CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
-            report_event({download_dismissed, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
-            notify_owner({finished, dismissed}, State),
-            {stop, normal, State};
         {_, {{_,StatusCode,StatusDesc}, Headers, Body}} ->
             CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
-            report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
-            notify_owner({finished, {error, {http,StatusCode,StatusDesc}}}, State),
-            {stop, normal, State};
+            handle_download_start_http_failure(StatusCode, StatusDesc, CiHeaders, Body, State);
         {_, {error, Reason}} ->
             report_event({download_failed_to_start, {error, Reason}}, State),
             notify_owner({finished, {error, {http,Reason}}}, State),
@@ -337,6 +350,65 @@ handle_httpc_message(Msg, State)
             report_event({download_finished, BodySizeSoFar, {error, Reason}}, State),
             notify_owner({finished, {error, {http,Reason}}}, State),
             {stop, normal, State}
+    end.
+
+handle_download_start_http_failure(StatusCode, StatusDesc, CiHeaders, Body, State) ->
+    case stream_start_failure_type(StatusCode, CiHeaders, State) of
+        not_modified ->
+            report_event({download_dismissed, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
+            notify_owner({finished, dismissed}, State),
+            {stop, normal, State};
+        {redirection, Redirection} when State#state.redirections < ?MAX_REDIRECTIONS ->
+            %% TODO test coverage of redirections
+            report_event({download_redirected, Redirection}, State),
+            #{url := NewURL} = Redirection,
+            State2 = cancel_download_start_timeout(State),
+            State3 = State2#state{ request_id = undefined, url = NewURL,
+                                   redirections = State2#state.redirections + 1 },
+            State4 = send_request(State3),
+            {noreply, State4};
+        {redirection, _} ->
+            %% TODO test coverage of redirections
+            report_event({download_failed_to_start, too_many_redirections}, State),
+            notify_owner({finished, {error, too_many_redirections}}, State),
+            {stop, normal, State};
+        {invalid_redirection, Reason} ->
+            %% TODO test coverage of redirections
+            report_event({download_failed_to_start, {invalid_redirection, Reason}}, State),
+            notify_owner({finished, {error, {invalid_redirection,Reason}}}, State),
+            {stop, normal, State};
+        error ->
+            report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
+            notify_owner({finished, {error, {http,StatusCode,StatusDesc}}}, State),
+            {stop, normal, State}
+    end.
+
+stream_start_failure_type(StatusCode, CiHeaders, State) ->
+    %% https://developer.mozilla.org/en-US/docs/Web/HTTP/Redirections
+    case StatusCode of
+        301 -> stream_start_redirect(permanent, CiHeaders, State);
+        302 -> stream_start_redirect(temporary, CiHeaders, State);
+        303 -> stream_start_redirect(temporary, CiHeaders, State);
+        304 -> not_modified;
+        307 -> stream_start_redirect(temporary, CiHeaders, State);
+        308 -> stream_start_redirect(permanent, CiHeaders, State);
+        _   -> error
+    end.
+
+stream_start_redirect(Permanence, CiHeaders, State) ->
+    case lists:keyfind("location", 1, CiHeaders) of
+        {_, NewLocation} ->
+            stream_start_redirect_for_location(Permanence, NewLocation, State);
+        _ ->
+            {invalid_redirection, missing_location_header}
+    end.
+
+stream_start_redirect_for_location(Permanence, NewLocation, State) ->
+    case locus_util:resolve_http_location(State#state.url, NewLocation) of
+        {ok, NewURL} ->
+            {redirection, #{permanence => Permanence, url => NewURL}};
+        {error, Reason} ->
+            {invalid_redirection, {bad_location, Reason}}
     end.
 
 handle_successful_download_conclusion(Headers, Body, State) ->

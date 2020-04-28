@@ -26,6 +26,10 @@
 
 -include_lib("kernel/include/file.hrl").
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -42,7 +46,8 @@
     is_utf8_binary/1,
     is_unicode_string/1,
     is_date/1,
-    purge_term_of_very_large_binaries/1
+    purge_term_of_very_large_binaries/1,
+    resolve_http_location/2
    ]).
 
 -ignore_xref(
@@ -198,6 +203,37 @@ purge_term_of_very_large_binaries(Binary)
 purge_term_of_very_large_binaries(Other) ->
     Other.
 
+-spec resolve_http_location(string(), string()) -> {ok, string()} | {error, term()}.
+resolve_http_location(BaseURL, Location) ->
+    % See:
+    % * https://tools.ietf.org/html/rfc7231#page-68
+    % * https://tools.ietf.org/html/rfc3986#section-4.2
+
+    case http_uri:parse(Location) of
+        {ok, _} ->
+            % location is an absolute URL
+            {ok, Location};
+        {error, no_scheme} ->
+            % location is a relative URL
+            BaseURLParseSuccess = http_uri:parse(BaseURL),
+            % we ignore URL fragments as they wouldn't be sent to the server anyway.
+            {ok, {Scheme, UserInfo, Host, Port, _Path, _Query}} = BaseURLParseSuccess,
+            case Location of
+                "//" ++ _ ->
+                    % network-path reference
+                    NewURL = format_string("~s:~s", [Scheme, Location]),
+                    {ok, NewURL};
+                "/" ++ _ ->
+                    % we should consider the colon character rule here
+                    NewURL = build_url(Scheme, UserInfo, Host, Port, Location),
+                    {ok, NewURL};
+                _ ->
+                    {error, bad_relative_location}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
@@ -232,3 +268,40 @@ url_query_encode_codepoint($\ ) ->
 url_query_encode_codepoint(Codepoint) ->
     UTF8Bytes = <<Codepoint/utf8>>,
     << <<$%, (integer_to_binary(Byte, 16))/bytes>> || <<Byte>> <= UTF8Bytes >>.
+
+build_url(Scheme, UserInfo, Host, Port, Path)
+  when UserInfo =:= "",
+       ((Scheme =:= http andalso Port =:= 80) orelse
+        (Scheme =:= https andalso Port =:= 443))
+       ->
+    format_string("~s://~s~s", [Scheme, Host, Path]);
+build_url(Scheme, UserInfo, Host, Port, Path)
+  when UserInfo =:= "" ->
+    format_string("~s://~s:~b~s", [Scheme, Host, Port, Path]);
+build_url(Scheme, UserInfo, Host, Port, Path) ->
+    format_string("~s://~s@~s:~b~s", [Scheme, UserInfo, Host, Port, Path]).
+
+-spec format_string(unicode:charlist(), list()) -> unicode:charlist().
+format_string(Fmt, Args) ->
+    CharData = io_lib:format(Fmt, Args),
+    unicode:characters_to_list(CharData).
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Unit Tests
+%% ------------------------------------------------------------------
+-ifdef(TEST).
+
+resolve_http_location_test() ->
+    BaseURL = "http://www.foo.bar",
+    AbsoluteLocation = "http://www.example.com/whatnot",
+    NetworkPathReference = "//google.com/thing",
+    RelativeReference = "/etc",
+
+    ?assertEqual({ok, AbsoluteLocation},
+                 resolve_http_location(BaseURL, AbsoluteLocation)),
+    ?assertEqual({ok, "http:" ++ NetworkPathReference},
+                 resolve_http_location(BaseURL, NetworkPathReference)),
+    ?assertEqual({ok, BaseURL ++ RelativeReference},
+                 resolve_http_location(BaseURL, RelativeReference)).
+
+-endif.
