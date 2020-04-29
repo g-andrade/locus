@@ -43,7 +43,7 @@
 
 -ifdef(TEST).
 -export(
-   [cached_database_path_for_maxmind_edition/2,
+   [cached_database_path_for_maxmind_edition_name/2,
     cached_database_path_for_url/1
    ]).
 -endif.
@@ -177,9 +177,14 @@
 -export_type([event_cache_attempt_finished/0]).
 
 -type source() ::
-    {remote, atom() | locus_http_download:url()} |
+    {remote, provider_source()} |
+    {remote, locus_http_download:url()} |
     locus_filesystem_load:source().
 -export_type([source/0]).
+
+-type provider_source() ::
+    {maxmind, atom()}.
+-export_type([provider_source/0]).
 
 -type msg() ::
     {event, event()} |
@@ -438,18 +443,18 @@ schedule_update(Interval, State)
 -spec cached_database_path(state()) -> nonempty_string().
 cached_database_path(State) ->
     case State#state.origin of
-        {maxmind, Edition} ->
+        {maxmind, EditionName} ->
             FetcherOpts = State#state.fetcher_opts,
             MaybeDate = proplists:get_value(date, FetcherOpts),
-            cached_database_path_for_maxmind_edition(Edition, MaybeDate);
+            cached_database_path_for_maxmind_edition_name(EditionName, MaybeDate);
         {http, URL} ->
             cached_database_path_for_url(URL)
     end.
 
--spec cached_database_path_for_maxmind_edition(atom(), undefined | calendar:date())
+-spec cached_database_path_for_maxmind_edition_name(atom(), undefined | calendar:date())
         -> nonempty_string().
 %% @private
-cached_database_path_for_maxmind_edition(Edition, MaybeDate) ->
+cached_database_path_for_maxmind_edition_name(Edition, MaybeDate) ->
     DirectoryPath = cache_directory_path(),
     BinEdition = atom_to_binary(Edition, utf8),
     BaseFilename = locus_util:filesystem_safe_name(BinEdition),
@@ -496,10 +501,10 @@ begin_update(State)
            last_modified = LastModified} = State,
 
     case Origin of
-        {maxmind, Edition} ->
+        {maxmind, EditionName} ->
             Headers = http_request_headers(LastModified),
-            {ok, FetcherPid} = locus_maxmind_download:start_link(Edition, Headers, FetcherOpts),
-            State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote,Edition} };
+            {ok, FetcherPid} = locus_maxmind_download:start_link(EditionName, Headers, FetcherOpts),
+            State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote,{maxmind,EditionName}} };
         {http, URL} ->
             Headers = http_request_headers(LastModified),
             {ok, FetcherPid} = locus_http_download:start_link(URL, Headers, FetcherOpts),

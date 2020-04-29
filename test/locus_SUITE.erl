@@ -134,7 +134,7 @@ init_per_group(GroupName, Config) ->
             ok = locus_logger:set_loglevel(debug),
             ok = application:set_env(locus, license_key, license_key_from_environment()),
             % RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36), % FIXME
-            Edition = 'GeoLite2-Country',
+            Edition = {maxmind, "GeoLite2-Country"},
             [{is_http, true},
              {is_remote, true},
              {url_or_edition, Edition}
@@ -156,9 +156,10 @@ end_per_group(GroupName, Config) ->
             _ = file:delete(CacheFilename),
             Config;
         "remote_http_tests" ->
-            Edition = proplists:get_value(url_or_edition, Config),
+            MaxMindEditionName = proplists:get_value(url_or_edition, Config),
             Date = undefined,
-            CacheFilename = locus_loader:cached_database_path_for_maxmind_edition(Edition, Date),
+            CacheFilename = locus_loader:cached_database_path_for_maxmind_edition(MaxMindEditionName,
+                                                                                  Date),
 
             ok = application:stop(locus),
             _ = file:delete(CacheFilename),
@@ -574,8 +575,8 @@ clear_proc_inbox_of_events(Loader) ->
             ok
     end.
 
-cached_database_path(Edition) when is_atom(Edition) ->
-    {maxmind, ParsedEdition} = locus:parse_database_edition(Edition),
-    locus_loader:cached_database_path_for_maxmind_edition(ParsedEdition, undefined);
+cached_database_path({maxmind, _} = Edition) ->
+    {maxmind, ParsedEditionName} = locus:parse_database_edition(Edition),
+    locus_loader:cached_database_path_for_maxmind_edition_name(ParsedEditionName, undefined);
 cached_database_path(URL) ->
     locus_loader:cached_database_path_for_url(URL).

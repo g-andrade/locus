@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - consumer-subscribed events as to follow the same URL censorship rules as the built-in logger
+- documented MaxMind database edition format from atoms to tuples while keeping retrocompatibility
 
 ## [1.10.2] - 2020-03-13
 ### Added

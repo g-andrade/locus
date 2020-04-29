@@ -35,7 +35,7 @@ application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 ##### 2\. Start the database loader
 
 ``` erlang
-ok = locus:start_loader(country, 'GeoLite2-Country').
+ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % You can also use a HTTP URL or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
 ```
 

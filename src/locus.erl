@@ -78,8 +78,16 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
--type database_edition() :: atom().
+-type database_edition() :: maxmind_database_edition().
 -export_type([database_edition/0]).
+
+-type maxmind_database_edition() ::
+    {maxmind, atom() | unicode:chardata()} |
+    legacy_maxmind_database_edition().
+-export_type([maxmind_database_edition/0]).
+
+-type legacy_maxmind_database_edition() :: atom().
+-export_type([legacy_maxmind_database_edition/0]).
 
 -type database_url() :: unicode:chardata().
 -export_type([database_url/0]).
@@ -117,7 +125,7 @@
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
 %% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% </ul>
 %%
@@ -143,7 +151,7 @@ start_loader(DatabaseId, DatabaseEditionOrURL) ->
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
 %% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
@@ -166,7 +174,7 @@ start_loader(DatabaseId, DatabaseEditionOrURL) ->
                  Error :: (invalid_url | already_started |
                            {invalid_opt,term()} | application_not_running).
 start_loader(DatabaseId, DatabaseEdition, Opts)
-  when is_atom(DatabaseEdition) ->
+  when is_tuple(DatabaseEdition); is_atom(DatabaseEdition) ->
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:start(DatabaseId, Origin, OptsWithDefaults);
@@ -197,7 +205,7 @@ stop_loader(DatabaseId) ->
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
 %% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% </ul>
 %%
@@ -222,7 +230,7 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL) ->
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
 %% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
@@ -249,7 +257,7 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL, Opts) ->
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be an atom; alternatively, `DatabaseURL'
+%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
 %% must be a string or a binary representing a HTTP(s) URL or local path.</li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
@@ -271,7 +279,7 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL, Opts) ->
                  Opts :: [locus_database:opt()],
                  ChildSpec :: locus_database:static_child_spec().
 loader_child_spec(ChildId, DatabaseId, DatabaseEdition, Opts)
-  when is_atom(DatabaseEdition) ->
+  when is_tuple(DatabaseEdition); is_atom(DatabaseEdition) ->
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults);
@@ -617,8 +625,17 @@ main(Args) ->
 
 -spec parse_database_edition(database_edition()) -> {maxmind, atom()}.
 %% @private
-parse_database_edition(DatabaseEdition) ->
-    {maxmind, DatabaseEdition}.
+parse_database_edition({maxmind, Atom})
+  when is_atom(Atom) ->
+    {maxmind, Atom};
+parse_database_edition({maxmind, Chardata})
+  when ?might_be_chardata(Chardata) ->
+    Charlist = unicode:characters_to_list(Chardata),
+    Atom = list_to_atom(Charlist),
+    {maxmind, Atom};
+parse_database_edition(LegacyMaxMindDatabaseEdition)
+  when is_atom(LegacyMaxMindDatabaseEdition) ->
+    {maxmind, LegacyMaxMindDatabaseEdition}.
 
 -spec parse_url(database_url()) -> locus_database:origin() | false.
 parse_url(DatabaseURL) ->
