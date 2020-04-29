@@ -174,12 +174,13 @@ arguments.
   - The downloaded databases are cached on the filesystem in order to
     more quickly achieve readiness on future launches of the database
     loader
-  - Until a MaxMind or HTTP URL database loader achieves readiness,
-    download attempts are made every minute; once readiness is achieved
-    (either from cache or network), this interval increases to every 6
-    hours. These can be tweaked using the `pre_readiness_update_period`
-    and `post_readiness_update_period` loader settings (in
-    milliseconds.)
+  - Database download attempts are retried upon error according to an
+    exponential backoff policy - quickly at first (every few seconds)
+    but gradually slowing down to every 15 minutes. Successful and
+    dismissed download attempts will be checked for update after 6
+    hours. Both of these behaviours can be tweaked through the
+    `error_retries` and `update_period` loader settings (see [function
+    reference](#api-reference).)
   - When downloading from a MaxMind edition or HTTPS URL, the remote
     certificate will be authenticated against a [list of known
     Certificate Authorities](https://github.com/certifi/erlang-certifi)
@@ -205,11 +206,16 @@ arguments.
 
 ##### Filesystem URLs: Loading and Updating
 
-  - The loaded databases, when compressed, are inflated in memory
-  - Until a filesystem database loader achieves readiness, load attempts
-    are made every 5 seconds; once readiness is achieved, this interval
-    increases to every 30 seconds and load attempts are dismissed as
-    long as the database file modification timestamp keeps unchanged
+  - The loaded database files, when compressed, are inflated in memory
+  - The database file modification timestamp is used to condition
+    subsequent load attempts in order to lower I/O activity
+  - Database load attempts are retried upon error according to an
+    exponential backoff policy - quickly at first (every few seconds)
+    but gradually slowing down to every 30 seconds. Successful and
+    dismissed load attempts will be checked for update after 30 seconds.
+    Both of these behaviours can be tweaked through the `error_retries`
+    and `update_period` loader settings (see [function
+    reference](#api-reference).)
 
 ##### Logging
 
