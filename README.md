@@ -15,8 +15,8 @@ filesystem and updated automatically.
 > [required](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
 > to download MaxMind GeoLite2 databases**.
 > 
-> The existing URLs have been discontinued; you should upgrade `locus`
-> to version `1.9.0` or higher if you used them.
+> Previous URLs have been discontinued; you should upgrade `locus` to a
+> recent version if you used them.
 
 #### Usage
 
