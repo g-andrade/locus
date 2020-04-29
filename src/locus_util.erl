@@ -47,7 +47,8 @@
     is_unicode_string/1,
     is_date/1,
     purge_term_of_very_large_binaries/1,
-    resolve_http_location/2
+    resolve_http_location/2,
+    censor_url_query/2
    ]).
 
 -ignore_xref(
@@ -225,13 +226,33 @@ resolve_http_location(BaseURL, Location) ->
                     {ok, NewURL};
                 "/" ++ _ ->
                     % we should consider the colon character rule here
-                    NewURL = build_url(Scheme, UserInfo, Host, Port, Location),
+                    NewURL = build_url(Scheme, UserInfo, Host, Port, Location, ""),
                     {ok, NewURL};
                 _ ->
                     {error, bad_relative_location}
             end;
         {error, Reason} ->
             {error, Reason}
+    end.
+
+-spec censor_url_query(string(), [unicode:charlist()]) -> string().
+censor_url_query(URL, KeysToCensor) ->
+    % we ignore URL fragments as they wouldn't have been sent to the server anyway.
+    {ok, {Scheme, UserInfo, Host, Port, Path, Query}} = http_uri:parse(URL),
+    case Query of
+        "?" ++ QueryBody ->
+            BinEncodedKeysToCensor = [url_query_encode(Key) || Key <- KeysToCensor],
+            PrefixesForWhichToCensorSuffix = [binary_to_list(BinEncodedKey) ++ "="
+                                              || BinEncodedKey <- BinEncodedKeysToCensor],
+
+            QueryPairs = string:tokens(QueryBody, [$&]),
+            CensoredQueryPairs = [maybe_censor_url_query_pair(Pair, PrefixesForWhichToCensorSuffix)
+                                  || Pair <- QueryPairs],
+            CensoredQueryBody = lists:join($&, CensoredQueryPairs),
+            CensoredQuery = [$? | CensoredQueryBody],
+            build_url(Scheme, UserInfo, Host, Port, Path, CensoredQuery);
+        "" ->
+            URL
     end.
 
 %% ------------------------------------------------------------------
@@ -269,22 +290,35 @@ url_query_encode_codepoint(Codepoint) ->
     UTF8Bytes = <<Codepoint/utf8>>,
     << <<$%, (integer_to_binary(Byte, 16))/bytes>> || <<Byte>> <= UTF8Bytes >>.
 
-build_url(Scheme, UserInfo, Host, Port, Path)
+-spec build_url(atom(), string(), iodata(), inet:port_number(), iodata(), iodata()) -> string().
+build_url(Scheme, UserInfo, Host, Port, Path, Query)
   when UserInfo =:= "",
        ((Scheme =:= http andalso Port =:= 80) orelse
         (Scheme =:= https andalso Port =:= 443))
        ->
-    format_string("~s://~s~s", [Scheme, Host, Path]);
-build_url(Scheme, UserInfo, Host, Port, Path)
+    format_string("~s://~s~s~s", [Scheme, Host, Path, Query]);
+build_url(Scheme, UserInfo, Host, Port, Path, Query)
   when UserInfo =:= "" ->
-    format_string("~s://~s:~b~s", [Scheme, Host, Port, Path]);
-build_url(Scheme, UserInfo, Host, Port, Path) ->
-    format_string("~s://~s@~s:~b~s", [Scheme, UserInfo, Host, Port, Path]).
+    format_string("~s://~s:~b~s", [Scheme, Host, Port, Path, Query]);
+build_url(Scheme, UserInfo, Host, Port, Path, Query) ->
+    format_string("~s://~s@~s:~b~s", [Scheme, UserInfo, Host, Port, Path, Query]).
 
--spec format_string(unicode:charlist(), list()) -> unicode:charlist().
+%-spec format_string(string(), list()) -> string().
 format_string(Fmt, Args) ->
-    CharData = io_lib:format(Fmt, Args),
-    unicode:characters_to_list(CharData).
+    IoData = io_lib:format(Fmt, Args),
+    Binary = iolist_to_binary(IoData),
+    binary_to_list(Binary).
+
+maybe_censor_url_query_pair(Pair, PrefixesForWhichToCensorSuffix) ->
+    case lists_anymap(
+           fun (Prefix) -> lists:prefix(Prefix, Pair) end,
+           PrefixesForWhichToCensorSuffix)
+    of
+        {true, Prefix} ->
+            Prefix ++ "XXXXXXXXXXXXXXXX";
+        false ->
+            Pair
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Unit Tests

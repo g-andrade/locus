@@ -60,6 +60,8 @@
 -define(MAX_REDIRECTIONS, 5).
 
 -define(is_timeout(V), ((is_integer((V)) andalso ((V) >= 0)) orelse ((V) =:= infinity))).
+-define(is_list_of_censored_query_keys(V), (length((V)) >= 0
+                                            andalso lists:all(fun is_atom/1, (V)))).
 
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
@@ -70,7 +72,8 @@
     {download_start_timeout, timeout()} |
     {idle_download_timeout, timeout()} |
     insecure |
-    {insecure, boolean()}.
+    {insecure, boolean()} |
+    {censor_query, CensoredKeys :: [atom()]}.
 -export_type([opt/0]).
 
 -type msg() ::
@@ -155,6 +158,7 @@
 -record(state, {
           owner_pid :: pid(),
           url :: url(),
+          censored_url :: url(),
           headers :: headers(),
           opts :: [opt()],
           timeouts :: #{ term() => infinity | reference() },
@@ -184,8 +188,11 @@ validate_opts(MixedOpts) ->
                   ?is_timeout(Value) orelse error({badopt,Opt});
               (insecure) ->
                   true;
-              ({insecure,Insecure} = Opt) ->
+              ({insecure, Insecure} = Opt) ->
                   is_boolean(Insecure) orelse error({badopt,Opt});
+              ({censor_query, CensoredKeys} = Opt) ->
+                  ?is_list_of_censored_query_keys(CensoredKeys)
+                  orelse error({badopt, Opt});
               (_) ->
                   false
           end,
@@ -221,6 +228,7 @@ init([OwnerPid, URL, Headers, Opts]) ->
     {ok, #state{
             owner_pid = OwnerPid,
             url = URL,
+            censored_url = maybe_censor_url(URL, Opts),
             headers = CiHeaders,
             opts = Opts,
             timeouts = #{},
@@ -275,10 +283,25 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec maybe_censor_url(url(), [opt()]) -> url().
+maybe_censor_url(URL, Opts) ->
+    case proplists:get_value(censor_query, Opts, []) of
+        [_|_] = CensoredKeys ->
+            CensoredStringKeys = [atom_to_list(Key) || Key <- CensoredKeys],
+            locus_util:censor_url_query(URL, CensoredStringKeys);
+        [] ->
+            URL
+    end.
+
+-spec maybe_censor_redirection(redirection(), [opt()]) -> redirection().
+maybe_censor_redirection(#{url := URL} = Redirection, Opts) ->
+    CensoredURL = maybe_censor_url(URL, Opts),
+    Redirection#{url := CensoredURL}.
+
 -spec send_request(state()) -> state().
 send_request(State)
   when State#state.request_id =:= undefined ->
-    #state{url = URL, headers = Headers, opts = Opts} = State,
+    #state{url = URL, censored_url = CensoredURL, headers = Headers, opts = Opts} = State,
     ConnectTimeout = proplists:get_value(connect_timeout, Opts, ?DEFAULT_CONNECT_TIMEOUT),
     Insecure = proplists:get_value(insecure, Opts, false),
 
@@ -303,7 +326,7 @@ send_request(State)
     {ok, RequestId} = httpc:request(get, Request, HTTPOpts, RequestOpts),
     true = is_reference(RequestId),
 
-    report_event({request_sent, URL, Headers}, State),
+    report_event({request_sent, CensoredURL, Headers}, State),
 
     State2 = State#state{ request_id = RequestId },
     _State3 = schedule_download_start_timeout(State2).
@@ -360,10 +383,14 @@ handle_download_start_http_failure(StatusCode, StatusDesc, CiHeaders, Body, Stat
             {stop, normal, State};
         {redirection, Redirection} when State#state.redirections < ?MAX_REDIRECTIONS ->
             %% TODO test coverage of redirections
-            report_event({download_redirected, Redirection}, State),
+            CensoredRedirection = maybe_censor_redirection(Redirection, State#state.opts),
+            report_event({download_redirected, CensoredRedirection}, State),
             #{url := NewURL} = Redirection,
+            #{url := CensoredNewURL} = CensoredRedirection,
             State2 = cancel_download_start_timeout(State),
-            State3 = State2#state{ request_id = undefined, url = NewURL,
+            State3 = State2#state{ request_id = undefined,
+                                   url = NewURL,
+                                   censored_url = CensoredNewURL,
                                    redirections = State2#state.redirections + 1 },
             State4 = send_request(State3),
             {noreply, State4};

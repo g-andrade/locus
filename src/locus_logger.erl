@@ -181,13 +181,11 @@ report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Reason}
                                  locus_http_download:event()) -> ok.
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {request_sent, URL, Headers}) ->
     if MinWeight =< ?debug ->
-           MaybeCensoredURL = locus_maxmind_download:maybe_censor_license_key_in_url(URL),
            log_info("[~ts] ~s download request sent (url \"~ts\", headers ~p)",
-                    [DatabaseId, DownloadType, MaybeCensoredURL, Headers]);
+                    [DatabaseId, DownloadType, URL, Headers]);
        MinWeight =< ?info ->
-           MaybeCensoredURL = locus_maxmind_download:maybe_censor_license_key_in_url(URL),
            log_info("[~ts] ~s download request sent (\"~ts\")",
-                    [DatabaseId, DownloadType, MaybeCensoredURL]);
+                    [DatabaseId, DownloadType, URL]);
        true ->
            ok
     end;
@@ -203,13 +201,11 @@ report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_redire
     #{permanence := Permanence, url := NewURL} = Redirection,
     case Permanence of
         permanent when MinWeight =< ?warning ->
-            MaybeCensoredNewURL = locus_maxmind_download:maybe_censor_license_key_in_url(NewURL),
             log_warning("[~ts] ~s download permanently redirected to \"~p\"",
-                        [DatabaseId, DownloadType, MaybeCensoredNewURL]);
+                        [DatabaseId, DownloadType, NewURL]);
         temporary when MinWeight =< ?info ->
-            MaybeCensoredNewURL = locus_maxmind_download:maybe_censor_license_key_in_url(NewURL),
             log_warning("[~ts] ~s download temporarily redirected to \"~p\"",
-                        [DatabaseId, DownloadType, MaybeCensoredNewURL]);
+                        [DatabaseId, DownloadType, NewURL]);
         _ ->
             ok
     end;

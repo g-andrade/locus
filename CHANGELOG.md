@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Added
 - support for HTTPS redirections across distinct hostnames
+- support for non-censorship of license keys from MaxMind URLs mentioned in logs
+- support for censorship of arbitrary query arguments from HTTP URLs mentioned in logs
+
+### Changed
+- consumer-subscribed events as to follow the same URL censorship rules as the built-in logger
 
 ## [1.10.2] - 2020-03-13
 ### Added
