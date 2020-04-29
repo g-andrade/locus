@@ -77,6 +77,8 @@
          element(1, (Event)) =:= download_started orelse
          element(1, (Event)) =:= download_finished)).
 
+-define(MAX_TRUNCATED_URL_LENGTH, 500).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -181,11 +183,12 @@ report(MinWeight, DatabaseId, {cache_attempt_finished, Filename, {error, Reason}
                                  locus_http_download:event()) -> ok.
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {request_sent, URL, Headers}) ->
     if MinWeight =< ?debug ->
-           log_info("[~ts] ~s download request sent (url \"~ts\", headers ~p)",
+           log_info("[~ts] ~s download request sent to \"~ts\" (headers: ~p)",
                     [DatabaseId, DownloadType, URL, Headers]);
        MinWeight =< ?info ->
-           log_info("[~ts] ~s download request sent (\"~ts\")",
-                    [DatabaseId, DownloadType, URL]);
+           MaybeTruncatedURL = maybe_truncate_url(URL),
+           log_info("[~ts] ~s download request sent to \"~ts\"",
+                    [DatabaseId, DownloadType, MaybeTruncatedURL]);
        true ->
            ok
     end;
@@ -302,6 +305,17 @@ has_usable_logger() ->
 log_to_error_logger(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt ++ "~n",
     error_logger:(Fun)(FullFmt, Args).
+
+-spec maybe_truncate_url(locus_http_download:url()) -> locus_http_download:url().
+maybe_truncate_url(URL) ->
+    TruncationSuffix = "...",
+    Threshold = ?MAX_TRUNCATED_URL_LENGTH - length(TruncationSuffix),
+    case length(URL) >= Threshold of
+        true ->
+            lists:sublist(URL, Threshold) ++ TruncationSuffix;
+        false ->
+            URL
+    end.
 
 -spec resumed_source(locus_loader:source()) -> cache | remote | filesystem.
 resumed_source({SourceType, _SourceLocation}) ->
