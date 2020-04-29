@@ -43,7 +43,7 @@ xref: $(REBAR3)
 	@$(REBAR3) xref
 
 test: $(REBAR3) cli test/MaxMind-DB/test-data
-	@$(REBAR3) as test eunit, ct, cover
+	@$(REBAR3) do eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 ci_test: $(REBAR3) cli
