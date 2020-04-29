@@ -4,12 +4,12 @@
 [![](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
-the country, city or ASN of IP addresses using MaxMind GeoIP2.
+the country, city or ASN of IP addresses using [MaxMind
+GeoIP2](https://dev.maxmind.com/geoip/geoip2/geolite2/) and [other
+providers](#alternative-providers).
 
-The free [MaxMind
-databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) you choose
-are loaded on-demand and, if using HTTP, cached on the filesystem and
-updated automatically.
+The databases will be loaded on-demand and, if using HTTP, cached on the
+filesystem and updated automatically.
 
 > ⚠️ Starting on December 31st, 2019, **a license key is now
 > [required](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
@@ -21,6 +21,9 @@ updated automatically.
 #### Usage
 
 ##### 1\. Configure your license key
+
+**Skip this step if you're not loading databases directly from
+MaxMind.**
 
 Get a free [license key](https://www.maxmind.com/en/geolite2/signup)
 from MaxMind if you haven't one already. Once logged in, you'll find the
@@ -107,8 +110,9 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 9.  [API Reference](#api-reference)
 10. [Tested Setup](#tested-setup)
 11. [License](#license)
-12. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
-13. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
+12. [Alternative Providers](#alternative-providers)
+13. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
+14. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
 
 ##### Supported File Formats
 
@@ -127,11 +131,9 @@ format](https://maxmind.github.io/MaxMind-DB/) is mostly complete.
 
   - The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
-    successfully tested; presumably `locus` can deal with any MaxMind DB
-    2.x database that maps IP address prefixes to arbitrary data, but no
-    [commercial
-    databases](https://dev.maxmind.com/geoip/geoip2/downloadable/) have
-    yet been tested
+    successfully tested; presumably `locus` can deal with [any MMDB
+    database](#alternative-providers) that maps IP address prefixes to
+    arbitrary data
   - The databases are loaded into memory (mostly) as is; reference
     counted binaries are shared with the application callers using ETS
     tables, and the original binary search tree is used to lookup
@@ -281,6 +283,12 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 `locus` is an independent project and has not been authorized,
 sponsored, or otherwise approved by MaxMind.
+
+##### Alternative Providers
+
+  - [DB-IP.com](https://db-ip.com/db/): lite databases seem to work but
+    setting up auto-update for them is not practical, as there's no
+    "latest" URL.
 
 ##### Alternative Libraries (Erlang)
 

@@ -1,5 +1,7 @@
 {application, locus,
- [{description, "Geolocation and ASN lookup of IP addresses using MaxMind GeoIP2 / GeoLite2"},
+ [{description,
+   "MMDB reader for geolocation and ASN lookup of IP addresses,"
+   " supporting MaxMind GeoLite2/GeoIP2 and other providers"},
   {vsn, "git"},
   {registered, []},
   {mod, {locus_app, []}},
