@@ -198,14 +198,12 @@ report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_dismis
            ok
     end;
 report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_redirected, Redirection}) ->
-    #{permanence := Permanence, url := NewURL} = Redirection,
+    #{permanence := Permanence} = Redirection,
     case Permanence of
         permanent when MinWeight =< ?warning ->
-            log_warning("[~ts] ~s download permanently redirected to \"~p\"",
-                        [DatabaseId, DownloadType, NewURL]);
+            log_warning("[~ts] ~s download permanently redirected", [DatabaseId, DownloadType]);
         temporary when MinWeight =< ?info ->
-            log_warning("[~ts] ~s download temporarily redirected to \"~p\"",
-                        [DatabaseId, DownloadType, NewURL]);
+            log_warning("[~ts] ~s download temporarily redirected", [DatabaseId, DownloadType]);
         _ ->
             ok
     end;
