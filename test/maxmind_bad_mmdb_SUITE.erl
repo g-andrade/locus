@@ -77,6 +77,9 @@ metadata_is_an_uint128_test(_Config) ->
 unexpected_bytes_test(_Config) ->
     expect_database_decode_failure("maxminddb-golang/unexpected-bytes.mmdb").
 
+bad_unicode_in_map_key_test(_Config) ->
+    expect_database_decode_failure("maxminddb-python/bad-unicode-in-map-key.mmdb").
+
 %% ------------------------------------------------------------------
 %% Internal
 %% ------------------------------------------------------------------
