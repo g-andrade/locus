@@ -78,6 +78,7 @@
     {finished, {error, {checksum_download, term()}}} |
     {finished, {error, {bad_checksum, #{expected := binary(),
                                         actual := binary()}}}} |
+    {finished, {error, {bad_checksum_format, binary()}}} |
     locus_http_download:msg().
 -export_type([msg/0]).
 
@@ -318,7 +319,7 @@ handle_database_download_success(Success, State) ->
 build_checksum_download_url(DatabaseDownloadSuccess, State) ->
     #state{edition = Edition, license_key = LicenseKey} = State,
     ChecksumDownloadOpts = checksum_download_opts(DatabaseDownloadSuccess, State),
-    build_download_url(Edition, LicenseKey, ChecksumDownloadOpts, "tar.gz.md5").
+    build_download_url(Edition, LicenseKey, ChecksumDownloadOpts, "tar.gz.sha256").
 
 checksum_download_opts(DatabaseDownloadSuccess, State) ->
     #state{edition = Edition, opts = BaseOpts} = State,
@@ -396,24 +397,42 @@ handle_checksum_download_msg({event, Event}, State) ->
 -spec handle_checksum_download_success(locus_http_download:success(), state())
         -> {stop, normal, state()}.
 handle_checksum_download_success(Success, State) ->
-    #{body := ExpectedDatabaseChecksum} = Success,
-    case actual_database_checksum(State) of
-        ExpectedDatabaseChecksum ->
+    ActualDatabaseChecksum = actual_database_checksum(State),
+    ActualDatabaseChecksumSize = byte_size(ActualDatabaseChecksum),
+
+    case extract_expected_database_checksum(Success, ActualDatabaseChecksumSize) of
+        {ok, ActualDatabaseChecksum} ->
             #state{database_download_success = DatabaseDownloadSuccess} = State,
             notify_owner({finished, {success, DatabaseDownloadSuccess}}, State),
             {stop, normal, State};
-        ActualDatabaseChecksum ->
+        {ok, ExpectedDatabaseChecksum} ->
             ErrorReason = {bad_checksum, #{expected => ExpectedDatabaseChecksum,
                                            actual => ActualDatabaseChecksum}},
             notify_owner({finished, {error, ErrorReason}}, State),
+            {stop, normal, State};
+        {error, ErrorReason} ->
+            notify_owner({finished, {error, ErrorReason}}, State),
             {stop, normal, State}
+    end.
+
+-spec extract_expected_database_checksum(locus_http_download:success(), pos_integer())
+        -> {ok, binary()} | {error, {bad_checksum_format, binary()}}.
+extract_expected_database_checksum(ChecksumDownloadSuccess, ActualDatabaseChecksumSize) ->
+    case ChecksumDownloadSuccess of
+        #{body := <<ExpectedDatabaseChecksum:ActualDatabaseChecksumSize/bytes>>} ->
+            {ok, ExpectedDatabaseChecksum};
+        #{body := <<ExpectedDatabaseChecksum:ActualDatabaseChecksumSize/bytes,
+                    " ", _Filename/bytes>>} ->
+            {ok, ExpectedDatabaseChecksum};
+        #{body := <<BadChecksum/bytes>>} ->
+            {error, {bad_checksum_format, BadChecksum}}
     end.
 
 -spec actual_database_checksum(state()) -> binary().
 actual_database_checksum(State) ->
     #state{database_download_success = DownloadSuccess} = State,
     #{body := ResponseBody} = DownloadSuccess,
-    Hash = crypto:hash(md5, ResponseBody),
+    Hash = crypto:hash(sha256, ResponseBody),
     ChecksumStr = locus_util:bin_to_hex_str(Hash),
     list_to_binary(ChecksumStr).
 
