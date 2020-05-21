@@ -135,7 +135,6 @@ init_per_group(GroupName, Config) ->
             ok = application:set_env(kernel, logger_level, debug),
             ok = locus_logger:set_loglevel(debug),
             ok = application:set_env(locus, license_key, license_key_from_environment()),
-            % RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36), % FIXME
             Edition = {maxmind, "GeoLite2-Country"},
             [{is_http, true},
              {is_remote, true},
@@ -158,10 +157,11 @@ end_per_group(GroupName, Config) ->
             _ = file:delete(CacheFilename),
             Config;
         "remote_http_tests" ->
-            MaxMindEditionName = proplists:get_value(url_or_edition, Config),
+            MaxMindEditionName
+                = list_to_atom(proplists:get_value(url_or_edition, Config)),
             Date = undefined,
-            CacheFilename = locus_loader:cached_database_path_for_maxmind_edition(MaxMindEditionName,
-                                                                                  Date),
+            CacheFilename = locus_loader:cached_database_path_for_maxmind_edition_name(
+                              MaxMindEditionName, Date),
 
             ok = application:stop(locus),
             _ = file:delete(CacheFilename),
