@@ -48,7 +48,8 @@
     is_date/1,
     purge_term_of_very_large_binaries/1,
     resolve_http_location/2,
-    censor_url_query/2
+    censor_url_query/2,
+    parse_absolute_http_url/1
    ]).
 
 -ignore_xref(
@@ -210,15 +211,15 @@ resolve_http_location(BaseURL, Location) ->
     % * https://tools.ietf.org/html/rfc7231#page-68
     % * https://tools.ietf.org/html/rfc3986#section-4.2
 
-    case http_uri:parse(Location) of
+    case parse_absolute_http_url(Location) of
         {ok, _} ->
             % location is an absolute URL
             {ok, Location};
-        {error, no_scheme} ->
+        {error, not_absolute_http_url} ->
             % location is a relative URL
-            BaseURLParseSuccess = http_uri:parse(BaseURL),
+            BaseURLParseSuccess = parse_absolute_http_url(BaseURL),
             % we ignore URL fragments as they wouldn't be sent to the server anyway.
-            {ok, {Scheme, UserInfo, Host, Port, _Path, _Query}} = BaseURLParseSuccess,
+            {ok, {Scheme, UserInfo, Host, Port, _Path, _Query, _Fragment}} = BaseURLParseSuccess,
             case Location of
                 "//" ++ _ ->
                     % network-path reference
@@ -238,7 +239,9 @@ resolve_http_location(BaseURL, Location) ->
 -spec censor_url_query(string(), [unicode:charlist()]) -> string().
 censor_url_query(URL, KeysToCensor) ->
     % we ignore URL fragments as they wouldn't have been sent to the server anyway.
-    {ok, {Scheme, UserInfo, Host, Port, Path, Query}} = http_uri:parse(URL),
+    {ok, {Scheme, UserInfo, Host, Port, Path,
+          Query, _Fragment}} = parse_absolute_http_url(URL),
+
     case Query of
         "?" ++ QueryBody ->
             BinEncodedKeysToCensor = [url_query_encode(Key) || Key <- KeysToCensor],
@@ -254,6 +257,65 @@ censor_url_query(URL, KeysToCensor) ->
         "" ->
             URL
     end.
+
+-ifdef(HTTP_URI_PARSE_DEPRECATED).
+-spec parse_absolute_http_url(string())
+        -> {ok, {atom(), string(), string(), inet:port_number(),
+                 string(), string(), string()}}
+           | {error, not_absolute_http_url}
+           | {error, {atom(), term()}}.
+parse_absolute_http_url(URI) ->
+    case uri_string:parse(URI) of
+        #{scheme := SchemeStr, host := Host} = ParsedURI
+          when (SchemeStr =:= "http" orelse SchemeStr =:= "https"),
+               length(Host) > 0 ->
+
+            Scheme = list_to_existing_atom(SchemeStr),
+            DefaultPort =
+                case Scheme of
+                    http -> 80;
+                    https -> 443
+                end,
+            Query =
+                case ParsedURI of
+                    #{query := QueryStr} when length(QueryStr) > 0 ->
+                        [$? | QueryStr]; % simulate http_uri:parse/2 behaviour
+                    #{} ->
+                        ""
+                end,
+
+            {ok, {Scheme,
+                  maps:get(userinfo, ParsedURI, ""),
+                  Host,
+                  maps:get(port, ParsedURI, DefaultPort),
+                  maps:get(path, ParsedURI, "/"),
+                  Query,
+                  maps:get(fragment, ParsedURI, "")
+                 }};
+        #{} ->
+            {error, not_absolute_http_url};
+        {error, Reason, Context} ->
+            {error, {Reason, Context}}
+    end.
+-else.
+-spec parse_absolute_http_url(string())
+        -> {ok, {atom(), string(), string(), inet:port_number(),
+                 string(), string(), string()}}
+           | {error, term()}.
+parse_absolute_http_url(URI) ->
+    case http_uri:parse(URI, [{fragment, true}]) of
+        {ok, {Scheme, _, Host, _, _, _, _}} = Success
+          when (Scheme =:= http orelse Scheme =:= https),
+               length(Host) > 0 ->
+            Success;
+        {ok, _} ->
+            {error, not_absolute_http_url};
+        {error, no_scheme} ->
+            {error, not_absolute_http_url};
+        {error, _} = Error ->
+            Error
+    end.
+-endif.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

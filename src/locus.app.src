@@ -14,8 +14,7 @@
     public_key,
     ssl,
     % External dependencies
-    certifi,
-    ssl_verify_fun
+    tls_certificate_check
    ]},
   {modules, []},
 

@@ -31,20 +31,14 @@ of
         OverriddenSortableDeps =
             lists:foldr(
               fun ({stacktrace_compat, Version}, Acc) ->
-                      [{1, {stacktrace_compat, ".*", {git, "https://github.com/g-andrade/stacktrace_compat.git",
-                                                      {tag, Version}}}}
+                      [{1, {stacktrace_compat, ".*",
+                            {git, "https://github.com/g-andrade/stacktrace_compat.git",
+                             {tag, Version}}}}
                        | Acc];
-                  ({certifi, Version}, Acc) ->
-                      [{2, {certifi, ".*", {git, "https://github.com/certifi/erlang-certifi.git",
-                                            {tag, Version}}}},
-                       %% XXX we don't actually need parse_trans, but certifi imports it
-                       %% from hex.pm, which would make it impossible to build it on rebar 2.
-                       {2, {parse_trans, ".*", {git, "https://github.com/uwiger/parse_trans.git",
-                                                {tag, "3.3.0"}}}}
-                       | Acc];
-                  ({ssl_verify_fun, Version}, Acc) ->
-                      [{3, {ssl_verify_fun, ".*", {git, "https://github.com/deadtrickster/ssl_verify_fun.erl.git",
-                                                   {tag, Version}}}}
+                  ({tls_certificate_check, Version}, Acc) ->
+                      [{2, {tls_certificate_check, ".*",
+                            {git, "https://github.com/g-andrade/tls_certificate_check.git",
+                             {tag, Version}}}}
                        | Acc];
                   ({Name, Version}, _Acc) ->
                       MsgErrorIo = io_lib:format("Hex package '~ts', version \"~ts\": missing Git repo",

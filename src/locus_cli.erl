@@ -65,7 +65,7 @@ prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
     DatabaseId = cli_analysis,
     BaseOpts = [{event_subscriber, self()}],
     ExtraOpts =
-        case http_uri:parse(DatabaseURL) of
+        case locus_util:parse_absolute_http_url(DatabaseURL) of
             {ok, _} -> [no_cache];
             {error, _} -> []
         end,

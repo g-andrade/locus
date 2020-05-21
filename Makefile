@@ -52,7 +52,7 @@ ci_test: $(REBAR3) cli
 
 cover: test
 
-shell: export ERL_FLAGS =? +pc unicode
+shell: export ERL_FLAGS ?= +pc unicode
 shell:
 	@$(REBAR3) as development shell
 

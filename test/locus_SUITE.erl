@@ -27,8 +27,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
--define(PATH_WITH_TEST_TARBALLS, "../../../../test/priv").
-
 -define(IPV4_STR_ADDR, "93.184.216.34"). % example.com
 -define(IPV6_STR_ADDR, "2606:2800:220:1:248:1893:25c8:1946"). % example.com
 
@@ -99,13 +97,15 @@ exported_functions() ->
 
 %%%%%%%%%%%%%%%
 init_per_group(GroupName, Config) ->
+    PathWithTestTarballs = path_with_test_tarballs(),
     case atom_to_list(GroupName) of
         "filesystem_tests_" ++ FileExtension ->
             {ok, _} = application:ensure_all_started(locus),
+            ok = application:set_env(kernel, logger_level, debug),
             ok = locus_logger:set_loglevel(debug),
-            BaseURL = ?PATH_WITH_TEST_TARBALLS,
-            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country." ++ FileExtension),
-            CorruptPath = filename:join(?PATH_WITH_TEST_TARBALLS, "corruption." ++ FileExtension),
+            BaseURL = PathWithTestTarballs,
+            DatabasePath = filename:join(PathWithTestTarballs, "GeoLite2-Country." ++ FileExtension),
+            CorruptPath = filename:join(PathWithTestTarballs, "corruption." ++ FileExtension),
             [{is_http, false},
              {url_or_edition, DatabasePath},
              {path, DatabasePath},
@@ -114,9 +114,10 @@ init_per_group(GroupName, Config) ->
              | Config];
         "local_http_tests_" ++ FileExtension ->
             {ok, _} = application:ensure_all_started(locus),
+            ok = application:set_env(kernel, logger_level, debug),
             ok = locus_logger:set_loglevel(debug),
-            {ok, HttpdPid, BaseURL} = locus_httpd:start(?PATH_WITH_TEST_TARBALLS),
-            DatabasePath = filename:join(?PATH_WITH_TEST_TARBALLS, "GeoLite2-Country." ++ FileExtension),
+            {ok, HttpdPid, BaseURL} = locus_httpd:start(PathWithTestTarballs),
+            DatabasePath = filename:join(PathWithTestTarballs, "GeoLite2-Country." ++ FileExtension),
             RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
             DatabaseURL = BaseURL ++ "/GeoLite2-Country." ++ FileExtension ++ "#" ++ RandomAnchor,
             CorruptURL = BaseURL ++ "/corruption." ++ FileExtension,
@@ -131,6 +132,7 @@ init_per_group(GroupName, Config) ->
              | Config];
         "remote_http_tests" ->
             {ok, _} = application:ensure_all_started(locus),
+            ok = application:set_env(kernel, logger_level, debug),
             ok = locus_logger:set_loglevel(debug),
             ok = application:set_env(locus, license_key, license_key_from_environment()),
             % RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36), % FIXME
@@ -164,6 +166,21 @@ end_per_group(GroupName, Config) ->
             ok = application:stop(locus),
             _ = file:delete(CacheFilename),
             Config
+    end.
+
+path_with_test_tarballs() ->
+    PrivDir = priv_dir(locus),
+    BuildRoot = filename:dirname(PrivDir),
+    filename:join([BuildRoot, "test", "priv"]).
+
+priv_dir(App) ->
+    % from: http://erlang.org/pipermail/erlang-questions/2011-October/062026.html
+    case code:priv_dir(App) of
+        {error, bad_name} ->
+            {ok, Cwd} = file:get_cwd(),
+            filename:join(Cwd, "priv");
+        Priv ->
+            Priv
     end.
 
 %% ------------------------------------------------------------------

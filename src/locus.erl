@@ -658,14 +658,10 @@ parse_http_url(DatabaseURL) when is_list(DatabaseURL) ->
 parse_http_url(DatabaseURL) ->
     ByteList = binary_to_list(DatabaseURL),
     try io_lib:printable_latin1_list(ByteList) andalso
-        http_uri:parse(ByteList)
+        locus_util:parse_absolute_http_url(ByteList)
     of
         false ->
             false;
-        {ok, {Scheme, "", "geolite.maxmind.com", Port, "/download/geoip/database/GeoLite2-" ++ Suffix, _}}
-          when Scheme =:= http, Port =:= 80;
-               Scheme =:= https, Port =:= 443 ->
-            parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList);
         {ok, {Scheme, "", "geolite.maxmind.com", Port, "/download/geoip/database/GeoLite2-" ++ Suffix, _, _}}
           when Scheme =:= http, Port =:= 80;
                Scheme =:= https, Port =:= 443 ->

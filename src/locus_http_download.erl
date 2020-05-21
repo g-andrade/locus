@@ -293,7 +293,6 @@ maybe_censor_url(URL, Opts) ->
             URL
     end.
 
--spec maybe_censor_redirection(redirection(), [opt()]) -> redirection().
 maybe_censor_redirection(#{url := URL} = Redirection, Opts) ->
     CensoredURL = maybe_censor_url(URL, Opts),
     Redirection#{url := CensoredURL}.
@@ -308,13 +307,11 @@ send_request(State)
     Request = {URL, Headers},
     BaseHTTPOpts = [{connect_timeout, ConnectTimeout}],
     ExtraHTTPOpts =
-        case Insecure orelse http_uri:parse(URL) of
+        case Insecure of
             true ->
                 [];
-            {ok, ParsedURL} when element(1, ParsedURL) =:= http ->
-                [];
-            {ok, ParsedURL} when element(1, ParsedURL) =:= https ->
-                [{ssl,locus_https_requests:ssl_opts_for_ca_authentication(URL)}]
+            false ->
+                [{ssl, tls_certificate_check:options(URL)}]
         end,
     % Autoredirect causes issues for HTTPS downloads,
     % since the TLS validation set up in `ExtraHTTPOpts'
