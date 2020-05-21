@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - support for OTP 23
 
+### Changed
+- checksum verification algorithm of MaxMind downloads from MD5 to SHA-256
+
 ## [1.11.0] - 2020-05-11
 ### Added
 - support for HTTPS redirections across distinct hostnames
