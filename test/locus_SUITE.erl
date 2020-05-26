@@ -168,6 +168,13 @@ end_per_group(GroupName, Config) ->
             Config
     end.
 
+-ifdef(PRIV_DIR_SHENANIGANS).
+path_with_test_tarballs() ->
+    % Work around mind-boggling behaviour in OTP 20.0
+    % for which I realy don't the time.
+    "../../../../test/priv".
+
+-else.
 path_with_test_tarballs() ->
     PrivDir = priv_dir(locus),
     BuildRoot = filename:dirname(PrivDir),
@@ -182,6 +189,8 @@ priv_dir(App) ->
         Priv ->
             Priv
     end.
+
+-endif. % endif(PRIV_DIR_SHENANIGANS)
 
 %% ------------------------------------------------------------------
 %% Test Cases
