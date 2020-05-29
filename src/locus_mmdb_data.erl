@@ -88,7 +88,7 @@
     boolean().
 -export_type([decoded_simple_value/0]).
 
--type int32() :: -(1 bsl 32)..((1 bsl 32) - 1).
+-type int32() :: -(1 bsl 31)..((1 bsl 31) - 1).
 -export_type([int32/0]).
 
 -type uint128() :: 0..((1 bsl 128) - 1).
