@@ -68,7 +68,7 @@
 -endif.
 
 %% ------------------------------------------------------------------
-%% Type Definitions
+%% Macro Definitions
 %% ------------------------------------------------------------------
 
 -define(might_be_chardata(V), (is_binary((V)) orelse ?is_proper_list((V)))).
