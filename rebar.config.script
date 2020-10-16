@@ -1,9 +1,10 @@
 % vim: set ft=erlang:
-case erlang:function_exported(rebar3, main, 1) orelse
-     {deps, lists:keyfind(deps, 1, CONFIG)}
+case erlang:function_exported(rebar3, main, 1)
+     orelse erlang:function_exported('Elixir.Mix', module_info, 1)
+     orelse {deps, lists:keyfind(deps, 1, CONFIG)}
 of
     true ->
-        % rebar3
+        % either rebar3 or mix
         CONFIG;
     {deps, false} ->
         % no override needed
