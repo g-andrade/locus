@@ -46,7 +46,7 @@ test: $(REBAR3) cli test/MaxMind-DB/test-data
 	@$(REBAR3) do eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
-ci_test: $(REBAR3) cli
+ci_test: $(REBAR3) cli test/MaxMind-DB/test-data
 	@$(REBAR3) as ci_test eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
