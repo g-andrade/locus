@@ -67,7 +67,7 @@ should_run_remote_http_tests() ->
 -else.
 should_run_remote_http_tests() ->
     currently_checkedout_commit_is_likely_tagged()
-    andalso (license_key_from_environment() =/= undefined).
+    andalso license_key_from_environment_is_defined().
 
 currently_checkedout_commit_is_likely_tagged() ->
     {ok, _} = application:ensure_all_started(locus),
@@ -77,6 +77,11 @@ currently_checkedout_commit_is_likely_tagged() ->
         [_,_,_] -> true; % likely a tagged commit
         _ -> false
     end.
+
+license_key_from_environment_is_defined() ->
+    LicenseKey = license_key_from_environment(),
+    LicenseKey =/= false andalso length(LicenseKey) > 0.
+
 -endif.
 
 license_key_from_environment() ->
