@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [1.13.0] - 2020-12-05
 ### Changed
+- CA bundles, based on the latest mkcert.org full CA list as of Nov 13, 2020
 - imported `stacktrace_compat` version to benefit from its latest improvements
 
 ## [1.12.2] - 2020-10-29
