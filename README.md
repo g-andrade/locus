@@ -1,7 +1,7 @@
 # locus
 
 [![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
-[![](https://travis-ci.org/g-andrade/locus.png?branch=master)](https://travis-ci.org/g-andrade/locus)
+[![](https://travis-ci.com/g-andrade/locus.png?branch=master)](https://travis-ci.com/g-andrade/locus)
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
 the country, city or ASN of IP addresses using [MaxMind
