@@ -82,7 +82,7 @@ init_per_group(Group, Config) ->
     {ok, BinDatabase} = file:read_file(DatabasePath),
     case file:read_file(SourcePath) of
         {ok, BinGroupDef} when not IsBroken ->
-            JsonGroupDef = jsx:decode(BinGroupDef, [return_maps]),
+            JsonGroupDef = jsx:decode(BinGroupDef),
             [{json_group_def, JsonGroupDef},
              {bin_database, BinDatabase}
              | Config];
