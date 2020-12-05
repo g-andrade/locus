@@ -2,7 +2,7 @@
 [{<<"certifi">>,{pkg,<<"certifi">>,<<"2.5.2">>},1},
  {<<"parse_trans">>,{pkg,<<"parse_trans">>,<<"3.3.0">>},1},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.6">>},1},
- {<<"stacktrace_compat">>,{pkg,<<"stacktrace_compat">>,<<"1.1.1">>},0},
+ {<<"stacktrace_compat">>,{pkg,<<"stacktrace_compat">>,<<"1.2.1">>},0},
  {<<"tls_certificate_check">>,
   {pkg,<<"tls_certificate_check">>,<<"1.0.2">>},
   0}]}.
@@ -11,6 +11,6 @@
  {<<"certifi">>, <<"B7CFEAE9D2ED395695DD8201C57A2D019C0C43ECAF8B8BCB9320B40D6662F340">>},
  {<<"parse_trans">>, <<"09765507A3C7590A784615CFD421D101AEC25098D50B89D7AA1D66646BC571C1">>},
  {<<"ssl_verify_fun">>, <<"CF344F5692C82D2CD7554F5EC8FD961548D4FD09E7D22F5B62482E5AEAEBD4B0">>},
- {<<"stacktrace_compat">>, <<"1C064BC1725F5BD6470853487AC7FBDA5D5E8745CE4B57D0AE71765C85B4414A">>},
+ {<<"stacktrace_compat">>, <<"EC6B8EA09B68DE061911AD50037E10673C823F4BC15B544DE657949DFB99961B">>},
  {<<"tls_certificate_check">>, <<"91F0A87CE22BDFD4442DC2714FF2ABF195B99AF154EC129C264243B3744E515F">>}]}
 ].
