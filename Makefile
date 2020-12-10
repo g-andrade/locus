@@ -79,7 +79,7 @@ cli: $(REBAR3)
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
 
 test/MaxMind-DB/test-data: test/MaxMind-DB
-	pushd test/MaxMind-DB && git reset --hard d7d482e
+	(cd test/MaxMind-DB && git reset --hard d7d482e)
 
 test/MaxMind-DB:
 	git clone https://github.com/maxmind/MaxMind-DB.git test/MaxMind-DB
