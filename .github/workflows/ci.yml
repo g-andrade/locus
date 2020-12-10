@@ -23,4 +23,6 @@ jobs:
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: true
       - run: RUNNING_ON_CI=yes make ci_test check
