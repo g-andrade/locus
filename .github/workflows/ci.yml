@@ -1,0 +1,26 @@
+---
+name: build
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  ci:
+    name: >
+      Run checks and tests over ${{matrix.otp_vsn}} and ${{matrix.os}}
+    runs-on: ${{matrix.os}}
+    container:
+      image: erlang:${{matrix.otp_vsn}}
+    strategy:
+      matrix:
+        # Use only latest OTP minor for each supported major, except for:
+        # - 20.0: because of PRIV_DIR_SHENANIGANS (only version affected)
+        # - 21.0: because of NO_LOGGER (which doesn't affect 21.1+)
+        otp_vsn: [19.3, 20.0, 20.3, 21.0, 21.3, 22.3, 23.1]
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - run: RUNNING_ON_CI=yes make ci_test check
