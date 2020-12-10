@@ -78,5 +78,8 @@ cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
 
-test/MaxMind-DB/test-data:
-	git submodule update --init --recursive -- test/MaxMind-DB
+test/MaxMind-DB/test-data: test/MaxMind-DB
+	(cd test/MaxMind-DB && git reset --hard d7d482e && rm -rf .git)
+
+test/MaxMind-DB:
+	git clone https://github.com/maxmind/MaxMind-DB.git test/MaxMind-DB
