@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2021-03-12
+### Changed
+- imported version of `tls_certificate_check` to 1.2.0
+
+### Fixed
+- broken `tls_certificate_check`s when using rebar3 3.14.4
+
 ## [1.13.2] - 2020-12-10
 ### Changed
 - CI from Travis to GitHub actions
