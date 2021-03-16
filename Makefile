@@ -72,7 +72,6 @@ README.md: doc
 
 publish: $(REBAR3)
 	@$(REBAR3) as publish hex publish
-	@$(REBAR3) as publish hex docs
 
 cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
