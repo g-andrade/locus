@@ -7,11 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [1.15.0] - 2021-04-02
 ### Changed
 - imported version of `tls_certificate_check` to '~> 1.3'
+- minimum Erlang/OTP version to 21.2
 
 ### Removed
-- compatibility with OTP 21.0 and 21.1
-- compatibility with OTP 20
-- compatibility with OTP 19
 - `stacktrace_compat` dependency
 - (now-)dead code that dealt with pre- OTP 21.2 differences in `stdlib` and such
 - unmaintained compatibility with rebar 2
