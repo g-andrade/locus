@@ -202,8 +202,7 @@ lookup_(Address, DatabaseParts) ->
         {error, Reason} ->
             {error, Reason}
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             erlang:raise(Class, SaferReason, SaferStacktrace)

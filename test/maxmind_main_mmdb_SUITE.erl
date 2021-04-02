@@ -27,8 +27,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(PROJECT_ROOT, "../../../../").
--define(TEST_SOURCES_REL_PATH, "test/MaxMind-DB/source-data/").
--define(TEST_DBS_REL_PATH, "test/MaxMind-DB/test-data/").
+-define(TEST_SOURCES_REL_PATH, "_build/test/lib/maxmind_test_data/source-data/").
+-define(TEST_DBS_REL_PATH, "_build/test/lib/maxmind_test_data/test-data/").
 
 -define(BLACKLIST, ["MaxMind-DB-no-ipv4-search-tree",
                     "MaxMind-DB-test-metadata-pointers"]).
@@ -40,13 +40,6 @@
 all() ->
     [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
--ifdef(RUNNING_ON_CI).
-groups() ->
-    % This suite is too heavy for Travis. It runs ok but screws up
-    % locus_SUITE which runs right after, e.g. with unexpected timeouts.
-    % Probably CPU throttling of some sort.
-    [].
--else.
 groups() ->
     DatabasePathsPattern = filename:join([?PROJECT_ROOT, ?TEST_DBS_REL_PATH, "*.mmdb"]),
     DatabasePaths = filelib:wildcard(DatabasePathsPattern),
@@ -61,7 +54,6 @@ groups() ->
                end)
       end,
       DatabasePaths).
--endif.
 
 test_cases() ->
     Exports = ?MODULE:module_info(exports),

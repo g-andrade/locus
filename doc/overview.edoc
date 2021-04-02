@@ -181,7 +181,7 @@ Run `./locus analyze --help' for a description of supported options and argument
   loader settings (see <a href="#api-reference">function reference</a>.)
   </li>
 <li>When downloading from a MaxMind edition or HTTPS URL, the remote certificate will be authenticated
-  against a <a target="_parent" href="https://github.com/certifi/erlang-certifi">list of known Certificate Authorities</a>
+  against a <a target="_parent" href="https://hexdocs.pm/tls_certificate_check/">list of known Certificate Authorities</a>
   and connection negotiation will fail in case of an expired certificate, mismatched hostname,
   self-signed certificate or unknown certificate authority.
   These checks can be disabled by specifying the `insecure' loader option.
@@ -249,7 +249,7 @@ The API reference can be found on <a target="_parent" href="https://hexdocs.pm/l
 <h5 id="tested-setup">Tested setup</h5>
 
 <ul>
-<li>Erlang/OTP 19 or newer</li>
+<li>Erlang/OTP 21.2 or newer</li>
 <li>rebar3</li>
 </ul>
 

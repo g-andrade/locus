@@ -17,10 +17,10 @@ endif
 CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
 
 .PHONY: all build clean check dialyzer xref
-.PHONY: test ci_test cover
+.PHONY: test cover
 .PHONY: shell console doc publish cli
 
-.NOTPARALLEL: check cover test ci_test
+.NOTPARALLEL: check cover test
 
 all: build
 
@@ -42,12 +42,8 @@ dialyzer: $(REBAR3)
 xref: $(REBAR3)
 	@$(REBAR3) xref
 
-test: $(REBAR3) cli test/MaxMind-DB/test-data
+test: $(REBAR3) cli
 	@$(REBAR3) do eunit, ct, cover
-	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
-
-ci_test: $(REBAR3) cli test/MaxMind-DB/test-data
-	@$(REBAR3) as ci_test eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 cover: test
@@ -76,9 +72,3 @@ publish: $(REBAR3)
 cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
-
-test/MaxMind-DB/test-data: test/MaxMind-DB
-	(cd test/MaxMind-DB && git reset --hard d7d482e && rm -rf .git)
-
-test/MaxMind-DB:
-	git clone https://github.com/maxmind/MaxMind-DB.git test/MaxMind-DB

@@ -61,10 +61,6 @@ groups() ->
             ++ [{remote_http_tests, [], test_cases("_httptest")}]
     end.
 
--ifdef(RUNNING_ON_CI).
-should_run_remote_http_tests() ->
-    false.
--else.
 should_run_remote_http_tests() ->
     currently_checkedout_commit_is_likely_tagged()
     andalso license_key_from_environment_is_defined().
@@ -81,8 +77,6 @@ currently_checkedout_commit_is_likely_tagged() ->
 license_key_from_environment_is_defined() ->
     LicenseKey = license_key_from_environment(),
     LicenseKey =/= false andalso length(LicenseKey) > 0.
-
--endif.
 
 license_key_from_environment() ->
     os:getenv("MAXMIND_LICENSE_KEY").
@@ -173,13 +167,6 @@ end_per_group(GroupName, Config) ->
             Config
     end.
 
--ifdef(PRIV_DIR_SHENANIGANS).
-path_with_test_tarballs() ->
-    % Work around mind-boggling behaviour in OTP 20.0
-    % for which I realy don't the time.
-    "../../../../test/priv".
-
--else.
 path_with_test_tarballs() ->
     PrivDir = priv_dir(locus),
     BuildRoot = filename:dirname(PrivDir),
@@ -194,8 +181,6 @@ priv_dir(App) ->
         Priv ->
             Priv
     end.
-
--endif. % endif(PRIV_DIR_SHENANIGANS)
 
 %% ------------------------------------------------------------------
 %% Test Cases

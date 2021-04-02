@@ -40,7 +40,6 @@
     lists_take/2,
     bin_to_hex_str/1,
     expect_linked_process_termination/1,
-    dialyzer_opaque_atom/1,
     url_query_encode/1,
     filesystem_safe_name/1,
     is_utf8_binary/1,
@@ -50,10 +49,6 @@
     resolve_http_location/2,
     censor_url_query/2,
     parse_absolute_http_url/1
-   ]).
-
--ignore_xref(
-   [dialyzer_opaque_atom/1
    ]).
 
 %% ------------------------------------------------------------------
@@ -127,10 +122,6 @@ expect_linked_process_termination(Pid) ->
             exit(Pid, kill),
             flush_link_exit(Pid, 1000)
     end.
-
--spec dialyzer_opaque_atom(atom()) -> atom().
-dialyzer_opaque_atom(Atom) ->
-    list_to_atom( atom_to_list(Atom) ).
 
 -spec url_query_encode(unicode:chardata()) -> binary().
 url_query_encode(Chardata) ->
@@ -258,7 +249,6 @@ censor_url_query(URL, KeysToCensor) ->
             URL
     end.
 
--ifdef(HTTP_URI_PARSE_DEPRECATED).
 -spec parse_absolute_http_url(string())
         -> {ok, {atom(), string(), string(), inet:port_number(),
                  string(), string(), string()}}
@@ -297,25 +287,6 @@ parse_absolute_http_url(URI) ->
         {error, Reason, Context} ->
             {error, {Reason, Context}}
     end.
--else.
--spec parse_absolute_http_url(string())
-        -> {ok, {atom(), string(), string(), inet:port_number(),
-                 string(), string(), string()}}
-           | {error, term()}.
-parse_absolute_http_url(URI) ->
-    case http_uri:parse(URI, [{fragment, true}]) of
-        {ok, {Scheme, _, Host, _, _, _, _}} = Success
-          when (Scheme =:= http orelse Scheme =:= https),
-               length(Host) > 0 ->
-            Success;
-        {ok, _} ->
-            {error, not_absolute_http_url};
-        {error, no_scheme} ->
-            {error, not_absolute_http_url};
-        {error, _} = Error ->
-            Error
-    end.
--endif.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

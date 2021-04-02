@@ -84,30 +84,20 @@
 %% ------------------------------------------------------------------
 
 -spec on_app_start() -> ok.
--ifdef(NO_LOGGER).
-%% @private
-on_app_start() -> ok.
--else.
 %% @private
 on_app_start() ->
     CurrentLevel = application:get_env(locus, log_level, undefined),
     _ = logger:set_application_level(locus, CurrentLevel),
     ok.
--endif.
 
 %% @doc Changes the logging verbosity in runtime
 %%
 %% `Level' must be either `debug', `info', `warning', `error' or `none'.
 -spec set_loglevel(debug | info | warning | error | none) -> ok.
--ifdef(NO_LOGGER).
-set_loglevel(Level) when ?is_loglevel(Level) ->
-    application:set_env(locus, log_level, Level).
--else.
 set_loglevel(Level) when ?is_loglevel(Level) ->
     application:set_env(locus, log_level, Level),
     _ = logger:set_application_level(locus, Level),
     ok.
--endif.
 
 %% ------------------------------------------------------------------
 %% locus_event_subscriber Function Definitions
@@ -247,19 +237,6 @@ report_http_download_event(MinWeight, DatabaseId, DownloadType, {download_finish
            ok
     end.
 
--ifdef(NO_LOGGER).
-log_info(Fmt, Args) ->
-    log_to_error_logger(info_msg, Fmt, Args).
-
--spec log_warning(string(), list()) -> ok.
-%% @private
-log_warning(Fmt, Args) ->
-    log_to_error_logger(warning_msg, Fmt, Args).
-
-log_error(Fmt, Args) ->
-    log_to_error_logger(error_msg, Fmt, Args).
-
--else.
 log_info(Fmt, Args) ->
     case use_error_logger() of
         true -> log_to_error_logger(info_msg, Fmt, Args);
@@ -300,7 +277,6 @@ has_usable_logger() ->
     %% The config is set (lager didn't remove it)
     erlang:function_exported(logger, get_handler_config, 1) andalso
     logger:get_handler_config(default) =/= {error, {not_found, default}}.
--endif.
 
 log_to_error_logger(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt ++ "~n",

@@ -94,8 +94,7 @@ run(DatabaseParts) ->
                 {error, {coordinator_stopped, CoordinatorPid, Reason}}
         end
     catch
-        ExcClass:ExcReason ->
-            Stacktrace = erlang:get_stacktrace(),
+        ExcClass:ExcReason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(ExcReason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             true = process_flag(trap_exit, PrevTrapExit),

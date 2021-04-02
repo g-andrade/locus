@@ -10,45 +10,18 @@ of
         % no override needed
         CONFIG;
     {deps, {_, Deps}} ->
-        %
-        % rebar 2.x - convert deps to old format
-        % THIS MAY STOP WORKING AT ANY MOMENT.
-        % USE AT YOUR OWN RISK.
-        %
-        error_logger:warning_msg("~n~n"
-                                 "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"
-                                 "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"
-                                 "\t*********************************************************************~n"
-                                 "\t~n"
-                                 "\t[locus] You're **strongly** incentivized to use `rebar3`.~n"
-                                 "\tCompatibility with rebar 2 is unmaintained and will be removed in the near future.~n"
-                                 "\t~n"
-                                 "\t*********************************************************************~n"
-                                 "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"
-                                 "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"),
-
-        {_, ErlOpts} = lists:keyfind(erl_opts, 1, CONFIG),
-        OverriddenErlOpts = ErlOpts -- [warn_missing_spec],
-        OverriddenSortableDeps =
-            lists:foldr(
-              fun ({stacktrace_compat, Version}, Acc) ->
-                      [{1, {stacktrace_compat, ".*",
-                            {git, "https://github.com/g-andrade/stacktrace_compat.git",
-                             {tag, Version}}}}
-                       | Acc];
-                  ({tls_certificate_check, Version}, Acc) ->
-                      [{2, {tls_certificate_check, ".*",
-                            {git, "https://github.com/g-andrade/tls_certificate_check.git",
-                             {tag, Version}}}}
-                       | Acc];
-                  ({Name, Version}, _Acc) ->
-                      MsgErrorIo = io_lib:format("Hex package '~ts', version \"~ts\": missing Git repo",
-                                                 [Name, Version]),
-                      error(MsgErrorIo)
-              end,
-              [], Deps),
-
-        OverriddenDeps = [element(2, Pair) || Pair <- lists:keysort(1, OverriddenSortableDeps)],
-        Config2 = lists:keystore(deps, 1, CONFIG, {deps,OverriddenDeps}),
-        lists:keystore(erl_opts, 1, Config2, {erl_opts,OverriddenErlOpts})
+        error_logger:error_msg("~n~n"
+                               "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"
+                               "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"
+                               "\t*********************************************************************~n"
+                               "\t~n"
+                               "\tThis library is no longer compatible with rebar 2 because it imports~n"
+                               "\tone or more of its dependencies as transitive ones.~n"
+                               "\t~n"
+                               "\tThe last version that _may_ still work is 1.14.1.~n"
+                               "\t~n"
+                               "\t*********************************************************************~n"
+                               "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"
+                               "\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"),
+        init:stop(_Status = 1)
 end.

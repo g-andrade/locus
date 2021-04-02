@@ -27,7 +27,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(PROJECT_ROOT, "../../../../").
--define(DATABASES_ROOT_DIR, "test/MaxMind-DB/bad-data").
+-define(DATABASES_ROOT_DIR, "_build/test/lib/maxmind_test_data/bad-data").
 
 %% ------------------------------------------------------------------
 %% Setup
@@ -91,8 +91,7 @@ expect_database_decode_failure(TailPath) ->
             ct:pal("Database version ~p successfully decoded", [Version]),
             error(unexpected_success)
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             ct:pal("Unable to decode database because of ~p:~p on ~p",

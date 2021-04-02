@@ -143,8 +143,7 @@ handle_write(State) ->
             notify_owner({finished, success}, State),
             {stop, normal, State}
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             notify_owner({finished, {error,{Class,SaferReason,SaferStacktrace}}}, State),
