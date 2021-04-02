@@ -255,7 +255,6 @@ censor_url_query(URL, KeysToCensor) ->
            | {error, not_absolute_http_url}
            | {error, {atom(), term()}}.
 parse_absolute_http_url(URI) ->
-    % TODO reevaluate the need to keep this
     case uri_string:parse(URI) of
         #{scheme := SchemeStr, host := Host} = ParsedURI
           when (SchemeStr =:= "http" orelse SchemeStr =:= "https"),
