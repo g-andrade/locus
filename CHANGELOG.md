@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Removed
 - unmaintained compatibility with rebar 2
-- `stacktrace_compat' dependency
+- `stacktrace_compat` dependency
 - lots of (now-)dead code that dealt with pre- OTP 21.2 differences
 - compatibility with OTP 19
 - compatibility with OTP 20
