@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Changed
+- imported version of `tls_certificate_check` to '~> 1.3'
+
+### Removed
+- unmaintained compatibility with rebar 2
+- `stacktrace_compat' dependency
+- lots of (now-)dead code that dealt with pre- OTP 21.2 differences
+- compatibility with OTP 19
+- compatibility with OTP 20
+- compatibility with OTP 21.0 and 21.1
+
+### Fixed
+- import of MaxMind test data in a way that works both locally and on GHA
+
 ## [1.14.1] - 2021-03-16
 ### Fixed
 - Hex documentation
