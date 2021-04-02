@@ -249,13 +249,13 @@ censor_url_query(URL, KeysToCensor) ->
             URL
     end.
 
--ifdef(HTTP_URI_PARSE_DEPRECATED).
 -spec parse_absolute_http_url(string())
         -> {ok, {atom(), string(), string(), inet:port_number(),
                  string(), string(), string()}}
            | {error, not_absolute_http_url}
            | {error, {atom(), term()}}.
 parse_absolute_http_url(URI) ->
+    % TODO reevaluate the need to keep this
     case uri_string:parse(URI) of
         #{scheme := SchemeStr, host := Host} = ParsedURI
           when (SchemeStr =:= "http" orelse SchemeStr =:= "https"),
@@ -288,25 +288,6 @@ parse_absolute_http_url(URI) ->
         {error, Reason, Context} ->
             {error, {Reason, Context}}
     end.
--else.
--spec parse_absolute_http_url(string())
-        -> {ok, {atom(), string(), string(), inet:port_number(),
-                 string(), string(), string()}}
-           | {error, term()}.
-parse_absolute_http_url(URI) ->
-    case http_uri:parse(URI, [{fragment, true}]) of
-        {ok, {Scheme, _, Host, _, _, _, _}} = Success
-          when (Scheme =:= http orelse Scheme =:= https),
-               length(Host) > 0 ->
-            Success;
-        {ok, _} ->
-            {error, not_absolute_http_url};
-        {error, no_scheme} ->
-            {error, not_absolute_http_url};
-        {error, _} = Error ->
-            Error
-    end.
--endif.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
