@@ -22,4 +22,4 @@ jobs:
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v2
-      - run: RUNNING_ON_CI=yes make ci_test check
+      - run: RUNNING_ON_CI=yes make check test

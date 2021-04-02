@@ -17,10 +17,10 @@ endif
 CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
 
 .PHONY: all build clean check dialyzer xref
-.PHONY: test ci_test cover
+.PHONY: test cover
 .PHONY: shell console doc publish cli
 
-.NOTPARALLEL: check cover test ci_test
+.NOTPARALLEL: check cover test
 
 all: build
 
@@ -44,10 +44,6 @@ xref: $(REBAR3)
 
 test: $(REBAR3) cli
 	@$(REBAR3) do eunit, ct, cover
-	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
-
-ci_test: $(REBAR3) cli
-	@$(REBAR3) as ci_test eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 cover: test
