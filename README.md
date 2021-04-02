@@ -1,5 +1,4 @@
-locus
-=====
+# locus
 
 [![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 [![](https://github.com/g-andrade/locus/workflows/build/badge.svg)](https://github.com/g-andrade/locus/actions?query=workflow%3Abuild)
@@ -15,13 +14,13 @@ filesystem and updated automatically.
 > ⚠️ Starting on December 31st, 2019, **a license key is now
 > [required](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
 > to download MaxMind GeoLite2 databases**.
->
+> 
 > Previous URLs have been discontinued; you should upgrade `locus` to a
 > recent version if you used them.
 
 #### Usage
 
-##### 1. Configure your license key
+##### 1\. Configure your license key
 
 **Skip this step if you're not loading databases directly from
 MaxMind.**
@@ -36,22 +35,23 @@ Then clone the repository, run `make shell` and declare your key:
 application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 ```
 
-##### 2. Start the database loader
+##### 2\. Start the database loader
 
 ``` erlang
 ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % You can also use a HTTP URL or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
 ```
 
-##### 3. Wait for the database to load (optional)
+##### 3\. Wait for the database to load (optional)
 
 ``` erlang
 {ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
 ```
 
-##### 4. Look up IP addresses
+##### 4\. Look up IP addresses
 
 ``` erlang
+
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
@@ -116,10 +116,10 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 
 ##### Supported File Formats
 
--   gzip-compressed tarballs (`.tar.gz`, `.tgz`)
--   plain tarballs (`.tar`)
--   MMDB files (`.mmdb`)
--   gzip-compressed MMDB files (`.mmdb.gz`)
+  - gzip-compressed tarballs (`.tar.gz`, `.tgz`)
+  - plain tarballs (`.tar`)
+  - MMDB files (`.mmdb`)
+  - gzip-compressed MMDB files (`.mmdb.gz`)
 
 For tarball files, the first file to be found within it with an `.mmdb`
 extension is the one that's chosen for loading.
@@ -129,12 +129,12 @@ format](https://maxmind.github.io/MaxMind-DB/) is mostly complete.
 
 ##### Database Types and Loading
 
--   The free GeoLite2 [Country, City and ASN
+  - The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
     successfully tested; presumably `locus` can deal with [any MMDB
     database](#alternative-providers) that maps IP address prefixes to
     arbitrary data
--   The databases are loaded into memory (mostly) as is; reference
+  - The databases are loaded into memory (mostly) as is; reference
     counted binaries are shared with the application callers using ETS
     tables, and the original binary search tree is used to lookup
     addresses. The data for each entry is decoded on the fly upon
@@ -153,7 +153,7 @@ the `locus` CLI utility:
     deployed to the current directory.
 
 2.  Run analysis:
-
+    
     ``` shell
     ./locus analyze GeoLite2-City.mmdb
     # Loading database from "GeoLite2-City.mmdb"...
@@ -168,24 +168,24 @@ arguments.
 
 ##### MaxMind sources / HTTP URLs: Downloading and Updating
 
--   The downloaded database files, when compressed, are inflated in
+  - The downloaded database files, when compressed, are inflated in
     memory
--   The `last-modified` response header, if present, is used to
+  - The `last-modified` response header, if present, is used to
     condition subsequent download attempts (using `if-modified-since`
     request headers) in order to save bandwidth
--   The downloaded databases are cached on the filesystem in order to
+  - The downloaded databases are cached on the filesystem in order to
     more quickly achieve readiness on future launches of the database
     loader
--   Database download attempts are retried upon error according to an
+  - Database download attempts are retried upon error according to an
     exponential backoff policy - quickly at first (every few seconds)
     but gradually slowing down to every 15 minutes. Successful and
     dismissed download attempts will be checked for update after 6
     hours. Both of these behaviours can be tweaked through the
     `error_retries` and `update_period` loader settings (see [function
     reference](#api-reference).)
--   When downloading from a MaxMind edition or HTTPS URL, the remote
+  - When downloading from a MaxMind edition or HTTPS URL, the remote
     certificate will be authenticated against a [list of known
-    Certificate Authorities](https://github.com/certifi/erlang-certifi)
+    Certificate Authorities](https://hexdocs.pm/tls_certificate_check/)
     and connection negotiation will fail in case of an expired
     certificate, mismatched hostname, self-signed certificate or unknown
     certificate authority. These checks can be disabled by specifying
@@ -193,25 +193,25 @@ arguments.
 
 ##### MaxMind sources / HTTP URLs: Caching
 
--   Caching is a best effort; the system falls back to relying
+  - Caching is a best effort; the system falls back to relying
     exclusively on the network if needed
--   A caching directory named `locus_erlang` is created under the
+  - A caching directory named `locus_erlang` is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
--   Cached databases are named after the MaxMind database edition name,
+  - Cached databases are named after the MaxMind database edition name,
     or alternatively after the SHA256 hash of their source URL
--   Modification time of the databases is extracted from `last-modified`
+  - Modification time of the databases is extracted from `last-modified`
     response header (when present) and used to condition downloads on
     subsequent boots and save bandwidth
--   Caching can be disabled by specifying the `no_cache` option when
+  - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
 
 ##### Filesystem URLs: Loading and Updating
 
--   The loaded database files, when compressed, are inflated in memory
--   The database file modification timestamp is used to condition
+  - The loaded database files, when compressed, are inflated in memory
+  - The database file modification timestamp is used to condition
     subsequent load attempts in order to lower I/O activity
--   Database load attempts are retried upon error according to an
+  - Database load attempts are retried upon error according to an
     exponential backoff policy - quickly at first (every few seconds)
     but gradually slowing down to every 30 seconds. Successful and
     dismissed load attempts will be checked for update after 30 seconds.
@@ -221,9 +221,9 @@ arguments.
 
 ##### Logging
 
--   Five logging levels are supported: `debug`, `info`, `warning`,
+  - Five logging levels are supported: `debug`, `info`, `warning`,
     `error` and `none`
--   The chosen backend on OTP 21.1+ is
+  - The chosen backend on OTP 21.1+ is
     [logger](http://erlang.org/doc/man/logger.html) **if**
     [lager](https://github.com/erlang-lager/lager/) is either missing or
     it hasn't
@@ -231,18 +231,18 @@ arguments.
     `logger`'s default handler; for all other scenarios,
     [error\_logger](http://erlang.org/doc/man/error_logger.html) is
     picked instead
--   The default log level is `error`; it can be changed in the
+  - The default log level is `error`; it can be changed in the
     application's `env` config
--   To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
+  - To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
 
 ##### Event Subscriptions
 
--   Any number of event subscribers can be attached to a database loader
+  - Any number of event subscribers can be attached to a database loader
     by specifying the `{event_subscriber, Subscriber}` option when
     starting the database
--   A `Subscriber` can be either a module implementing the
+  - A `Subscriber` can be either a module implementing the
     `locus_event_subscriber` behaviour or an arbitrary `pid()`
--   The format and content of reported events can be consulted in detail
+  - The format and content of reported events can be consulted in detail
     on the `locus_event_subscriber` module documentation; most key steps
     in the loader pipeline are reported (download started, download
     succeeded, download failed, caching succeeded, loading failed, etc.)
@@ -253,8 +253,8 @@ The API reference can be found on [HexDocs](https://hexdocs.pm/locus/).
 
 ##### Tested setup
 
--   Erlang/OTP 19 or newer
--   rebar3
+  - Erlang/OTP 21.2 or newer
+  - rebar3
 
 ##### License
 
@@ -286,40 +286,40 @@ sponsored, or otherwise approved by MaxMind.
 
 ##### Alternative Providers
 
--   [DB-IP.com](https://db-ip.com/db/): lite databases seem to work but
+  - [DB-IP.com](https://db-ip.com/db/): lite databases seem to work but
     setting up auto-update for them is not practical, as there's no
     "latest" URL.
 
 ##### Alternative Libraries (Erlang)
 
--   [egeoip](https://github.com/mochi/egeoip): IP Geolocation module,
+  - [egeoip](https://github.com/mochi/egeoip): IP Geolocation module,
     currently supporting the MaxMind GeoLite City Database
--   [geodata2](https://github.com/brigadier/geodata2): Application for
+  - [geodata2](https://github.com/brigadier/geodata2): Application for
     working with MaxMind geoip2 (.mmdb) databases
--   [geoip](https://github.com/manifest/geoip): Returns the location of
+  - [geoip](https://github.com/manifest/geoip): Returns the location of
     an IP address; based on the ipinfodb.com web service
--   [geolite2data](https://hex.pm/packages/geolite2data): Periodically
+  - [geolite2data](https://hex.pm/packages/geolite2data): Periodically
     fetches the free MaxMind GeoLite2 databases
--   [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
+  - [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
     Uses IP2Location geolocation database
 
 ##### Alternative Libraries (Elixir)
 
--   [asn](https://hex.pm/packages/asn): IP-to-AS-to-ASname lookup
--   [freegeoip](https://hex.pm/packages/freegeoip): Simple wrapper for
+  - [asn](https://hex.pm/packages/asn): IP-to-AS-to-ASname lookup
+  - [freegeoip](https://hex.pm/packages/freegeoip): Simple wrapper for
     freegeoip.net HTTP API
--   [freegeoipx](https://hex.pm/packages/freegeoipx): API Client for
+  - [freegeoipx](https://hex.pm/packages/freegeoipx): API Client for
     freegeoip.net
--   [geoip](https://hex.pm/packages/geoip): Lookup the geo location for
+  - [geoip](https://hex.pm/packages/geoip): Lookup the geo location for
     a given IP address, hostname or Plug.Conn instance
--   [geolix](https://hex.pm/packages/geolix): MaxMind GeoIP2 database
+  - [geolix](https://hex.pm/packages/geolix): MaxMind GeoIP2 database
     reader/decoder
--   [plug\_geoip2](https://hex.pm/packages/plug_geoip2): Adds geo
+  - [plug\_geoip2](https://hex.pm/packages/plug_geoip2): Adds geo
     location to a Plug connection based upon the client IP address by
     using MaxMind's GeoIP2 database
--   [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
+  - [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
     from a location efficiently using PostGIS and Ecto
 
-------------------------------------------------------------------------
+-----
 
 *Generated by EDoc*
