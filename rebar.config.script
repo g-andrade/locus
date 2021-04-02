@@ -31,13 +31,8 @@ of
         OverriddenErlOpts = ErlOpts -- [warn_missing_spec],
         OverriddenSortableDeps =
             lists:foldr(
-              fun ({stacktrace_compat, Version}, Acc) ->
-                      [{1, {stacktrace_compat, ".*",
-                            {git, "https://github.com/g-andrade/stacktrace_compat.git",
-                             {tag, Version}}}}
-                       | Acc];
-                  ({tls_certificate_check, Version}, Acc) ->
-                      [{2, {tls_certificate_check, ".*",
+              fun ({tls_certificate_check, Version}, Acc) ->
+                      [{1, {tls_certificate_check, ".*",
                             {git, "https://github.com/g-andrade/tls_certificate_check.git",
                              {tag, Version}}}}
                        | Acc];

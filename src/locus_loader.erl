@@ -689,8 +689,7 @@ decode_database_from_tgz_blob(Source, Blob) ->
         Tarball ->
             decode_database_from_tarball_blob(Source, Tarball)
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             {error, {decode_database_from_tgz_blob, {Class, SaferReason, SaferStacktrace}}}
@@ -706,8 +705,7 @@ decode_database_from_gzip_blob(Source, Blob) ->
         Uncompressed ->
             decode_database_from_unknown_blob(Source, Uncompressed)
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             {error, {decode_database_from_gzip_blob, {Class, SaferReason, SaferStacktrace}}}
@@ -722,8 +720,7 @@ decode_database_from_gzipped_mmdb_blob(Source, Blob) ->
         Uncompressed ->
             decode_database_from_mmdb_blob(Source, Uncompressed)
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             {error, {decode_database_from_gzipped_mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
@@ -750,8 +747,7 @@ decode_database_from_tarball_blob(Source, Tarball) ->
         BinDatabase ->
             decode_database_from_mmdb_blob(Source, BinDatabase)
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             {error, {decode_database_from_tarball_blob, {Class, SaferReason, SaferStacktrace}}}
@@ -765,8 +761,7 @@ decode_database_from_mmdb_blob(Source, BinDatabase) ->
         {Version, Parts} ->
             {ok, Version, Parts, BinDatabase}
     catch
-        Class:Reason ->
-            Stacktrace = erlang:get_stacktrace(),
+        Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             {error, {decode_database_from_mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
