@@ -693,7 +693,7 @@ log_warning_on_use_of_discontinued_geolite2_http_url(LegacyURL, DatabaseEdition)
     locus_logger:log_warning(
       "Public access to GeoLite2 was discontinued on 2019-12-30; converting legacy URL for your convenience.~n"
       "Update your `:start_loader' and `:loader_child_spec' calls to silence this message.~n"
-      "(Use the atom '~ts' instead of the legacy URL \"~ts\")",
+      "(Use the tuple {maxmind, '~ts'} instead of the legacy URL \"~ts\")",
       [DatabaseEdition, LegacyURL]).
 
 parse_filesystem_url(DatabaseURL) ->
