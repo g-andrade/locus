@@ -77,8 +77,15 @@ cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
 
-test/MaxMind-DB/test-data: test/MaxMind-DB
-	(cd test/MaxMind-DB && git reset --hard d7d482e && rm -rf .git)
+test/MaxMind-DB/test-data: .git
+	git submodule update --init --recursive
+	rm -rf test/MaxMind-DB/.git
 
-test/MaxMind-DB:
-	git clone https://github.com/maxmind/MaxMind-DB.git test/MaxMind-DB
+.git:
+	# If `.git` is missing, then we're likely
+	# running under GitHub Actions.
+	#
+	# Since we need for a repo to exist in order
+	# for submodules to be imported, create a dummy one.
+	git init .
+	git commit --allow-empty -m "Dummy first commit"
