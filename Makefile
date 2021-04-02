@@ -88,4 +88,6 @@ test/MaxMind-DB/test-data: .git
 	# Since we need for a repo to exist in order
 	# for submodules to be imported, create a dummy one.
 	git init .
+	git config user.email "dummy@dummy.dummy"
+	git config user.name "Dummy McDummier"
 	git commit --allow-empty -m "Dummy first commit"
