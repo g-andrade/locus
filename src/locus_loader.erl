@@ -65,9 +65,7 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
--ifndef(NO_GEN_SERVER_HIBERNATE_AFTER).
 -define(HIBERNATE_AFTER, (timer:seconds(5))).
--endif.
 
 -define(is_pos_integer(V), ((is_integer((V)) andalso ((V) >= 1)))).
 
@@ -212,7 +210,7 @@ validate_opts(Origin, MixedOpts) ->
 %% @private
 start_link(DatabaseId, Origin, LoaderOpts, FetcherOpts) ->
     Opts = [self(), DatabaseId, Origin, LoaderOpts, FetcherOpts],
-    ServerOpts = server_opts(),
+    ServerOpts = [{hibernate_after, ?HIBERNATE_AFTER}],
     gen_server:start_link(?MODULE, Opts, ServerOpts).
 
 %% ------------------------------------------------------------------
@@ -287,12 +285,6 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Initialization
 %% ------------------------------------------------------------------
-
--ifndef(NO_GEN_SERVER_HIBERNATE_AFTER).
-server_opts() -> [{locus_util:dialyzer_opaque_atom(hibernate_after), ?HIBERNATE_AFTER}].
--else.
-server_opts() -> [].
--endif.
 
 -spec validate_fetcher_opts(origin(), list())
         -> {ok, {[fetcher_opt()], list()}} |
