@@ -1,3 +1,0 @@
-[submodule "test/MaxMind-DB"]
-	path = test/MaxMind-DB
-	url = https://github.com/maxmind/MaxMind-DB.git

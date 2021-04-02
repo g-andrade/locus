@@ -27,8 +27,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(PROJECT_ROOT, "../../../../").
--define(TEST_SOURCES_REL_PATH, "test/MaxMind-DB/source-data/").
--define(TEST_DBS_REL_PATH, "test/MaxMind-DB/test-data/").
+-define(TEST_SOURCES_REL_PATH, "_build/test/lib/maxmind_test_data/source-data/").
+-define(TEST_DBS_REL_PATH, "_build/test/lib/maxmind_test_data/test-data/").
 
 -define(BLACKLIST, ["MaxMind-DB-no-ipv4-search-tree",
                     "MaxMind-DB-test-metadata-pointers"]).

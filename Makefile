@@ -42,11 +42,11 @@ dialyzer: $(REBAR3)
 xref: $(REBAR3)
 	@$(REBAR3) xref
 
-test: $(REBAR3) cli test/MaxMind-DB/test-data
+test: $(REBAR3) cli
 	@$(REBAR3) do eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
-ci_test: $(REBAR3) cli test/MaxMind-DB/test-data
+ci_test: $(REBAR3) cli
 	@$(REBAR3) as ci_test eunit, ct, cover
 	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
 
@@ -76,18 +76,3 @@ publish: $(REBAR3)
 cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
-
-test/MaxMind-DB/test-data: .git
-	git submodule update --init --recursive
-	rm -rf test/MaxMind-DB/.git
-
-.git:
-	# If `.git` is missing, then we're likely
-	# running under GitHub Actions.
-	#
-	# Since we need for a repo to exist in order
-	# for submodules to be imported, create a dummy one.
-	git init .
-	git config user.email "dummy@dummy.dummy"
-	git config user.name "Dummy McDummier"
-	git commit --allow-empty -m "Dummy first commit"

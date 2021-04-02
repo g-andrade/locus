@@ -27,7 +27,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(PROJECT_ROOT, "../../../../").
--define(DATABASES_ROOT_DIR, "test/MaxMind-DB/bad-data").
+-define(DATABASES_ROOT_DIR, "_build/test/lib/maxmind_test_data/bad-data").
 
 %% ------------------------------------------------------------------
 %% Setup
