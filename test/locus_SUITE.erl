@@ -134,7 +134,7 @@ init_per_group(GroupName, Config) ->
             ok = application:set_env(kernel, logger_level, debug),
             ok = locus_logger:set_loglevel(debug),
             ok = application:set_env(locus, license_key, license_key_from_environment()),
-            Edition = {maxmind, "GeoLite2-Country"},
+            Edition = {maxmind, 'GeoLite2-Country'},
             [{is_http, true},
              {is_remote, true},
              {url_or_edition, Edition}
@@ -156,8 +156,8 @@ end_per_group(GroupName, Config) ->
             _ = file:delete(CacheFilename),
             Config;
         "remote_http_tests" ->
-            MaxMindEditionName
-                = list_to_atom(proplists:get_value(url_or_edition, Config)),
+            {maxmind, MaxMindEditionName}
+                = proplists:get_value(url_or_edition, Config),
             Date = undefined,
             CacheFilename = locus_loader:cached_database_path_for_maxmind_edition_name(
                               MaxMindEditionName, Date),
@@ -196,6 +196,20 @@ cacheless_loading_httptest(Config) ->
     ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
     ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+
+    _ = case URLOrEdition of
+            {maxmind, _} ->
+                ?assertRecv({locus, Loader, {checksum, {request_sent, _ChecksumURL,
+                                                        _ChecksumReqHeaders}}}),
+                ?assertRecv({locus, Loader, {checksum, {download_started,
+                                                        _ChecksumRespHeaders}}}),
+                ?assertRecv({locus, Loader, {checksum, {download_finished,
+                                                        _BytesReceived,
+                                                        {ok, _TrailingChecksumRespHeaders}}}});
+            _ ->
+                ok
+        end,
+
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, LoadedVersion}}}),
     % check info
     ?assertMatch({ok, #{ metadata := #{}, source := {remote,_}, version := LoadedVersion }},
@@ -216,6 +230,20 @@ cold_remote_loading_httptest(Config) ->
     ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
     ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+
+    _ = case URLOrEdition of
+            {maxmind, _} ->
+                ?assertRecv({locus, Loader, {checksum, {request_sent, _ChecksumURL,
+                                                        _ChecksumReqHeaders}}}),
+                ?assertRecv({locus, Loader, {checksum, {download_started,
+                                                        _ChecksumRespHeaders}}}),
+                ?assertRecv({locus, Loader, {checksum, {download_finished,
+                                                        _BytesReceived,
+                                                        {ok, _TrailingChecksumRespHeaders}}}});
+            _ ->
+                ok
+        end,
+
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, LoadedVersion}}}),
     ?assertRecv({locus, Loader, {cache_attempt_finished, _CacheFilename, ok}}),
     % check info
