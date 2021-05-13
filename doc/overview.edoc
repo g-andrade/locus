@@ -219,12 +219,10 @@ Run `./locus analyze --help' for a description of supported options and argument
 
 <ul>
 <li>Five logging levels are supported: `debug', `info', `warning', `error' and `none'</li>
-<li>The chosen backend on OTP 21.1+ is <a target="_parent" href="http://erlang.org/doc/man/logger.html">logger</a>
-  <b>if</b> <a target="_parent" href="https://github.com/erlang-lager/lager/">lager</a> is either missing or
+<li>The chosen backend is <a target="_parent" href="http://erlang.org/doc/man/logger.html">logger</a>
+  <i>if</i> <a target="_parent" href="https://github.com/erlang-lager/lager/">lager</a> is either missing or
   it hasn't <a target="_parent" href="https://github.com/erlang-lager/lager/issues/492">removed</a> `logger''s
-  default handler; for all other scenarios,
-  <a target="_parent" href="http://erlang.org/doc/man/error_logger.html">error_logger</a> is picked instead
-  </li>
+  default handler.</li>
 <li>The default log level is `error'; it can be changed in the application's `env' config</li>
 <li>To tweak the log level in runtime, use `locus_logger:set_loglevel/1'</li>
 </ul>
@@ -249,7 +247,7 @@ The API reference can be found on <a target="_parent" href="https://hexdocs.pm/l
 <h5 id="tested-setup">Tested setup</h5>
 
 <ul>
-<li>Erlang/OTP 21.2 or newer</li>
+<li>Erlang/OTP 22 or newer</li>
 <li>rebar3</li>
 </ul>
 

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2021-05-13
+### Added
+- OTP 24 to CI targets
+
+### Changed
+- minimum Erlang/OTP version to 22
+- imported version of `tls_certificate_check` to '~> 1.5'
+
 ## [1.15.0] - 2021-04-02
 ### Changed
 - imported version of `tls_certificate_check` to '~> 1.3'
