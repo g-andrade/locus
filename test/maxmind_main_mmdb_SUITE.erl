@@ -76,6 +76,7 @@ init_per_group(Group, Config) ->
         {ok, BinGroupDef} when not IsBroken ->
             JsonGroupDef = jsx:decode(BinGroupDef),
             [{json_group_def, JsonGroupDef},
+             {json_group_def_filename, SourceFilename},
              {bin_database, BinDatabase}
              | Config];
         {error, enoent} ->
@@ -111,12 +112,19 @@ load_database_test(Config) ->
 expected_lookup_results_test(Config) ->
     case lists:keymember(json_group_def, 1, Config) of
         true ->
+            {json_group_def_filename, SourceFilename} = lists:keyfind(json_group_def_filename,
+                                                                      1, Config),
             {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
             ct:pal("Database version: ~p", [DatabaseVersion]),
             lists:foreach(
-              fun ({Address, Expectation}) ->
+              fun ({TestCaseIndex, Address, Expectation}) ->
                       Reality = determine_lookup_reality(DatabaseParts, Address),
-                      ?assertEqual(Expectation, Reality)
+                      ?assertEqual(Expectation, Reality,
+                                   unicode:characters_to_list(
+                                     io_lib:format("Source filename: '~ts'"
+                                                   ", test case index: ~b",
+                                                   [SourceFilename, TestCaseIndex])
+                                    ))
               end,
               expected_lookup_results(Config));
         false ->
@@ -142,15 +150,23 @@ decode_database_parts(Config) ->
 
 expected_lookup_results(Config) ->
     JsonGroupDef = proplists:get_value(json_group_def, Config),
+    JsonGroupDefIndices = lists:seq(1, length(JsonGroupDef)),
+    EnumeratedJsonGroupDef = lists:zip(JsonGroupDefIndices, JsonGroupDef),
     lists:foldr(
-      fun (JsonDict, Acc) ->
-              maps:fold(fun expected_lookup_results/3, Acc, JsonDict)
+      fun ({TestCaseIndex, JsonDict}, Acc) ->
+              maps:fold(
+                fun (Address, UncomparableSuccess, SubAcc) ->
+                        expected_lookup_results(TestCaseIndex, Address,
+                                                UncomparableSuccess,
+                                                SubAcc)
+                end,
+                Acc, JsonDict)
       end,
-      [], JsonGroupDef).
+      [], EnumeratedJsonGroupDef).
 
-expected_lookup_results(Address, UncomparableSuccess, Acc) ->
+expected_lookup_results(TestCaseIndex, Address, UncomparableSuccess, Acc) ->
     ComparableSuccess = comparable_lookup_success(UncomparableSuccess),
-    [{Address, {ok, ComparableSuccess}} | Acc].
+    [{TestCaseIndex, Address, {ok, ComparableSuccess}} | Acc].
 
 determine_lookup_reality(DatabaseParts, Address) ->
     ct:pal("Looking up ~s", [Address]),
