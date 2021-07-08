@@ -258,7 +258,16 @@ parse_chunk(Data) ->
             {4, map, Count, RemainingData};
 
         <<0:3, Size:5, ?extended_int32, Value:Size/signed-integer-unit:8, RemainingData/bytes>>
-          when Size =< 4 ->
+          when Size =:=4 ->
+            {2 + Size, int32, Value, RemainingData};
+        <<0:3, Size:5, ?extended_int32, Value:Size/integer-unit:8, RemainingData/bytes>>
+          when Size < 4 ->
+            % As per the spec:
+            % "When storing a signed integer, fields shorter than the maximum byte length
+            %  are always positive. When the field is the maximum length, e.g., 4 bytes
+            %  for 32-bit integers, the left-most bit is the sign.
+            %  A 1 is negative and a 0 is positive."
+            %
             {2 + Size, int32, Value, RemainingData};
         <<0:3, Size:5, ?extended_uint64, Value:Size/integer-unit:8, RemainingData/bytes>>
           when Size =< 8 ->
