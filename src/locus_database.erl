@@ -65,14 +65,6 @@
 
 -define(HIBERNATE_AFTER, (timer:seconds(5))).
 
--define(DEFAULT_HTTP_UNREADY_UPDATE_PERIOD, (timer:minutes(1))).
--define(DEFAULT_HTTP_READY_UPDATE_PERIOD, (timer:hours(6))).
-
--define(DEFAULT_FS_UNREADY_UPDATE_PEROID, (timer:seconds(5))).
--define(DEFAULT_FS_READY_UPDATE_PERIOD, (timer:seconds(30))).
-
--define(is_pos_integer(V), ((is_integer((V)) andalso ((V) >= 1)))).
-
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
 %% ------------------------------------------------------------------
