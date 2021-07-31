@@ -92,6 +92,9 @@
 -type database_url() :: unicode:chardata().
 -export_type([database_url/0]).
 
+-type custom_fetcher() :: {custom_fetcher, module(), Args :: term()}.
+-export_type([custom_fetcher/0]).
+
 -type database_error() :: database_unknown | database_not_loaded.
 -export_type([database_error/0]).
 
@@ -125,8 +128,15 @@
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
-%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% <li>`LoadFrom' must be either:
+%%  <ul>
+%%      <li>a `database_edition()' tuple, or</li>
+%%      <li>a `DatabaseURL' containing either a string or binary representation
+%%      of a HTTP(s) URL or local path, or</li>
+%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
+%%      the `locus_custom_fetcher' behaviour</li>
+%%  </ul>
+%% </li>
 %% </ul>
 %%
 %% Returns:
@@ -139,20 +149,29 @@
 %% @see await_loader/2
 %% @see start_loader/1
 %% @see start_loader/3
--spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL) -> ok | {error, Error}
+-spec start_loader(DatabaseId, LoadFrom) -> ok | {error, Error}
             when DatabaseId :: atom(),
+                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
+                 CustomFetcher :: custom_fetcher(),
                  Error :: invalid_url | already_started | application_not_running.
-start_loader(DatabaseId, DatabaseEditionOrURL) ->
-    start_loader(DatabaseId, DatabaseEditionOrURL, []).
+start_loader(DatabaseId, LoadFrom) ->
+    start_loader(DatabaseId, LoadFrom, []).
 
 %% @doc Starts a database loader under id `DatabaseId' with options `Opts'.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
-%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% <li>`LoadFrom' must be either:
+%%  <ul>
+%%      <li>a `database_edition()' tuple, or</li>
+%%      <li>a `DatabaseURL' containing either a string or binary representation
+%%      of a HTTP(s) URL or local path, or</li>
+%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
+%%      the `locus_custom_fetcher' behaviour</li>
+%%  </ul>
+%% </li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
 %%
@@ -166,15 +185,22 @@ start_loader(DatabaseId, DatabaseEditionOrURL) ->
 %% @see await_loader/2
 %% @see start_loader/1
 %% @see start_loader/2
--spec start_loader(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ok | {error, Error}
+-spec start_loader(DatabaseId, LoadFrom, Opts) -> ok | {error, Error}
             when DatabaseId :: atom(),
+                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
+                 CustomFetcher :: custom_fetcher(),
                  Opts :: [locus_database:opt()],
                  Error :: (invalid_url | already_started |
                            {invalid_opt,term()} | application_not_running).
+start_loader(DatabaseId, {maxmind, _} = DatabaseEdition, Opts) ->
+    Origin = parse_database_edition(DatabaseEdition),
+    OptsWithDefaults = opts_with_defaults(Opts),
+    locus_database:start(DatabaseId, Origin, OptsWithDefaults);
 start_loader(DatabaseId, DatabaseEdition, Opts)
-  when is_tuple(DatabaseEdition); is_atom(DatabaseEdition) ->
+  when is_atom(DatabaseEdition) ->
+    % Deprecated edition format
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:start(DatabaseId, Origin, OptsWithDefaults);
@@ -186,7 +212,12 @@ start_loader(DatabaseId, DatabaseURL, Opts)
         Origin ->
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:start(DatabaseId, Origin, OptsWithDefaults)
-    end.
+    end;
+start_loader(DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts)
+  when is_atom(Module) ->
+    Origin = CustomFetcher,
+    OptsWithDefaults = opts_with_defaults(Opts),
+    locus_database:start(DatabaseId, Origin, OptsWithDefaults).
 
 %% @doc Stops the database loader under id `DatabaseId'.
 %%
@@ -205,8 +236,15 @@ stop_loader(DatabaseId) ->
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
-%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% <li>`LoadFrom' must be either:
+%%  <ul>
+%%      <li>a `database_edition()' tuple, or</li>
+%%      <li>a `DatabaseURL' containing either a string or binary representation
+%%      of a HTTP(s) URL or local path, or</li>
+%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
+%%      the `locus_custom_fetcher' behaviour</li>
+%%  </ul>
+%% </li>
 %% </ul>
 %%
 %% Returns:
@@ -217,20 +255,29 @@ stop_loader(DatabaseId) ->
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/2
--spec loader_child_spec(DatabaseId, DatabaseEdition | DatabaseURL) -> ChildSpec | no_return()
+-spec loader_child_spec(DatabaseId, LoadFrom) -> ChildSpec | no_return()
             when DatabaseId :: atom(),
+                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
+                 CustomFetcher :: custom_fetcher(),
                  ChildSpec :: locus_database:static_child_spec().
-loader_child_spec(DatabaseId, DatabaseEditionOrURL) ->
-    loader_child_spec(DatabaseId, DatabaseEditionOrURL, []).
+loader_child_spec(DatabaseId, LoadFrom) ->
+    loader_child_spec(DatabaseId, LoadFrom, []).
 
 %% @doc Like `:loader_child_spec/3' but with default child id
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
-%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% <li>`LoadFrom' must be either:
+%%  <ul>
+%%      <li>a `database_edition()' tuple, or</li>
+%%      <li>a `DatabaseURL' containing either a string or binary representation
+%%      of a HTTP(s) URL or local path, or</li>
+%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
+%%      the `locus_custom_fetcher' behaviour</li>
+%%  </ul>
+%% </li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
 %%
@@ -243,21 +290,30 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL) ->
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/3
--spec loader_child_spec(DatabaseId, DatabaseEdition | DatabaseURL, Opts) -> ChildSpec | no_return()
+-spec loader_child_spec(DatabaseId, LoadFrom, Opts) -> ChildSpec | no_return()
             when DatabaseId :: atom(),
+                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
+                 CustomFetcher :: custom_fetcher(),
                  Opts :: [locus_database:opt()],
                  ChildSpec :: locus_database:static_child_spec().
-loader_child_spec(DatabaseId, DatabaseEditionOrURL, Opts) ->
-    loader_child_spec({locus_database,DatabaseId}, DatabaseId, DatabaseEditionOrURL, Opts).
+loader_child_spec(DatabaseId, LoadFrom, Opts) ->
+    loader_child_spec({locus_database,DatabaseId}, DatabaseId, LoadFrom, Opts).
 
 %% @doc Returns a supervisor child spec for a database loader under id `DatabaseId' with options `Opts'.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
-%% <li>`DatabaseEdition' must be a `database_edition()' tuple; alternatively, `DatabaseURL'
-%% must be a string or a binary representing a HTTP(s) URL or local path.</li>
+%% <li>`LoadFrom' must be either:
+%%  <ul>
+%%      <li>a `database_edition()' tuple, or</li>
+%%      <li>a `DatabaseURL' containing either a string or binary representation
+%%      of a HTTP(s) URL or local path, or</li>
+%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
+%%      the `locus_custom_fetcher' behaviour</li>
+%%  </ul>
+%% </li>
 %% <li>`Opts' must be a list of `locus_database:opt()' values</li>
 %% </ul>
 %%
@@ -269,16 +325,23 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL, Opts) ->
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/3
--spec loader_child_spec(ChildId, DatabaseId, DatabaseEdition | DatabaseURL, Opts)
+-spec loader_child_spec(ChildId, DatabaseId, LoadFrom, Opts)
         -> ChildSpec | no_return()
             when ChildId :: term(),
                  DatabaseId :: atom(),
+                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
                  DatabaseEdition :: database_edition(),
                  DatabaseURL :: database_url(),
+                 CustomFetcher :: custom_fetcher(),
                  Opts :: [locus_database:opt()],
                  ChildSpec :: locus_database:static_child_spec().
+loader_child_spec(ChildId, DatabaseId, {maxmind, _} = DatabaseEdition, Opts) ->
+    Origin = parse_database_edition(DatabaseEdition),
+    OptsWithDefaults = opts_with_defaults(Opts),
+    locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults);
 loader_child_spec(ChildId, DatabaseId, DatabaseEdition, Opts)
-  when is_tuple(DatabaseEdition); is_atom(DatabaseEdition) ->
+  when is_atom(DatabaseEdition) ->
+    % Deprecated edition format
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults);
@@ -290,7 +353,12 @@ loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
         Origin ->
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults)
-    end.
+    end;
+loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts)
+  when is_atom(Module) ->
+    Origin = CustomFetcher,
+    OptsWithDefaults = opts_with_defaults(Opts),
+    locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults).
 
 %% @doc Like `await_loader/1' but with a default timeout of 30 seconds.
 %%

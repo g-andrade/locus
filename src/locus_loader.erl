@@ -24,6 +24,8 @@
 -module(locus_loader).
 -behaviour(gen_server).
 
+-include_lib("stdlib/include/assert.hrl").
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
@@ -34,7 +36,8 @@
 
 -export(
    [validate_opts/2,
-    start_link/4
+    start_link/4,
+    valid_blob_formats/0
    ]).
 
 -ignore_xref(
@@ -44,7 +47,8 @@
 -ifdef(TEST).
 -export(
    [cached_database_path_for_maxmind_edition_name/2,
-    cached_database_path_for_url/1
+    cached_database_path_for_url/1,
+    cached_database_path_for_custom_fetcher/2
    ]).
 -endif.
 
@@ -107,11 +111,19 @@
     {post_readiness_update_period, milliseconds_interval()}.
 -export_type([deprecated_loader_opt/0]).
 
--type fetcher_opt() :: locus_http_download:opt().
+-type fetcher_opt() :: locus_maxmind_download:opt() | locus_http_download:opt().
 -export_type([fetcher_opt/0]).
 
--type fetcher_msg() :: locus_http_download:msg() | locus_filesystem_load:msg().
--type fetcher_success() :: locus_http_download:success() | locus_filesystem_load:success().
+-type fetcher_msg() ::
+    locus_http_download:msg() |
+    locus_filesystem_load:msg() |
+    locus_custom_fetcher:msg().
+
+-type fetcher_success() ::
+    locus_http_download:success() |
+    locus_filesystem_load:success() |
+    locus_custom_fetcher:success().
+
 -type cacher_msg() :: locus_filesystem_store:msg().
 
 -record(state, {
@@ -122,7 +134,10 @@
           fetcher_opts :: [fetcher_opt()],
 
           update_timer :: reference() | undefined,
-          last_modified :: calendar:datetime() | undefined,
+          last_modified :: calendar:datetime() | unknown,
+          last_loaded_version :: calendar:datetime() | undefined,
+          fetch_metadata_for_last_successful_load
+            :: locus_custom_fetcher:successful_fetch_metadata() | undefined,
 
           fetcher_pid :: pid() | undefined,
           fetcher_source :: source() | undefined,
@@ -149,11 +164,13 @@
 -export_type([uniformly_distributed_update_period/0]).
 
 -type blob_format() :: tgz | tarball | gzip | gzipped_mmdb | mmdb | unknown.
+-export_type([blob_format/0]).
 
 -type origin() ::
     {maxmind, atom()} |
     {http, locus_http_download:url()} |
-    {filesystem, locus_filesystem_load:path()}.
+    {filesystem, locus_filesystem_load:path()} |
+    locus:custom_fetcher().
 -export_type([origin/0]).
 
 -type maxmind_origin_params() ::
@@ -166,6 +183,7 @@
     locus_maxmind_download:event() |
     locus_http_download:event() |
     locus_filesystem_load:event() |
+    locus_custom_fetcher:event() |
     event_cache_attempt_finished().
 -export_type([event/0]).
 
@@ -177,7 +195,8 @@
 -type source() ::
     {remote, provider_source()} |
     {remote, locus_http_download:url()} |
-    locus_filesystem_load:source().
+    locus_filesystem_load:source() |
+    locus_custom_fetcher:source().
 -export_type([source/0]).
 
 -type provider_source() ::
@@ -213,6 +232,11 @@ start_link(DatabaseId, Origin, LoaderOpts, FetcherOpts) ->
     ServerOpts = [{hibernate_after, ?HIBERNATE_AFTER}],
     gen_server:start_link(?MODULE, Opts, ServerOpts).
 
+-spec valid_blob_formats() -> [tgz | tarball | gzip | gzipped_mmdb | mmdb | unknown, ...].
+%% @private
+valid_blob_formats() ->
+    [tgz, tarball, gzip, gzipped_mmdb, mmdb, unknown].
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -230,6 +254,7 @@ init([OwnerPid, DatabaseId, Origin, LoaderOpts, FetcherOpts]) ->
            database_id = DatabaseId,
            origin = Origin,
            settings = Settings,
+           last_modified = unknown,
            fetcher_opts = FetcherOpts,
            error_backoff_count = 0
           },
@@ -294,6 +319,10 @@ validate_fetcher_opts({maxmind,_}, MixedOpts) ->
 validate_fetcher_opts({http,_}, MixedOpts) ->
     locus_http_download:validate_opts(MixedOpts);
 validate_fetcher_opts({filesystem,_}, MixedOpts) ->
+    {ok, {[], MixedOpts}};
+validate_fetcher_opts({custom_fetcher, _Module, _Args}, MixedOpts) ->
+    % Whatever opts `Module' needs can be placed in `Args' instead,
+    % keeping things simple.
     {ok, {[], MixedOpts}}.
 
 -spec validate_loader_opts(list(), [fetcher_opt()])
@@ -344,37 +373,44 @@ is_error_retry_behaviour(_) ->
 
 -spec default_settings(origin()) -> settings().
 default_settings({maxmind,_}) ->
-    default_http_origin_settings();
+    default_remote_origin_settings();
 default_settings({http,_}) ->
-    default_http_origin_settings();
+    default_remote_origin_settings();
 default_settings({filesystem,_}) ->
-    default_filesystem_origin_settings().
+    default_local_origin_settings();
+default_settings({custom_fetcher, Module, Args}) ->
+    case locus_custom_fetcher:source(Module, Args) of
+        {remote, {custom, _}} ->
+            default_remote_origin_settings();
+        {local, {custom, _}} ->
+            default_local_origin_settings()
+    end.
 
--spec default_http_origin_settings() -> settings().
-default_http_origin_settings() ->
+-spec default_remote_origin_settings() -> settings().
+default_remote_origin_settings() ->
     #settings{
        update_period = timer:hours(6),
-       error_retry_behaviour = default_http_origin_error_retry_behaviour(),
+       error_retry_behaviour = default_remote_origin_error_retry_behaviour(),
        error_retry_behaviour_applies_after_readiness = true,
        use_cache = true
       }.
 
-default_http_origin_error_retry_behaviour() ->
+default_remote_origin_error_retry_behaviour() ->
     {exponential_backoff, #{min_interval => timer:seconds(1),
                             max_interval => timer:minutes(15),
                             growth_base => timer:seconds(2),
                             growth_exponent => 0.625}}.
 
--spec default_filesystem_origin_settings() -> settings().
-default_filesystem_origin_settings() ->
+-spec default_local_origin_settings() -> settings().
+default_local_origin_settings() ->
     #settings{
        update_period = timer:seconds(30),
-       error_retry_behaviour = default_filesystem_origin_error_retry_behaviour(),
+       error_retry_behaviour = default_local_origin_error_retry_behaviour(),
        error_retry_behaviour_applies_after_readiness = true,
        use_cache = false
       }.
 
-default_filesystem_origin_error_retry_behaviour() ->
+default_local_origin_error_retry_behaviour() ->
     {exponential_backoff, #{min_interval => timer:seconds(1),
                             max_interval => timer:seconds(30),
                             growth_base => timer:seconds(2),
@@ -419,12 +455,27 @@ log_warning_on_use_of_legacy_opt(DatabaseId, {post_readiness_update_period, Inte
 -spec finish_initialization(state()) -> state().
 finish_initialization(State)
   when (State#state.settings)#settings.use_cache ->
-    CachedDatabasePath = cached_database_path(State),
-    Source = {cache,CachedDatabasePath},
+    UpdatedState = maybe_mock_fetch_metadata_for_last_successful_load(State),
+    CachedDatabasePath = cached_database_path(UpdatedState),
+    Source = {cache, CachedDatabasePath},
     {ok, FetcherPid} = locus_filesystem_load:start_link(Source, undefined),
-    State#state{ fetcher_pid = FetcherPid, fetcher_source = Source };
+    UpdatedState#state{ fetcher_pid = FetcherPid, fetcher_source = Source };
 finish_initialization(State) ->
     schedule_update(0, State).
+
+maybe_mock_fetch_metadata_for_last_successful_load(State) ->
+    case State#state.origin of
+        {custom_fetcher, Module, Args} ->
+            maybe_mock_custom_fetcher_metadata_for_last_successful_load(Module, Args, State);
+        _ ->
+            State
+    end.
+
+maybe_mock_custom_fetcher_metadata_for_last_successful_load(Module, Args, State) ->
+    Description = locus_custom_fetcher:description(Module, Args),
+    #{database_is_stored_remotely := true, database_is_fetched_from := FetchedFrom} = Description,
+    MockMetadata = #{fetched_from => FetchedFrom, modified_on => unknown},
+    State#state{fetch_metadata_for_last_successful_load = MockMetadata}.
 
 -spec schedule_update(0 | milliseconds_interval(), state()) -> state().
 schedule_update(Interval, State)
@@ -440,7 +491,11 @@ cached_database_path(State) ->
             MaybeDate = proplists:get_value(date, FetcherOpts),
             cached_database_path_for_maxmind_edition_name(EditionName, MaybeDate);
         {http, URL} ->
-            cached_database_path_for_url(URL)
+            cached_database_path_for_url(URL);
+        {custom_fetcher, Module, _Args} ->
+            #state{fetch_metadata_for_last_successful_load = PreviousMetadata} = State,
+            #{fetched_from := FetchedFrom} = PreviousMetadata,
+            cached_database_path_for_custom_fetcher(Module, FetchedFrom)
     end.
 
 -spec cached_database_path_for_maxmind_edition_name(atom(), undefined | calendar:date())
@@ -468,6 +523,17 @@ cached_database_path_for_url(URL) ->
     URLHash = crypto:hash(sha256, URL),
     HexURLHash = locus_util:bin_to_hex_str(URLHash),
     Filename = HexURLHash ++ ".mmdb.gz",
+    filename:join(DirectoryPath, Filename).
+
+-spec cached_database_path_for_custom_fetcher(module(), term()) -> nonempty_string().
+%% @private
+cached_database_path_for_custom_fetcher(Module, FetchedFrom) ->
+    DirectoryPath = cache_directory_path(),
+    ModuleName = atom_to_binary(Module, utf8),
+    SafeModuleName = locus_util:filesystem_safe_name(ModuleName),
+    Hash = erlang:phash2(FetchedFrom, 1 bsl 32),
+    FilenameIoData = io_lib:format("custom.~ts.~.36..b.mmdb.gz", [SafeModuleName, Hash]),
+    Filename = unicode:characters_to_list(FilenameIoData),
     filename:join(DirectoryPath, Filename).
 
 -spec cache_directory_path() -> nonempty_string().
@@ -502,11 +568,19 @@ begin_update(State)
             {ok, FetcherPid} = locus_http_download:start_link(URL, Headers, FetcherOpts),
             State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote,URL} };
         {filesystem, _} = Source ->
+            ?assertEqual([], FetcherOpts),
             {ok, FetcherPid} = locus_filesystem_load:start_link(Source, LastModified),
+            State#state{ fetcher_pid = FetcherPid, fetcher_source = Source };
+        {custom_fetcher, Module, Args} ->
+            ?assertEqual([], FetcherOpts),
+            #state{fetch_metadata_for_last_successful_load = PreviousMetadata} = State,
+            Source = locus_custom_fetcher:source(Module, Args),
+            {ok, FetcherPid} = locus_custom_fetcher:start_link(Source, Module, Args,
+                                                               PreviousMetadata),
             State#state{ fetcher_pid = FetcherPid, fetcher_source = Source }
     end.
 
-http_request_headers(undefined) ->
+http_request_headers(unknown = _LastModified) ->
     http_base_request_headers();
 http_request_headers(LastModified) ->
     LocalLastModified = calendar:universal_time_to_local_time(LastModified),
@@ -569,7 +643,7 @@ handle_cacher_msg({finished,Status}, State) ->
 
 -spec handle_database_fetch_dismissal(source(), state()) -> {noreply, state()}.
 handle_database_fetch_dismissal(Source, State)
-  when State#state.last_modified =/= undefined -> % sanity check
+  when State#state.last_modified =/= unknown -> % sanity check
     handle_load_attempt_conclusion(Source, reset, State).
 
 -spec handle_database_fetch_success(source(), fetcher_success(), state()) -> {noreply, state()}.
@@ -578,22 +652,46 @@ handle_database_fetch_success(Source, Success, State) ->
     case decode_database_from_blob(Source, BlobFormat, Blob) of
         {ok, Version, Parts, BinDatabase} ->
             LastModified = fetched_database_modification_datetime(Source, Success),
-            handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified, State);
+            UpdatedState = maybe_save_fetch_metadata(Source, Success, State),
+            handle_database_decode_success(Source, Version, Parts, BinDatabase,
+                                           LastModified, UpdatedState);
         {error, Reason} ->
             handle_database_decode_error(Source, Reason, State)
     end.
 
+-spec maybe_save_fetch_metadata(source(), fetcher_success(), state()) -> state().
+maybe_save_fetch_metadata({_,{custom,_}}, Success, State) ->
+    #{metadata := Metadata} = Success,
+    State#state{fetch_metadata_for_last_successful_load = Metadata};
+maybe_save_fetch_metadata({remote, _}, _Success, State) ->
+    ?assertEqual(undefined, State#state.fetch_metadata_for_last_successful_load),
+    State;
+maybe_save_fetch_metadata({cache, _}, Success, State) ->
+    case State#state.fetch_metadata_for_last_successful_load of
+        undefined ->
+            State;
+        Metadata ->
+            % Not the prettiest hack around.
+            #{modified_on := ModifiedOn} = Success,
+            UpdatedMetadata = Metadata#{modified_on := ModifiedOn},
+            State#state{fetch_metadata_for_last_successful_load = UpdatedMetadata}
+    end;
+maybe_save_fetch_metadata({filesystem, _}, _Success, State) ->
+    ?assertEqual(undefined, State#state.fetch_metadata_for_last_successful_load),
+    State.
+
 -spec handle_database_decode_success(source(), calendar:datetime(), locus_mmdb:parts(),
                                      binary(), calendar:datetime(), state()) -> {noreply, state()}.
 handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified, State) ->
-    State2 = State#state{ last_modified = LastModified },
+    State2 = State#state{ last_modified = LastModified, last_loaded_version = Version },
     notify_owner({load_success, Source, Version, Parts}, State2),
 
     case Source of
-        {remote,_} when (State2#state.settings)#settings.use_cache ->
+        {remote,_} when (State2#state.settings)#settings.use_cache, LastModified =/= unknown ->
             CachedDatabasePath = cached_database_path(State2),
             CachedDatabaseBlob = make_cached_database_blob(CachedDatabasePath, BinDatabase),
-            {ok, CacherPid} = locus_filesystem_store:start_link(CachedDatabasePath, CachedDatabaseBlob,
+            {ok, CacherPid} = locus_filesystem_store:start_link(CachedDatabasePath,
+                                                                CachedDatabaseBlob,
                                                                 LastModified),
             State3 = State2#state{ cacher_pid = CacherPid,
                                    cacher_path = CachedDatabasePath,
@@ -634,7 +732,7 @@ update_error_backoff_count(Increment, State) ->
 time_to_next_update(LastFetchSource, State) ->
     #state{settings = Settings, error_backoff_count = ErrorBackoffCount} = State,
     {LastFetchSourceType, _} = LastFetchSource,
-    HasAchievedReadiness = (State#state.last_modified =/= undefined),
+    HasAchievedReadiness = (State#state.last_loaded_version =/= unknown),
 
     if LastFetchSourceType =:= cache ->
            0;
@@ -664,9 +762,9 @@ exponential_error_backoff_interval(Count, Params) ->
 
 -spec decode_database_from_blob(source(), blob_format(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from_tgz_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+           {error, {decode_database_from, tgz_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_blob(Source, tgz, Blob) ->
     decode_database_from_tgz_blob(Source, Blob);
 decode_database_from_blob(Source, tarball, Blob) ->
@@ -682,8 +780,8 @@ decode_database_from_blob(Source, unknown, Blob) ->
 
 -spec decode_database_from_tgz_blob(source(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_tgz_blob(Source, Blob) ->
     try zlib:gunzip(Blob) of
         Tarball ->
@@ -692,14 +790,14 @@ decode_database_from_tgz_blob(Source, Blob) ->
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from_tgz_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {decode_database_from, tgz_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
 -spec decode_database_from_gzip_blob(source(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from_gzip_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+           {error, {decode_database_from, gzip_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_gzip_blob(Source, Blob) ->
     try zlib:gunzip(Blob) of
         Uncompressed ->
@@ -708,13 +806,13 @@ decode_database_from_gzip_blob(Source, Blob) ->
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from_gzip_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {decode_database_from, gzip_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
 -spec decode_database_from_gzipped_mmdb_blob(source(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from_gzipped_mmdb_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+           {error, {decode_database_from, gzipped_mmdb_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_gzipped_mmdb_blob(Source, Blob) ->
     try zlib:gunzip(Blob) of
         Uncompressed ->
@@ -723,13 +821,13 @@ decode_database_from_gzipped_mmdb_blob(Source, Blob) ->
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from_gzipped_mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {decode_database_from, gzipped_mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
 -spec decode_database_from_unknown_blob(source(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_unknown_blob(Source, Blob) ->
     case decode_database_from_tarball_blob(Source, Blob) of
         {ok, _, _, _} = Success ->
@@ -740,8 +838,8 @@ decode_database_from_unknown_blob(Source, Blob) ->
 
 -spec decode_database_from_tarball_blob(source(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from_tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_tarball_blob(Source, Tarball) ->
     try extract_mmdb_from_tarball_blob(Tarball) of
         BinDatabase ->
@@ -750,12 +848,12 @@ decode_database_from_tarball_blob(Source, Tarball) ->
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from_tarball_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {decode_database_from, tarball_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
 -spec decode_database_from_mmdb_blob(source(), binary())
         -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from_mmdb_blob, {atom(), term(), [term()]}}}.
+           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
 decode_database_from_mmdb_blob(Source, BinDatabase) ->
     try locus_mmdb:decode_database_parts(Source, BinDatabase) of
         {Version, Parts} ->
@@ -764,7 +862,7 @@ decode_database_from_mmdb_blob(Source, BinDatabase) ->
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from_mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {decode_database_from, mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
 -spec extract_mmdb_from_tarball_blob(binary()) -> binary().
@@ -807,7 +905,10 @@ filename_extension_parts_recur(Filename, Acc) ->
     end.
 
 -spec fetched_database_format_and_blob(source(), fetcher_success()) -> {blob_format(), binary()}.
-fetched_database_format_and_blob({remote,_}, #{headers := Headers, body := Body}) ->
+fetched_database_format_and_blob({_,{custom,_}}, #{format := BlobFormat, content := Blob}) ->
+    {BlobFormat, Blob};
+fetched_database_format_and_blob({remote,From}, #{headers := Headers, body := Body}) ->
+    ?assertNotMatch({custom, _}, From),
     case {lists:keyfind("content-type", 1, Headers), Body} of
         {{_,"application/gzip"}, _} ->
             {gzip, Body};
@@ -844,14 +945,22 @@ fetched_database_format_and_blob({SourceType,Path}, #{content := Content})
             {unknown, Content}
     end.
 
--spec fetched_database_modification_datetime(source(), fetcher_success()) -> calendar:datetime().
+-spec fetched_database_modification_datetime(source(), fetcher_success())
+        -> calendar:datetime() | unknown.
+fetched_database_modification_datetime({_,{custom,_}}, Success) ->
+    case Success of
+        #{metadata := #{modified_on := ModificationDate}} ->
+            ModificationDate;
+        #{} ->
+            unknown
+    end;
 fetched_database_modification_datetime({remote,_}, #{headers := Headers}) ->
     case lists:keyfind("last-modified", 1, Headers) of
         {"last-modified", LastModified} ->
             ({_,_} = ModificationDate) = httpd_util:convert_request_date(LastModified),
             ModificationDate;
         false ->
-            {{1970,1,1}, {0,0,0}}
+            unknown
     end;
 fetched_database_modification_datetime({cache,_}, #{modified_on := ModificationDate}) ->
     ModificationDate;

@@ -21,7 +21,7 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
--module(locus_http_SUITE).
+-module(locus_remote_sources_SUITE).
 -compile(export_all).
 
 -include_lib("stdlib/include/assert.hrl").
@@ -45,15 +45,28 @@ groups() ->
     LocalExtensions = ["tar.gz", "tgz", "tar", "mmdb", "mmdb.gz"],
     LocalTests =
         [{list_to_atom("local_http_tests_" ++ FileExtension), [],
-          locus_test_utils:test_cases(?MODULE, ["_test", "_localtest"])}
+          locus_test_utils:test_cases(?MODULE, ["_test", "_localtest",
+                                                "_httptest", "_localhttptest"])}
          || FileExtension <- LocalExtensions],
+
+    CustomFetcherTests
+        = [{list_to_atom("custom_fetcher_tests_" ++ FileExtension),
+            _Opts = [],
+            locus_test_utils:test_cases(?MODULE, ["_test", "_localtest",
+                                                  "_customtest"])}
+           || FileExtension <- LocalExtensions],
+
 
     case should_run_remote_http_tests() of
         false ->
-            LocalTests;
+            LocalTests
+            ++ CustomFetcherTests;
         true ->
             LocalTests
-            ++ [{remote_http_tests, [], locus_test_utils:test_cases(?MODULE, "_test")}]
+            ++ CustomFetcherTests
+            ++ [{remote_http_tests,
+                 _Opts = [],
+                 locus_test_utils:test_cases(?MODULE, ["_test", "_httptest"])}]
     end.
 
 should_run_remote_http_tests() ->
@@ -78,34 +91,57 @@ license_key_from_environment() ->
 
 %%%%%%%%%%%%%%%
 init_per_group(GroupName, Config) ->
+    {ok, _} = application:ensure_all_started(locus),
+    ok = application:set_env(kernel, logger_level, debug),
+    ok = locus_logger:set_loglevel(debug),
+
     case atom_to_list(GroupName) of
         "local_http_tests_" ++ FileExtension ->
-            {ok, _} = application:ensure_all_started(locus),
-            ok = application:set_env(kernel, logger_level, debug),
-            ok = locus_logger:set_loglevel(debug),
             PathWithTestTarballs = locus_test_utils:path_with_test_tarballs(),
             {ok, HttpdPid, BaseURL} = locus_httpd:start(PathWithTestTarballs),
             DatabasePath = filename:join(PathWithTestTarballs, "GeoLite2-Country." ++ FileExtension),
             RandomAnchor = integer_to_list(rand:uniform(1 bsl 64), 36),
             DatabaseURL = BaseURL ++ "/GeoLite2-Country." ++ FileExtension ++ "#" ++ RandomAnchor,
+            WrongURL = BaseURL ++ "/foobarbarfoofoobar",
             CorruptURL = BaseURL ++ "/corruption." ++ FileExtension,
             ok = set_file_mtime(DatabasePath, ?VERSION1_TIMESTAMP),
-            [{is_http, true},
-             {is_remote, false},
+            [{group_type, local_http},
              {httpd_pid, HttpdPid},
              {load_from, DatabaseURL},
-             {path, DatabasePath},
-             {corrupt_url, CorruptURL},
-             {base_url, BaseURL}
+             {wrong_load_from, WrongURL},
+             {corrupt_load_from, CorruptURL},
+             {local_path, DatabasePath}
              | Config];
+
+        "custom_fetcher_tests_" ++ FileExtension ->
+            ModifiedOn = calendar:universal_time(),
+
+            {ok, GoodPid} = locus_test_custom_fetcher:start("GeoLite2-Country", FileExtension,
+                                                            ModifiedOn),
+            GoodFetcherArgs = #{locality => remote, pid => GoodPid},
+            GoodFetcher = {custom_fetcher, locus_test_custom_fetcher, GoodFetcherArgs},
+
+            {ok, BadPid} = locus_test_custom_fetcher:start("foobarbarfoofoobar", FileExtension,
+                                                           ModifiedOn),
+            BadFetcherArgs = #{locality => remote, pid => BadPid},
+            BadFetcher = {custom_fetcher, locus_test_custom_fetcher, BadFetcherArgs},
+
+            {ok, UglyPid} = locus_test_custom_fetcher:start("corruption", FileExtension,
+                                                           ModifiedOn),
+            UglyFetcherArgs = #{locality => remote, pid => UglyPid},
+            UglyFetcher = {custom_fetcher, locus_test_custom_fetcher, UglyFetcherArgs},
+
+            [{group_type, custom_fetcher},
+             {load_from, GoodFetcher},
+             {wrong_load_from, BadFetcher},
+             {corrupt_load_from, UglyFetcher},
+             {custom_fetcher_pids, [GoodPid, BadPid, UglyPid]}
+             | Config];
+
         "remote_http_tests" ->
-            {ok, _} = application:ensure_all_started(locus),
-            ok = application:set_env(kernel, logger_level, debug),
-            ok = locus_logger:set_loglevel(debug),
             ok = application:set_env(locus, license_key, license_key_from_environment()),
             Edition = {maxmind, 'GeoLite2-Country'},
-            [{is_http, true},
-             {is_remote, true},
+            [{group_type, remote_http},
              {load_from, Edition}
              | Config]
     end.
@@ -121,6 +157,20 @@ end_per_group(GroupName, Config) ->
             ok = locus_httpd:stop(HttpdPid),
             _ = file:delete(CacheFilename),
             Config;
+
+        "custom_fetcher_tests_" ++ _FileExtension ->
+            {custom_fetcher, Module, _Args} = proplists:get_value(load_from, Config),
+            [GoodPid, BadPid, UglyPid] = proplists:get_value(custom_fetcher_pids, Config),
+            FetchedFrom = locus_test_custom_fetcher:get_database_is_fetched_from(GoodPid),
+            CacheFilename = locus_loader:cached_database_path_for_custom_fetcher(Module, FetchedFrom),
+
+            ok = application:stop(locus),
+            _ = file:delete(CacheFilename),
+            ok = locus_test_custom_fetcher:stop(GoodPid),
+            ok = locus_test_custom_fetcher:stop(BadPid),
+            ok = locus_test_custom_fetcher:stop(UglyPid),
+            Config;
+
         "remote_http_tests" ->
             {maxmind, MaxMindEditionName}
                 = proplists:get_value(load_from, Config),
@@ -143,26 +193,32 @@ cacheless_loading_test(Config) ->
     LoaderOpts = [no_cache, {event_subscriber, self()}],
     ok = locus:start_loader(Loader, LoadFrom, LoaderOpts),
     LoadedVersion = locus_common_tests:test_successful_loader_await(Loader),
-    % check events
-    ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_started, _Headers}}),
-    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
 
-    _ = case LoadFrom of
-            {maxmind, _} ->
-                ?assertRecv({locus, Loader, {checksum, {request_sent, _ChecksumURL,
-                                                        _ChecksumReqHeaders}}}),
-                ?assertRecv({locus, Loader, {checksum, {download_started,
-                                                        _ChecksumRespHeaders}}}),
-                ?assertRecv({locus, Loader, {checksum, {download_finished,
-                                                        _BytesReceived,
-                                                        {ok, _TrailingChecksumRespHeaders}}}});
-            _ ->
-                ok
-        end,
+    case LoadFrom of
+        "http" ++ _ ->
+            ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_started, _Headers}}),
+            ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}});
+
+        {maxmind, _} ->
+            ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_started, _Headers}}),
+            ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+
+            ?assertRecv({locus, Loader, {checksum, {request_sent, _ChecksumURL,
+                                                    _ChecksumReqHeaders}}}),
+            ?assertRecv({locus, Loader, {checksum, {download_started,
+                                                    _ChecksumRespHeaders}}}),
+            ?assertRecv({locus, Loader, {checksum, {download_finished,
+                                                    _BytesReceived,
+                                                    {ok, _TrailingChecksumRespHeaders}}}});
+
+        {custom_fetcher, _, _} ->
+            ?assertRecv({locus, Loader, {load_attempt_started,
+                                         {remote, {custom, _}}}})
+    end,
 
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, LoadedVersion}}}),
-    % check info
     ?assertMatch({ok, #{ metadata := #{}, source := {remote,_}, version := LoadedVersion }},
                  locus:get_info(Loader)),
     ?assertMatch({ok, #{}}, locus:get_info(Loader, metadata)),
@@ -176,28 +232,34 @@ cold_remote_loading_test(Config) ->
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, LoadFrom, LoaderOpts),
     LoadedVersion = locus_common_tests:test_successful_loader_await(Loader),
-    % check events
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {error,_}}}),
-    ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_started, _Headers}}),
-    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
 
-    _ = case LoadFrom of
-            {maxmind, _} ->
-                ?assertRecv({locus, Loader, {checksum, {request_sent, _ChecksumURL,
-                                                        _ChecksumReqHeaders}}}),
-                ?assertRecv({locus, Loader, {checksum, {download_started,
-                                                        _ChecksumRespHeaders}}}),
-                ?assertRecv({locus, Loader, {checksum, {download_finished,
-                                                        _BytesReceived,
-                                                        {ok, _TrailingChecksumRespHeaders}}}});
-            _ ->
-                ok
-        end,
+    case LoadFrom of
+        "http" ++ _ ->
+            ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_started, _Headers}}),
+            ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}});
+
+        {maxmind, _} ->
+            ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_started, _Headers}}),
+            ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+
+            ?assertRecv({locus, Loader, {checksum, {request_sent, _ChecksumURL,
+                                                    _ChecksumReqHeaders}}}),
+            ?assertRecv({locus, Loader, {checksum, {download_started,
+                                                    _ChecksumRespHeaders}}}),
+            ?assertRecv({locus, Loader, {checksum, {download_finished,
+                                                    _BytesReceived,
+                                                    {ok, _TrailingChecksumRespHeaders}}}});
+
+        {custom_fetcher, _, _} ->
+            ?assertRecv({locus, Loader, {load_attempt_started,
+                                         {remote, {custom, _}}}})
+    end,
 
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, LoadedVersion}}}),
     ?assertRecv({locus, Loader, {cache_attempt_finished, _CacheFilename, ok}}),
-    % check info
     ?assertMatch({ok, #{ metadata := #{}, source := {remote,_}, version := LoadedVersion }},
                  locus:get_info(Loader)),
     ?assertMatch({ok, #{}}, locus:get_info(Loader, metadata)),
@@ -211,12 +273,20 @@ warm_remote_loading_test(Config) ->
     LoaderOpts = [{event_subscriber, self()}],
     ok = locus:start_loader(Loader, LoadFrom, LoaderOpts),
     LoadedVersion = locus_common_tests:test_successful_loader_await(Loader),
-    CacheFilename = cached_database_path(LoadFrom),
-    % check events
+    CacheFilename = cached_database_path(LoadFrom, Config),
     ?assertRecv({locus, Loader, {load_attempt_finished, {cache,_}, {ok,LoadedVersion}}}),
-    ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_dismissed, {http, {304,_}, _Headers, _Body}}}),
-    % check info
+
+    case LoadFrom of
+        {custom_fetcher, _, _} ->
+            ?assertRecv({locus, Loader, {load_attempt_started,
+                                         {remote, {custom, _}}}}),
+            ?assertRecv({locus, Loader, {load_attempt_dismissed,
+                                         {remote, {custom, _}}}});
+        _HttpOrMaxMind ->
+            ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_dismissed, {http, {304,_}, _Headers, _Body}}})
+    end,
+
     ?assertMatch({ok, #{ metadata := #{}, source := {cache,CacheFilename}, version := LoadedVersion }},
                  locus:get_info(Loader)),
     ?assertMatch({ok, #{}}, locus:get_info(Loader, metadata)),
@@ -224,43 +294,98 @@ warm_remote_loading_test(Config) ->
     ?assertEqual({ok, LoadedVersion}, locus:get_info(Loader, version)),
     ok = locus:stop_loader(Loader).
 
-update_works_test(Config) ->
-    IsRemote = proplists:get_value(is_remote, Config),
-    update_works_test(IsRemote, Config).
-
-update_works_test(IsRemote, _Config) when IsRemote ->
-    {skip, "Unable to tweak modification time of remote files"};
-update_works_test(_IsRemote, Config) ->
+update_works_localhttptest(Config) ->
     LoadFrom = proplists:get_value(load_from, Config),
-    Path = proplists:get_value(path, Config),
     Loader = update_works_test,
     UpdatePeriod = 200,
     LoaderOpts = [no_cache,
                   {update_period, UpdatePeriod},
                   {event_subscriber, self()}],
-    %%
+
+    %% First load
+    Path = proplists:get_value(local_path, Config),
     ok = set_file_mtime(Path, ?VERSION1_TIMESTAMP),
     ok = locus:start_loader(Loader, LoadFrom, LoaderOpts),
     ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
     ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
-    %%
+
+    %% Update
     ok = set_file_mtime(Path, ?VERSION2_TIMESTAMP),
-    {TimeElapsedA, _} = timer:tc(fun () -> ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}) end),
+    {TimeElapsedA, _}
+    = timer:tc(
+        fun () ->
+                ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}})
+        end),
     MillisecondsElapsedA = TimeElapsedA / 1000,
     ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedA]),
     ?assertRecv({locus, Loader, {download_started, _Headers}}),
     ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
     ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {ok, _}}}),
     ?assert(MillisecondsElapsedA / UpdatePeriod >= 0.90),
-    %%
-    {TimeElapsedB, _} = timer:tc(fun () -> ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}) end),
+
+    %% Dismissal
+    {TimeElapsedB, _}
+    = timer:tc(
+        fun () ->
+                ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}})
+        end),
     MillisecondsElapsedB = TimeElapsedB / 1000,
     ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedB]),
     ?assertRecv({locus, Loader, {download_dismissed, {http, {304,_}, _Headers, _Body}}}),
     ?assert(MillisecondsElapsedB / UpdatePeriod >= 0.90),
-    %%
+
+    ok = locus:stop_loader(Loader).
+
+update_works_customtest(Config) ->
+    LoadFrom = proplists:get_value(load_from, Config),
+    Loader = update_works_test,
+    UpdatePeriod = 200,
+    LoaderOpts = [no_cache,
+                  {update_period, UpdatePeriod},
+                  {event_subscriber, self()}],
+
+
+    %% First load
+    [GoodPid, _BadPid, _UglyPid] = proplists:get_value(custom_fetcher_pids, Config),
+    locus_test_custom_fetcher:set_modification_datetime(GoodPid, ?VERSION1_TIMESTAMP),
+    ok = locus:start_loader(Loader, LoadFrom, LoaderOpts),
+    ?assertRecv({locus, Loader, {load_attempt_started,
+                                 {remote, {custom, _}}}}),
+    ?assertRecv({locus, Loader, {load_attempt_finished,
+                                 {remote, {custom, _}},
+                                 {ok, _}}}),
+
+    %% Update
+    locus_test_custom_fetcher:set_modification_datetime(GoodPid, ?VERSION2_TIMESTAMP),
+    {TimeElapsedA, _}
+    = timer:tc(
+        fun () ->
+                ?assertRecv({locus, Loader, {load_attempt_started,
+                                             {remote, {custom, _}}}})
+        end),
+    MillisecondsElapsedA = TimeElapsedA / 1000,
+    ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedA]),
+    ?assertRecv({locus, Loader, {load_attempt_finished,
+                                 {remote, {custom, _}},
+                                 {ok, _}}}),
+
+    ?assert(MillisecondsElapsedA / UpdatePeriod >= 0.90),
+
+    %% Dismissal
+    {TimeElapsedB, _}
+    = timer:tc(
+        fun () ->
+                ?assertRecv({locus, Loader, {load_attempt_started,
+                                             {remote, {custom, _}}}})
+        end),
+    MillisecondsElapsedB = TimeElapsedB / 1000,
+    ct:pal("MillsecondsElapsed: ~p", [MillisecondsElapsedB]),
+    ?assertRecv({locus, Loader, {load_attempt_dismissed,
+                                 {remote, {custom, _}}}}),
+    ?assert(MillisecondsElapsedB / UpdatePeriod >= 0.90),
+
     ok = locus:stop_loader(Loader).
 
 ipv4_country_lookup_test(Config) ->
@@ -275,7 +400,7 @@ ipv6_country_lookup_test(Config) ->
 ipv6_invalid_addr_test(Config) ->
     locus_common_tests:ipv6_invalid_addr_test(Config).
 
-connect_timeout_test(Config) ->
+connect_timeout_httptest(Config) ->
     % Undeterministic test case
     LoadFrom = proplists:get_value(load_from, Config),
     Loader = connect_timeout_test,
@@ -296,7 +421,7 @@ connect_timeout_test(Config) ->
              end
      end(MaxAttempts)).
 
-download_start_timeout_test(Config) ->
+download_start_timeout_httptest(Config) ->
     %% Undeterministic test case
     LoadFrom = proplists:get_value(load_from, Config),
     Loader = download_start_timeout_test,
@@ -317,7 +442,7 @@ download_start_timeout_test(Config) ->
              end
      end)(MaxAttempts).
 
-idle_download_timeout_test(Config) ->
+idle_download_timeout_httptest(Config) ->
     % Undeterministic test case
     LoadFrom = proplists:get_value(load_from, Config),
     Loader = idle_download_timeout_test,
@@ -339,40 +464,71 @@ idle_download_timeout_test(Config) ->
              end
      end(MaxAttempts)).
 
-wrong_url_localtest(Config) ->
-    BaseURL = proplists:get_value(base_url, Config),
-    URL = BaseURL ++ "/foobarbarfoofoobar",
-    Loader = wrong_url_test,
+wrong_source_localtest(Config) ->
+    WrongLoadFrom = proplists:get_value(wrong_load_from, Config),
+    Loader = wrong_source_test,
     LoaderOpts = [no_cache, {event_subscriber, self()}],
-    ok = locus:start_loader(Loader, URL, LoaderOpts),
-    ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_failed_to_start,
-                                 {http, {404 = _StatusCode, _StatusDesc}, _Headers, _Body}}}),
+    ok = locus:start_loader(Loader, WrongLoadFrom, LoaderOpts),
+
+    case WrongLoadFrom of
+        "http" ++ _ = URL ->
+            ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_failed_to_start,
+                                         {http, {404 = _StatusCode, _StatusDesc}, _Headers, _Body}}});
+        {custom_fetcher, _, _} ->
+            ?assertRecv({locus, Loader, {load_attempt_started,
+                                         {remote, {custom, _}}}}),
+            ?assertRecv({locus, Loader, {load_attempt_finished,
+                                         {remote, {custom, _}},
+                                         {error, not_found}}})
+    end,
     ok = locus:stop_loader(Loader).
 
 corrupt_database_localtest(Config) ->
-    CorruptURL = proplists:get_value(corrupt_url, Config),
+    CorruptLoadFrom = proplists:get_value(corrupt_load_from, Config),
     Loader = corrupt_database_test,
     LoaderOpts = [no_cache, {event_subscriber, self()}],
-    ok = locus:start_loader(Loader, CorruptURL, LoaderOpts),
-    ?assertRecv({locus, Loader, {request_sent, CorruptURL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_started, _Headers}}),
-    ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
-    ?assertRecv({locus, Loader, {load_attempt_finished, {remote,_}, {error, _}}}),
+    ok = locus:start_loader(Loader, CorruptLoadFrom, LoaderOpts),
+
+    case CorruptLoadFrom of
+        "http" ++ _ = URL ->
+            ?assertRecv({locus, Loader, {request_sent, URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_started, _Headers}}),
+            ?assertRecv({locus, Loader, {download_finished, _BytesReceived, {ok, _TrailingHeaders}}}),
+            ?assertRecv({locus, Loader, {load_attempt_finished,
+                                         {remote, URL},
+                                         {error, {decode_database_from, _, _}}}});
+        {custom_fetcher, _, _} ->
+            ?assertRecv({locus, Loader, {load_attempt_started,
+                                         {remote, {custom, _}}}}),
+            ?assertRecv({locus, Loader, {load_attempt_finished,
+                                         {remote, {custom, _}},
+                                         {error, {decode_database_from, _, _}}}})
+    end,
     ok = locus:stop_loader(Loader).
 
 database_unknown_test(_Config) ->
     locus_common_tests:database_unknown_test().
 
 database_still_loading_localtest(Config) ->
-    BaseURL = proplists:get_value(base_url, Config),
-    URL = BaseURL ++ "/foobarbarfoofoobar",
+    WrongLoadFrom = proplists:get_value(wrong_load_from, Config),
     Loader = database_still_loading_test,
     LoaderOpts = [no_cache, {event_subscriber, self()}],
-    ok = locus:start_loader(Loader, URL, LoaderOpts),
-    ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
-    ?assertRecv({locus, Loader, {download_failed_to_start,
-                                 {http, {404 = _StatusCode, _StatusDesc}, _Headers, _Body}}}),
+    ok = locus:start_loader(Loader, WrongLoadFrom, LoaderOpts),
+
+    case WrongLoadFrom of
+        "http" ++ _ ->
+            ?assertRecv({locus, Loader, {request_sent, _URL, _Headers}}),
+            ?assertRecv({locus, Loader, {download_failed_to_start,
+                                         {http, {404 = _StatusCode, _StatusDesc}, _Headers, _Body}}});
+        {custom_fetcher, _, _} ->
+            ?assertRecv({locus, Loader, {load_attempt_started,
+                                         {remote, {custom, _}}}}),
+            ?assertRecv({locus, Loader, {load_attempt_finished,
+                                         {remote, {custom, _}},
+                                         {error, not_found}}})
+    end,
+
     ?assertEqual({error, database_not_loaded}, locus:lookup(Loader, "127.0.0.1")),
     ?assertEqual({error, database_not_loaded}, locus:get_version(Loader)),
     ?assertEqual({error, database_not_loaded}, locus:get_info(Loader)),
@@ -399,9 +555,10 @@ wait_for_loader_failures_test(_Config) ->
 %%%
 
 max_undeterministic_attempts(Config) ->
-    case proplists:get_value(is_remote, Config) of
-        true -> 10;
-        false -> 1000
+    % Doesn't apply to `custom_fetcher' tests
+    case proplists:get_value(group_type, Config) of
+        local_http -> 1000;
+        remote_http -> 10
     end.
 
 set_file_mtime(Path, DateTime) ->
@@ -417,8 +574,12 @@ clear_proc_inbox_of_events(Loader) ->
             ok
     end.
 
-cached_database_path({maxmind, _} = Edition) ->
+cached_database_path({maxmind, _} = Edition, _Config) ->
     {maxmind, ParsedEditionName} = locus:parse_database_edition(Edition),
     locus_loader:cached_database_path_for_maxmind_edition_name(ParsedEditionName, undefined);
-cached_database_path(URL) ->
-    locus_loader:cached_database_path_for_url(URL).
+cached_database_path("http" ++ _ = URL, _Config) ->
+    locus_loader:cached_database_path_for_url(URL);
+cached_database_path({custom_fetcher, Module, _Args}, Config) ->
+    [GoodPid, _BadPid, _UglyPid] = proplists:get_value(custom_fetcher_pids, Config),
+    FetchedFrom = locus_test_custom_fetcher:get_database_is_fetched_from(GoodPid),
+    locus_loader:cached_database_path_for_custom_fetcher(Module, FetchedFrom).
