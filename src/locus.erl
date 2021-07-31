@@ -213,7 +213,6 @@ stop_loader(DatabaseId) ->
 %% <ul>
 %% <li>A `supervisor:child_spec()'.</li>
 %% </ul>
-%% @see loader_child_spec/1
 %% @see loader_child_spec/3
 %% @see await_loader/1
 %% @see await_loader/2
@@ -239,7 +238,7 @@ loader_child_spec(DatabaseId, DatabaseEditionOrURL) ->
 %% <ul>
 %% <li>A `supervisor:child_spec()'.</li>
 %% </ul>
-%% @see loader_child_spec/3
+%% @see loader_child_spec/2
 %% @see loader_child_spec/4
 %% @see await_loader/1
 %% @see await_loader/2
