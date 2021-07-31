@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 
 - single CT suite covering both filesystem and HTTP sources into one for each
+- databases downloaded through HTTP(S) without a `last-modified` response header are no longer
+cached
 
 ## [1.16.1] - 2021-07-12
 
