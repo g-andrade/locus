@@ -27,19 +27,19 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_loader/2]).                -ignore_xref({start_loader,2}).
--export([start_loader/3]).                -ignore_xref({start_loader,3}).
--export([stop_loader/1]).                 -ignore_xref({stop_loader,1}).
--export([loader_child_spec/2]).           -ignore_xref({loader_child_spec,2}).
--export([loader_child_spec/3]).           -ignore_xref({loader_child_spec,3}).
--export([loader_child_spec/4]).           -ignore_xref({loader_child_spec,4}).
--export([await_loader/1]).                -ignore_xref({await_loader,1}).
--export([await_loader/2]).                -ignore_xref({await_loader,2}).
--export([await_loaders/2]).               -ignore_xref({await_loaders,2}).
--export([lookup/2]).                      -ignore_xref({lookup,2}).
--export([get_info/1]).                    -ignore_xref({get_info,1}).
--export([get_info/2]).                    -ignore_xref({get_info,2}).
--export([analyze/1]).                     -ignore_xref({analyze,1}).
+-export([start_loader/2]).                -ignore_xref(start_loader/2).
+-export([start_loader/3]).                -ignore_xref(start_loader/3).
+-export([stop_loader/1]).                 -ignore_xref(stop_loader/1).
+-export([loader_child_spec/2]).           -ignore_xref(loader_child_spec/2).
+-export([loader_child_spec/3]).           -ignore_xref(loader_child_spec/3).
+-export([loader_child_spec/4]).           -ignore_xref(loader_child_spec/4).
+-export([await_loader/1]).                -ignore_xref(await_loader/1).
+-export([await_loader/2]).                -ignore_xref(await_loader/2).
+-export([await_loaders/2]).               -ignore_xref(await_loaders/2).
+-export([lookup/2]).                      -ignore_xref(lookup/2).
+-export([get_info/1]).                    -ignore_xref(get_info/1).
+-export([get_info/2]).                    -ignore_xref(get_info/2).
+-export([analyze/1]).                     -ignore_xref(analyze/1).
 
 -ifdef(TEST).
 -export([parse_database_edition/1]).
@@ -49,22 +49,22 @@
 %% Deprecated API Function Exports
 %% ------------------------------------------------------------------
 
--export([wait_for_loader/1]).             -ignore_xref({wait_for_loader,1}).
--export([wait_for_loader/2]).             -ignore_xref({wait_for_loader,2}).
--export([wait_for_loaders/2]).            -ignore_xref({wait_for_loaders,2}).
--export([get_version/1]).                 -ignore_xref({get_version,1}).
+-export([wait_for_loader/1]).             -ignore_xref(wait_for_loader/1).
+-export([wait_for_loader/2]).             -ignore_xref(wait_for_loader/2).
+-export([wait_for_loaders/2]).            -ignore_xref(wait_for_loaders/2).
+-export([get_version/1]).                 -ignore_xref(get_version/1).
 
--deprecated([{wait_for_loader,1,eventually}]).
--deprecated([{wait_for_loader,2,eventually}]).
--deprecated([{wait_for_loaders,2,eventually}]).
--deprecated([{get_version,1,eventually}]).
+-deprecated([{wait_for_loader, 1, eventually}]).
+-deprecated([{wait_for_loader, 2, eventually}]).
+-deprecated([{wait_for_loaders, 2, eventually}]).
+-deprecated([{get_version, 1, eventually}]).
 
 %% ------------------------------------------------------------------
 %% CLI-only Function Exports
 %% ------------------------------------------------------------------
 
 -ifdef(ESCRIPTIZING).
--export([main/1]).                        -ignore_xref({main,1}).
+-export([main/1]).                        -ignore_xref(main/1).
 -endif.
 
 %% ------------------------------------------------------------------
@@ -193,7 +193,7 @@ start_loader(DatabaseId, LoadFrom) ->
                  CustomFetcher :: custom_fetcher(),
                  Opts :: [locus_database:opt()],
                  Error :: (invalid_url | already_started |
-                           {invalid_opt,term()} | application_not_running).
+                           {invalid_opt, term()} | application_not_running).
 start_loader(DatabaseId, {maxmind, _} = DatabaseEdition, Opts) ->
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
@@ -299,9 +299,10 @@ loader_child_spec(DatabaseId, LoadFrom) ->
                  Opts :: [locus_database:opt()],
                  ChildSpec :: locus_database:static_child_spec().
 loader_child_spec(DatabaseId, LoadFrom, Opts) ->
-    loader_child_spec({locus_database,DatabaseId}, DatabaseId, LoadFrom, Opts).
+    loader_child_spec({locus_database, DatabaseId}, DatabaseId, LoadFrom, Opts).
 
-%% @doc Returns a supervisor child spec for a database loader under id `DatabaseId' with options `Opts'.
+%% @doc Returns a supervisor child spec for a database loader
+%% under id `DatabaseId' with options `Opts'.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom.</li>
@@ -370,8 +371,10 @@ loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomF
 %% <ul>
 %% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {database_stopped, _}}' if the database loader for `DatabaseId' stopped while we waited.</li>
-%% <li>`{error, {timeout, [_]}}' if all the load attempts performed before timing out have failed.</li>
+%% <li>`{error, {database_stopped, _}}'
+%%      if the database loader for `DatabaseId' stopped while we waited.</li>
+%% <li>`{error, {timeout, [_]}}'
+%%      if all the load attempts performed before timing out have failed.</li>
 %% </ul>
 %% @see await_loader/2
 -spec await_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Reason}
@@ -384,7 +387,8 @@ loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomF
 await_loader(DatabaseId) ->
     await_loader(DatabaseId, 30000).
 
-%% @doc Blocks caller execution until either readiness is achieved or the default timeout is triggered.
+%% @doc Blocks caller execution until either readiness is achieved
+%% or the default timeout is triggered.
 %%
 %% <ul>
 %% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
@@ -395,8 +399,10 @@ await_loader(DatabaseId) ->
 %% <ul>
 %% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {database_stopped, _}}' if the database loader for `DatabaseId' stopped while we waited.</li>
-%% <li>`{error, {timeout, [_]}}' if all the load attempts performed before timing out have failed.</li>
+%% <li>`{error, {database_stopped, _}}'
+%%      if the database loader for `DatabaseId' stopped while we waited.</li>
+%% <li>`{error, {timeout, [_]}}'
+%%      if all the load attempts performed before timing out have failed.</li>
 %% </ul>
 %% @see await_loader/1
 %% @see await_loaders/2
@@ -424,8 +430,10 @@ await_loader(DatabaseId, Timeout) ->
 %% Returns:
 %% <ul>
 %% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
-%% <li>`{error, {DatabaseId, database_unknown}}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {DatabaseId, {loading, term()}}}' if loading `DatabaseId' failed for some reason.</li>
+%% <li>`{error, {DatabaseId, database_unknown}}'
+%%      if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, {DatabaseId, {loading, term()}}}'
+%%      if loading `DatabaseId' failed for some reason.</li>
 %% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% </ul>
 
@@ -459,8 +467,7 @@ await_loaders(DatabaseIds, Timeout) ->
     ReplyRef = make_ref(),
     UniqueDatabaseIds = lists:usort(DatabaseIds),
     WaiterOpts = [],
-    Waiters = [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
-               || DatabaseId <- UniqueDatabaseIds],
+    Waiters = launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds),
     EmulateLegacyBehaviour = false,
     perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
 
@@ -613,7 +620,7 @@ wait_for_loader(DatabaseId) ->
             when DatabaseId :: atom(),
                  Timeout :: timeout(),
                  LoadedVersion :: database_version(),
-                 Reason :: database_unknown | {loading,term()} | timeout.
+                 Reason :: database_unknown | {loading, term()} | timeout.
 wait_for_loader(DatabaseId, Timeout) ->
     case wait_for_loaders([DatabaseId], Timeout) of
         {ok, #{DatabaseId := LoadedVersion}} ->
@@ -635,8 +642,10 @@ wait_for_loader(DatabaseId, Timeout) ->
 %% Returns:
 %% <ul>
 %% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
-%% <li>`{error, {DatabaseId, database_unknown}}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {DatabaseId, {loading, term()}}}' if loading `DatabaseId' failed for some reason.</li>
+%% <li>`{error, {DatabaseId, database_unknown}}'
+%%      if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, {DatabaseId, {loading, term()}}}'
+%%      if loading `DatabaseId' failed for some reason.</li>
 %% <li>`{error, timeout}' if we've given up on waiting.</li>
 %% </ul>
 -spec wait_for_loaders(DatabaseIds, Timeout) -> {ok, LoadedVersionPerDatabase} | {error, Reason}
@@ -644,15 +653,14 @@ wait_for_loader(DatabaseId, Timeout) ->
                  Timeout :: timeout(),
                  LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
                  LoadedVersion :: database_version(),
-                 Reason ::{DatabaseId,LoaderFailure} | timeout,
-                 LoaderFailure :: database_unknown | {loading,term()}.
+                 Reason ::{DatabaseId, LoaderFailure} | timeout,
+                 LoaderFailure :: database_unknown | {loading, term()}.
 wait_for_loaders(DatabaseIds, Timeout) ->
     ReplyRef = make_ref(),
     UniqueDatabaseIds = lists:usort(DatabaseIds),
     EmulateLegacyBehaviour = true,
     WaiterOpts = [{emulate_legacy_behaviour, EmulateLegacyBehaviour}],
-    Waiters = [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
-               || DatabaseId <- UniqueDatabaseIds],
+    Waiters = launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds),
     perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
 
 %% @doc Returns the currently loaded database version.
@@ -729,7 +737,8 @@ parse_http_url(DatabaseURL) ->
     of
         false ->
             false;
-        {ok, {Scheme, "", "geolite.maxmind.com", Port, "/download/geoip/database/GeoLite2-" ++ Suffix, _, _}}
+        {ok, {Scheme, "", "geolite.maxmind.com", Port,
+              "/download/geoip/database/GeoLite2-" ++ Suffix, _, _}}
           when Scheme =:= http, Port =:= 80;
                Scheme =:= https, Port =:= 443 ->
             parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList);
@@ -758,7 +767,8 @@ parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList) ->
 
 log_warning_on_use_of_discontinued_geolite2_http_url(LegacyURL, DatabaseEdition) ->
     locus_logger:log_warning(
-      "Public access to GeoLite2 was discontinued on 2019-12-30; converting legacy URL for your convenience.~n"
+      "Public access to GeoLite2 was discontinued on 2019-12-30"
+      "; converting legacy URL for your convenience.~n"
       "Update your `:start_loader' and `:loader_child_spec' calls to silence this message.~n"
       "(Use the tuple {maxmind, '~ts'} instead of the legacy URL \"~ts\")",
       [DatabaseEdition, LegacyURL]).
@@ -781,6 +791,10 @@ info_from_db_parts(Parts) ->
 opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
 
+launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds) ->
+    [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
+     || DatabaseId <- UniqueDatabaseIds].
+
 perform_wait(_ReplyRef, [], Successes, Failures, EmulateLegacyBehaviour) ->
     case map_size(Failures) =:= 0 of
         true ->
@@ -794,7 +808,8 @@ perform_wait(ReplyRef, WaitersLeft, Successes, Failures, EmulateLegacyBehaviour)
         {DatabaseId, {ok, Version}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
             UpdatedSuccesses = Successes#{ DatabaseId => Version },
-            perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses, Failures, EmulateLegacyBehaviour);
+            perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses,
+                         Failures, EmulateLegacyBehaviour);
         {DatabaseId, {error, Reason}}
           when EmulateLegacyBehaviour ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
@@ -807,7 +822,8 @@ perform_wait(ReplyRef, WaitersLeft, Successes, Failures, EmulateLegacyBehaviour)
         {DatabaseId, {error, Reason}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
             UpdatedFailures = Failures#{ DatabaseId => Reason },
-            perform_wait(ReplyRef, RemainingWaitersLeft, Successes, UpdatedFailures, EmulateLegacyBehaviour)
+            perform_wait(ReplyRef, RemainingWaitersLeft, Successes,
+                         UpdatedFailures, EmulateLegacyBehaviour)
     end.
 
 receive_waiter_reply(ReplyRef) ->

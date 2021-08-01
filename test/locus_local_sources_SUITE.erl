@@ -61,9 +61,13 @@ init_per_group(GroupName, Config) ->
     case atom_to_list(GroupName) of
         "from_filesystem_" ++ FileExtension ->
             PathWithTestTarballs = locus_test_utils:path_with_test_tarballs(),
-            DatabasePath = filename:join(PathWithTestTarballs, "GeoLite2-Country." ++ FileExtension),
-            WrongPath = filename:join(PathWithTestTarballs, "foobarbarfoofoobar"),
-            CorruptPath = filename:join(PathWithTestTarballs, "corruption." ++ FileExtension),
+            DatabasePath
+                = filename:join(PathWithTestTarballs, "GeoLite2-Country." ++ FileExtension),
+            WrongPath
+                = filename:join(PathWithTestTarballs, "foobarbarfoofoobar"),
+            CorruptPath
+                = filename:join(PathWithTestTarballs, "corruption." ++ FileExtension),
+
             [{group_type, filesystem},
              {load_from, DatabasePath},
              {wrong_load_from, WrongPath},

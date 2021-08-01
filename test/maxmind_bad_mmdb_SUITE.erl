@@ -38,7 +38,7 @@ all() ->
 
 groups() ->
     [{individual_tests, [],
-      [Function || {Function,1} <- ?MODULE:module_info(exports),
+      [Function || {Function, 1} <- ?MODULE:module_info(exports),
                    lists:suffix("_test", atom_to_list(Function))]
      }].
 

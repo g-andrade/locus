@@ -65,7 +65,8 @@ reply_to_owner(OwnerPid, ReplyRef, DatabaseId, Reply) ->
     unlink(OwnerPid),
     exit(normal).
 
-wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId, Timeout, Opts, LoadAttemptFailures) ->
+wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
+                 Timeout, Opts, LoadAttemptFailures) ->
     EmulateLegacyBehaviour = proplists:get_value(emulate_legacy_behaviour, Opts),
 
     case receive_message(OwnerPid, SubscriptionRef, DatabaseId) of

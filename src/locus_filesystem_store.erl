@@ -57,7 +57,7 @@
 
 -type msg() ::
     {finished, success} |
-    {finished, {error,term()}}.
+    {finished, {error, term()}}.
 -export_type([msg/0]).
 
 -type path() :: nonempty_string().
@@ -101,7 +101,7 @@ init([OwnerPid, Path, Content, ModificationDT]) ->
             modified_on = ModificationDT
            }}.
 
--spec handle_call(term(), {pid(),reference()}, state())
+-spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
@@ -146,7 +146,7 @@ handle_write(State) ->
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            notify_owner({finished, {error,{Class,SaferReason,SaferStacktrace}}}, State),
+            notify_owner({finished, {error, {Class, SaferReason, SaferStacktrace}}}, State),
             {stop, normal, State}
     end.
 
@@ -161,7 +161,7 @@ do_write(State) ->
     {ok, IoDevice} = file:open(TmpPath, [write, exclusive, raw]),
     ok = file:write(IoDevice, Content),
     ok = file:close(IoDevice),
-    ok = file:write_file_info(TmpPath, FileInfoMod, [{time,universal}]),
+    ok = file:write_file_info(TmpPath, FileInfoMod, [{time, universal}]),
     ok = file:rename(TmpPath, Path).
 
 %% ------------------------------------------------------------------
@@ -171,5 +171,5 @@ do_write(State) ->
 %-spec notify_owner(msg(), state()) -> ok.
 notify_owner(Msg, State) ->
     #state{owner_pid = OwnerPid} = State,
-    _ = erlang:send(OwnerPid, {self(),Msg}, [noconnect]),
+    _ = erlang:send(OwnerPid, {self(), Msg}, [noconnect]),
     ok.

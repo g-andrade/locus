@@ -57,10 +57,10 @@
 
 -type msg() ::
     {event, event()} |
-    {finished, {success,success()}} |
+    {finished, {success, success()}} |
     {finished, dismissed} |
-    {finished, {error,not_found}} |
-    {finished, {error,term()}}.
+    {finished, {error, not_found}} |
+    {finished, {error, term()}}.
 -export_type([msg/0]).
 
 -type event() ::
@@ -121,7 +121,7 @@ init([OwnerPid, Source, PrevModificationDT]) ->
             previously_modified_on = PrevModificationDT
            }}.
 
--spec handle_call(term(), {pid(),reference()}, state())
+-spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
@@ -162,7 +162,7 @@ handle_read(State) ->
     {_, Path} = Source,
     report_event({load_attempt_started, Source}, State),
 
-    case file:read_file_info(Path, [{time,universal}]) of
+    case file:read_file_info(Path, [{time, universal}]) of
         {ok, #file_info{ mtime = ModificationDT }}
           when ModificationDT =:= PrevModificationDT ->
             report_event({load_attempt_dismissed, Source}, State),
@@ -174,7 +174,7 @@ handle_read(State) ->
             notify_owner({finished, {error, not_found}}, State),
             {stop, normal, State};
         {error, Reason} ->
-            notify_owner({finished, {error, {read_file_info,Reason}}}, State),
+            notify_owner({finished, {error, {read_file_info, Reason}}}, State),
             {stop, normal, State}
     end.
 
@@ -186,13 +186,13 @@ handle_new_read(Path, ModificationDT, State) ->
                 #{ modified_on => ModificationDT,
                    content => Content
                  },
-            notify_owner({finished, {success,Success}}, State),
+            notify_owner({finished, {success, Success}}, State),
             {stop, normal, State};
         {error, enoent} ->
             notify_owner({finished, {error, not_found}}, State),
             {stop, normal, State};
         {error, Reason} ->
-            notify_owner({finished, {error, {read_file,Reason}}}, State),
+            notify_owner({finished, {error, {read_file, Reason}}}, State),
             {stop, normal, State}
     end.
 
@@ -202,10 +202,10 @@ handle_new_read(Path, ModificationDT, State) ->
 
 -spec report_event(event(), state()) -> ok.
 report_event(Event, State) ->
-    notify_owner({event,Event}, State).
+    notify_owner({event, Event}, State).
 
 -spec notify_owner(msg(), state()) -> ok.
 notify_owner(Msg, State) ->
     #state{owner_pid = OwnerPid} = State,
-    _ = erlang:send(OwnerPid, {self(),Msg}, [noconnect]),
+    _ = erlang:send(OwnerPid, {self(), Msg}, [noconnect]),
     ok.

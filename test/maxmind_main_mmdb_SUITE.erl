@@ -57,7 +57,7 @@ groups() ->
 
 test_cases() ->
     Exports = ?MODULE:module_info(exports),
-    [Function || {Function,1} <- Exports,
+    [Function || {Function, 1} <- Exports,
                  lists:suffix("_test", atom_to_list(Function))].
 
 %%%%%%%%%%%%%%%
@@ -93,11 +93,11 @@ end_per_group(_Group, _Config) ->
 %% ------------------------------------------------------------------
 
 load_database_test(Config) ->
-    case lists:member({is_broken,true}, Config) of
+    case lists:member({is_broken, true}, Config) of
         false ->
             ?assertMatch(
-               {{{_,_,_},{_,_,_}} = _DatabaseVersion,
-                #{tree := _} = _DatabaseParts},
+               {{{_, _, _}, {_, _, _}}, % DatabaseVersion,
+                #{tree := _}}, % DatabaseParts,
                decode_database_parts(Config));
         true ->
             ?assertError(

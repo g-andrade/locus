@@ -74,7 +74,7 @@
 -define(is_pos_integer(V), ((is_integer((V)) andalso ((V) >= 1)))).
 
 % https://en.wikipedia.org/wiki/Gzip
--define(GZIP_MAGIC_BYTES, 16#1f,16#8b).
+-define(GZIP_MAGIC_BYTES, 16#1f, 16#8b).
 
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
@@ -261,7 +261,7 @@ init([OwnerPid, DatabaseId, Origin, LoaderOpts, FetcherOpts]) ->
     self() ! finish_initialization,
     {ok, State}.
 
--spec handle_call(term(), {pid(),reference()}, state())
+-spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
@@ -314,11 +314,11 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 -spec validate_fetcher_opts(origin(), list())
         -> {ok, {[fetcher_opt()], list()}} |
            {error, term()}.
-validate_fetcher_opts({maxmind,_}, MixedOpts) ->
+validate_fetcher_opts({maxmind, _}, MixedOpts) ->
     locus_maxmind_download:validate_opts(MixedOpts);
-validate_fetcher_opts({http,_}, MixedOpts) ->
+validate_fetcher_opts({http, _}, MixedOpts) ->
     locus_http_download:validate_opts(MixedOpts);
-validate_fetcher_opts({filesystem,_}, MixedOpts) ->
+validate_fetcher_opts({filesystem, _}, MixedOpts) ->
     {ok, {[], MixedOpts}};
 validate_fetcher_opts({custom_fetcher, _Module, _Args}, MixedOpts) ->
     % Whatever opts `Module' needs can be placed in `Args' instead,
@@ -332,18 +332,22 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
     try
         lists:partition(
           fun ({update_period, Interval} = Opt) ->
-                  ?is_pos_integer(Interval) orelse error({badopt,Opt});
+                  ?is_pos_integer(Interval)
+                  orelse error({badopt, Opt});
               ({error_retries, Behaviour} = Opt) ->
-                  is_error_retry_behaviour(Behaviour) orelse error({badopt,Opt});
+                  is_error_retry_behaviour(Behaviour)
+                  orelse error({badopt, Opt});
               (no_cache) ->
                   true;
               %
               % Legacy options
               %
               ({pre_readiness_update_period, Interval} = Opt) ->
-                  ?is_pos_integer(Interval) orelse error({badopt,Opt});
+                  ?is_pos_integer(Interval)
+                  orelse error({badopt, Opt});
               ({post_readiness_update_period, Interval} = Opt) ->
-                  ?is_pos_integer(Interval) orelse error({badopt,Opt});
+                  ?is_pos_integer(Interval)
+                  orelse error({badopt, Opt});
               (_) ->
                   false
           end,
@@ -352,7 +356,7 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
         {LoaderOpts, OtherOpts} ->
             {ok, {LoaderOpts, FetcherOpts, OtherOpts}}
     catch
-        error:{badopt,BadOpt} ->
+        error:{badopt, BadOpt} ->
             {error, BadOpt}
     end.
 
@@ -372,11 +376,11 @@ is_error_retry_behaviour(_) ->
     false.
 
 -spec default_settings(origin()) -> settings().
-default_settings({maxmind,_}) ->
+default_settings({maxmind, _}) ->
     default_remote_origin_settings();
-default_settings({http,_}) ->
+default_settings({http, _}) ->
     default_remote_origin_settings();
-default_settings({filesystem,_}) ->
+default_settings({filesystem, _}) ->
     default_local_origin_settings();
 default_settings({custom_fetcher, Module, Args}) ->
     case locus_custom_fetcher:source(Module, Args) of
@@ -562,15 +566,19 @@ begin_update(State)
         {maxmind, EditionName} ->
             Headers = http_request_headers(LastModified),
             {ok, FetcherPid} = locus_maxmind_download:start_link(EditionName, Headers, FetcherOpts),
-            State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote,{maxmind,EditionName}} };
+            State#state{ fetcher_pid = FetcherPid,
+                         fetcher_source = {remote, {maxmind, EditionName}} };
+
         {http, URL} ->
             Headers = http_request_headers(LastModified),
             {ok, FetcherPid} = locus_http_download:start_link(URL, Headers, FetcherOpts),
-            State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote,URL} };
+            State#state{ fetcher_pid = FetcherPid, fetcher_source = {remote, URL} };
+
         {filesystem, _} = Source ->
             ?assertEqual([], FetcherOpts),
             {ok, FetcherPid} = locus_filesystem_load:start_link(Source, LastModified),
             State#state{ fetcher_pid = FetcherPid, fetcher_source = Source };
+
         {custom_fetcher, Module, Args} ->
             ?assertEqual([], FetcherOpts),
             #state{fetch_metadata_for_last_successful_load = PreviousMetadata} = State,
@@ -602,16 +610,16 @@ join_http_header_values(Values) ->
     string:join(Values, "; ").
 
 -spec handle_fetcher_msg(fetcher_msg(), state()) -> {noreply, state()}.
-handle_fetcher_msg({event,Event}, State) ->
+handle_fetcher_msg({event, Event}, State) ->
     #state{fetcher_source = Source} = State,
     case Source of
-        {cache,_} ->
+        {cache, _} ->
             {noreply, State};
         _ ->
             report_event(Event, State),
             {noreply, State}
     end;
-handle_fetcher_msg({finished,Status}, State) ->
+handle_fetcher_msg({finished, Status}, State) ->
     #state{fetcher_pid = FetcherPid, fetcher_source = Source} = State,
     locus_util:expect_linked_process_termination(FetcherPid),
     UpdatedState = State#state{ fetcher_pid = undefined, fetcher_source = undefined },
@@ -625,7 +633,7 @@ handle_fetcher_msg({finished,Status}, State) ->
     end.
 
 -spec handle_cacher_msg(cacher_msg(), state()) -> {noreply, state()}.
-handle_cacher_msg({finished,Status}, State) ->
+handle_cacher_msg({finished, Status}, State) ->
     #state{cacher_pid = CacherPid, cacher_path = CacherPath, cacher_source = Source} = State,
 
     locus_util:expect_linked_process_termination(CacherPid),
@@ -637,7 +645,7 @@ handle_cacher_msg({finished,Status}, State) ->
             report_event({cache_attempt_finished, CacherPath, ok}, UpdatedState),
             handle_load_attempt_conclusion(Source, reset, UpdatedState);
         {error, Reason} ->
-            report_event({cache_attempt_finished, CacherPath, {error,Reason}}, UpdatedState),
+            report_event({cache_attempt_finished, CacherPath, {error, Reason}}, UpdatedState),
             handle_load_attempt_conclusion(Source, reset, UpdatedState)
     end.
 
@@ -660,7 +668,7 @@ handle_database_fetch_success(Source, Success, State) ->
     end.
 
 -spec maybe_save_fetch_metadata(source(), fetcher_success(), state()) -> state().
-maybe_save_fetch_metadata({_,{custom,_}}, Success, State) ->
+maybe_save_fetch_metadata({_, {custom, _}}, Success, State) ->
     #{metadata := Metadata} = Success,
     State#state{fetch_metadata_for_last_successful_load = Metadata};
 maybe_save_fetch_metadata({remote, _}, _Success, State) ->
@@ -687,7 +695,7 @@ handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified
     notify_owner({load_success, Source, Version, Parts}, State2),
 
     case Source of
-        {remote,_} when (State2#state.settings)#settings.use_cache, LastModified =/= unknown ->
+        {remote, _} when (State2#state.settings)#settings.use_cache, LastModified =/= unknown ->
             CachedDatabasePath = cached_database_path(State2),
             CachedDatabaseBlob = make_cached_database_blob(CachedDatabasePath, BinDatabase),
             {ok, CacherPid} = locus_filesystem_store:start_link(CachedDatabasePath,
@@ -710,8 +718,8 @@ handle_database_decode_error(Source, Reason, State) ->
 handle_database_fetch_error(Source, Reason, State) ->
     notify_owner({load_failure, Source, Reason}, State),
     case Source of
-        {cache,_} -> handle_load_attempt_conclusion(Source, reset, State);
-        _         -> handle_load_attempt_conclusion(Source, +1, State)
+        {cache, _} -> handle_load_attempt_conclusion(Source, reset, State);
+        _          -> handle_load_attempt_conclusion(Source, +1, State)
     end.
 
 -spec handle_load_attempt_conclusion(source(), reset | +1, state()) -> {noreply, state()}.
@@ -821,7 +829,8 @@ decode_database_from_gzipped_mmdb_blob(Source, Blob) ->
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from, gzipped_mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {decode_database_from, gzipped_mmdb_blob,
+                     {Class, SaferReason, SaferStacktrace}}}
     end.
 
 -spec decode_database_from_unknown_blob(source(), binary())
@@ -867,10 +876,10 @@ decode_database_from_mmdb_blob(Source, BinDatabase) ->
 
 -spec extract_mmdb_from_tarball_blob(binary()) -> binary().
 extract_mmdb_from_tarball_blob(Tarball) ->
-    {ok, ContainedPaths} = erl_tar:table({binary,Tarball}),
+    {ok, ContainedPaths} = erl_tar:table({binary, Tarball}),
     {true, DatabasePath} = locus_util:lists_anymap(fun has_mmdb_extension/1, ContainedPaths),
     {ok, [{DatabasePath, BinDatabase}]} =
-        erl_tar:extract({binary,Tarball}, [{files, [DatabasePath]}, memory]),
+        erl_tar:extract({binary, Tarball}, [{files, [DatabasePath]}, memory]),
     BinDatabase.
 
 -spec has_mmdb_extension(nonempty_string()) -> boolean().
@@ -895,41 +904,41 @@ filename_extension_parts_recur(Filename, Acc) ->
     end.
 
 -spec fetched_database_format_and_blob(source(), fetcher_success()) -> {blob_format(), binary()}.
-fetched_database_format_and_blob({_,{custom,_}}, #{format := BlobFormat, content := Blob}) ->
+fetched_database_format_and_blob({_, {custom, _}}, #{format := BlobFormat, content := Blob}) ->
     {BlobFormat, Blob};
-fetched_database_format_and_blob({remote,From}, #{headers := Headers, body := Body}) ->
+fetched_database_format_and_blob({remote, From}, #{headers := Headers, body := Body}) ->
     ?assertNotMatch({custom, _}, From),
     case {lists:keyfind("content-type", 1, Headers), Body} of
-        {{_,"application/gzip"}, _} ->
+        {{_, "application/gzip"}, _} ->
             {gzip, Body};
-        {{_,"application/x-gzip"}, _} ->
+        {{_, "application/x-gzip"}, _} ->
             {gzip, Body};
-        {{_,"application/x-gtar"}, <<?GZIP_MAGIC_BYTES,_/bytes>>} ->
+        {{_, "application/x-gtar"}, <<?GZIP_MAGIC_BYTES, _/bytes>>} ->
             {tgz, Body};
-        {{_,"application/x-tgz"}, _} ->
+        {{_, "application/x-tgz"}, _} ->
             {tgz, Body};
-        {{_,"application/x-tar"}, _} ->
+        {{_, "application/x-tar"}, _} ->
             {tarball, Body};
-        {_, <<?GZIP_MAGIC_BYTES,_/bytes>>} ->
+        {_, <<?GZIP_MAGIC_BYTES, _/bytes>>} ->
             {gzip, Body};
         _ ->
             {unknown, Body}
     end;
-fetched_database_format_and_blob({SourceType,Path}, #{content := Content})
+fetched_database_format_and_blob({SourceType, Path}, #{content := Content})
   when SourceType =:= cache;
        SourceType =:= filesystem ->
     case {filename_extension_parts(Path), Content} of
-        {["tgz"|_], _} ->
+        {["tgz" | _], _} ->
             {tgz, Content};
-        {["gz","tar"|_], _} ->
+        {["gz", "tar" | _], _} ->
             {tgz, Content};
-        {["tar"|_], _} ->
+        {["tar" | _], _} ->
             {tarball, Content};
-        {["mmdb"|_], _} ->
+        {["mmdb" | _], _} ->
             {mmdb, Content};
-        {["gz","mmdb"|_], _} ->
+        {["gz", "mmdb" | _], _} ->
             {gzipped_mmdb, Content};
-        {_, <<?GZIP_MAGIC_BYTES,_/bytes>>} ->
+        {_, <<?GZIP_MAGIC_BYTES, _/bytes>>} ->
             {gzip, Content};
         _ ->
             {unknown, Content}
@@ -937,30 +946,30 @@ fetched_database_format_and_blob({SourceType,Path}, #{content := Content})
 
 -spec fetched_database_modification_datetime(source(), fetcher_success())
         -> calendar:datetime() | unknown.
-fetched_database_modification_datetime({_,{custom,_}}, Success) ->
+fetched_database_modification_datetime({_, {custom, _}}, Success) ->
     case Success of
         #{metadata := #{modified_on := ModificationDate}} ->
             ModificationDate;
         #{} ->
             unknown
     end;
-fetched_database_modification_datetime({remote,_}, #{headers := Headers}) ->
+fetched_database_modification_datetime({remote, _}, #{headers := Headers}) ->
     case lists:keyfind("last-modified", 1, Headers) of
         {"last-modified", LastModified} ->
-            ({_,_} = ModificationDate) = httpd_util:convert_request_date(LastModified),
+            ({_, _} = ModificationDate) = httpd_util:convert_request_date(LastModified),
             ModificationDate;
         false ->
             unknown
     end;
-fetched_database_modification_datetime({cache,_}, #{modified_on := ModificationDate}) ->
+fetched_database_modification_datetime({cache, _}, #{modified_on := ModificationDate}) ->
     ModificationDate;
-fetched_database_modification_datetime({filesystem,_}, #{modified_on := ModificationDate}) ->
+fetched_database_modification_datetime({filesystem, _}, #{modified_on := ModificationDate}) ->
     ModificationDate.
 
 %-spec make_cached_database_blob(nonempty_string(), binary()) -> binary().
 make_cached_database_blob(CachedTarballPath, BinDatabase) ->
     case filename_extension_parts(CachedTarballPath) of
-        ["gz","mmdb"|_] -> zlib:gzip(BinDatabase)
+        ["gz", "mmdb" | _] -> zlib:gzip(BinDatabase)
     end.
 
 %% ------------------------------------------------------------------
@@ -984,12 +993,12 @@ handle_linked_process_death(Pid, Reason, State)
 
 -spec report_event(event(), state()) -> ok.
 report_event(Event, State) ->
-    notify_owner({event,Event}, State).
+    notify_owner({event, Event}, State).
 
 -spec notify_owner(msg(), state()) -> ok.
 notify_owner(Msg, State) ->
     #state{owner_pid = OwnerPid} = State,
-    _ = erlang:send(OwnerPid, {self(),Msg}, [noconnect]),
+    _ = erlang:send(OwnerPid, {self(), Msg}, [noconnect]),
     ok.
 
 %% ------------------------------------------------------------------
@@ -1004,7 +1013,8 @@ constant_error_backoff_test() ->
               RetryBehaviour = {backoff, Interval},
               lists:foreach(
                 fun (ConsecutiveErrors) ->
-                        ?assertEqual(Interval, error_backoff_interval(ConsecutiveErrors, RetryBehaviour))
+                        ?assertEqual(Interval, error_backoff_interval(ConsecutiveErrors,
+                                                                      RetryBehaviour))
                 end,
                 lists:seq(1, 1000))
       end,
@@ -1016,107 +1026,107 @@ exponential_error_backoff_test() ->
                 max_interval => timer:hours(24),
                 growth_base => timer:seconds(2),
                 growth_exponent => 0.625}},
-	?assertEqual(1000, error_backoff_interval(1, Trial1)),
-	?assertEqual(1542, error_backoff_interval(2, Trial1)),
-	?assertEqual(2378, error_backoff_interval(3, Trial1)),
-	?assertEqual(3668, error_backoff_interval(4, Trial1)),
-	?assertEqual(5656, error_backoff_interval(5, Trial1)),
-	?assertEqual(8724, error_backoff_interval(6, Trial1)),
-	?assertEqual(13454, error_backoff_interval(7, Trial1)),
-	?assertEqual(20749, error_backoff_interval(8, Trial1)),
-	?assertEqual(32000, error_backoff_interval(9, Trial1)),
-	?assertEqual(49350, error_backoff_interval(10, Trial1)),
-	?assertEqual(76109, error_backoff_interval(11, Trial1)),
-	?assertEqual(117376, error_backoff_interval(12, Trial1)),
-	?assertEqual(181019, error_backoff_interval(13, Trial1)),
-	?assertEqual(279169, error_backoff_interval(14, Trial1)),
-	?assertEqual(430538, error_backoff_interval(15, Trial1)),
-	?assertEqual(663981, error_backoff_interval(16, Trial1)),
-	?assertEqual(1024000, error_backoff_interval(17, Trial1)),
-	?assertEqual(1579223, error_backoff_interval(18, Trial1)),
-	?assertEqual(2435496, error_backoff_interval(19, Trial1)),
-	?assertEqual(3756048, error_backoff_interval(20, Trial1)),
-	?assertEqual(5792618, error_backoff_interval(21, Trial1)),
-	?assertEqual(8933439, error_backoff_interval(22, Trial1)),
-	?assertEqual(13777246, error_backoff_interval(23, Trial1)),
-	?assertEqual(21247419, error_backoff_interval(24, Trial1)),
-	?assertEqual(32768000, error_backoff_interval(25, Trial1)),
-	?assertEqual(50535164, error_backoff_interval(26, Trial1)),
-	?assertEqual(77935877, error_backoff_interval(27, Trial1)),
-	?assertEqual(86400000, error_backoff_interval(28, Trial1)),
-	?assertEqual(86400000, error_backoff_interval(29, Trial1)),
-	?assertEqual(86400000, error_backoff_interval(30, Trial1)),
+    ?assertEqual(1000, error_backoff_interval(1, Trial1)),
+    ?assertEqual(1542, error_backoff_interval(2, Trial1)),
+    ?assertEqual(2378, error_backoff_interval(3, Trial1)),
+    ?assertEqual(3668, error_backoff_interval(4, Trial1)),
+    ?assertEqual(5656, error_backoff_interval(5, Trial1)),
+    ?assertEqual(8724, error_backoff_interval(6, Trial1)),
+    ?assertEqual(13454, error_backoff_interval(7, Trial1)),
+    ?assertEqual(20749, error_backoff_interval(8, Trial1)),
+    ?assertEqual(32000, error_backoff_interval(9, Trial1)),
+    ?assertEqual(49350, error_backoff_interval(10, Trial1)),
+    ?assertEqual(76109, error_backoff_interval(11, Trial1)),
+    ?assertEqual(117376, error_backoff_interval(12, Trial1)),
+    ?assertEqual(181019, error_backoff_interval(13, Trial1)),
+    ?assertEqual(279169, error_backoff_interval(14, Trial1)),
+    ?assertEqual(430538, error_backoff_interval(15, Trial1)),
+    ?assertEqual(663981, error_backoff_interval(16, Trial1)),
+    ?assertEqual(1024000, error_backoff_interval(17, Trial1)),
+    ?assertEqual(1579223, error_backoff_interval(18, Trial1)),
+    ?assertEqual(2435496, error_backoff_interval(19, Trial1)),
+    ?assertEqual(3756048, error_backoff_interval(20, Trial1)),
+    ?assertEqual(5792618, error_backoff_interval(21, Trial1)),
+    ?assertEqual(8933439, error_backoff_interval(22, Trial1)),
+    ?assertEqual(13777246, error_backoff_interval(23, Trial1)),
+    ?assertEqual(21247419, error_backoff_interval(24, Trial1)),
+    ?assertEqual(32768000, error_backoff_interval(25, Trial1)),
+    ?assertEqual(50535164, error_backoff_interval(26, Trial1)),
+    ?assertEqual(77935877, error_backoff_interval(27, Trial1)),
+    ?assertEqual(86400000, error_backoff_interval(28, Trial1)),
+    ?assertEqual(86400000, error_backoff_interval(29, Trial1)),
+    ?assertEqual(86400000, error_backoff_interval(30, Trial1)),
 
     Trial2 = {exponential_backoff,
               #{min_interval => timer:seconds(1),
                 max_interval => timer:hours(24),
                 growth_base => timer:seconds(3),
                 growth_exponent => 0.5}},
-	?assertEqual(1000, error_backoff_interval(1, Trial2)),
-	?assertEqual(1732, error_backoff_interval(2, Trial2)),
-	?assertEqual(3000, error_backoff_interval(3, Trial2)),
-	?assertEqual(5196, error_backoff_interval(4, Trial2)),
-	?assertEqual(9000, error_backoff_interval(5, Trial2)),
-	?assertEqual(15588, error_backoff_interval(6, Trial2)),
-	?assertEqual(27000, error_backoff_interval(7, Trial2)),
-	?assertEqual(46765, error_backoff_interval(8, Trial2)),
-	?assertEqual(81000, error_backoff_interval(9, Trial2)),
-	?assertEqual(140296, error_backoff_interval(10, Trial2)),
-	?assertEqual(243000, error_backoff_interval(11, Trial2)),
-	?assertEqual(420888, error_backoff_interval(12, Trial2)),
-	?assertEqual(729000, error_backoff_interval(13, Trial2)),
-	?assertEqual(1262665, error_backoff_interval(14, Trial2)),
-	?assertEqual(2187000, error_backoff_interval(15, Trial2)),
-	?assertEqual(3787995, error_backoff_interval(16, Trial2)),
-	?assertEqual(6561000, error_backoff_interval(17, Trial2)),
-	?assertEqual(11363985, error_backoff_interval(18, Trial2)),
-	?assertEqual(19683000, error_backoff_interval(19, Trial2)),
-	?assertEqual(34091956, error_backoff_interval(20, Trial2)),
-	?assertEqual(59049000, error_backoff_interval(21, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(22, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(23, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(24, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(25, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(26, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(27, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(28, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(29, Trial2)),
-	?assertEqual(86400000, error_backoff_interval(30, Trial2)),
+    ?assertEqual(1000, error_backoff_interval(1, Trial2)),
+    ?assertEqual(1732, error_backoff_interval(2, Trial2)),
+    ?assertEqual(3000, error_backoff_interval(3, Trial2)),
+    ?assertEqual(5196, error_backoff_interval(4, Trial2)),
+    ?assertEqual(9000, error_backoff_interval(5, Trial2)),
+    ?assertEqual(15588, error_backoff_interval(6, Trial2)),
+    ?assertEqual(27000, error_backoff_interval(7, Trial2)),
+    ?assertEqual(46765, error_backoff_interval(8, Trial2)),
+    ?assertEqual(81000, error_backoff_interval(9, Trial2)),
+    ?assertEqual(140296, error_backoff_interval(10, Trial2)),
+    ?assertEqual(243000, error_backoff_interval(11, Trial2)),
+    ?assertEqual(420888, error_backoff_interval(12, Trial2)),
+    ?assertEqual(729000, error_backoff_interval(13, Trial2)),
+    ?assertEqual(1262665, error_backoff_interval(14, Trial2)),
+    ?assertEqual(2187000, error_backoff_interval(15, Trial2)),
+    ?assertEqual(3787995, error_backoff_interval(16, Trial2)),
+    ?assertEqual(6561000, error_backoff_interval(17, Trial2)),
+    ?assertEqual(11363985, error_backoff_interval(18, Trial2)),
+    ?assertEqual(19683000, error_backoff_interval(19, Trial2)),
+    ?assertEqual(34091956, error_backoff_interval(20, Trial2)),
+    ?assertEqual(59049000, error_backoff_interval(21, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(22, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(23, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(24, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(25, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(26, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(27, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(28, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(29, Trial2)),
+    ?assertEqual(86400000, error_backoff_interval(30, Trial2)),
 
     Trial3 = {exponential_backoff,
               #{min_interval => timer:seconds(1),
                 max_interval => timer:hours(24),
                 growth_base => timer:seconds(1.5),
                 growth_exponent => 2.0}},
-	?assertEqual(1000, error_backoff_interval(1, Trial3)),
-	?assertEqual(2250, error_backoff_interval(2, Trial3)),
-	?assertEqual(5062, error_backoff_interval(3, Trial3)),
-	?assertEqual(11390, error_backoff_interval(4, Trial3)),
-	?assertEqual(25628, error_backoff_interval(5, Trial3)),
-	?assertEqual(57665, error_backoff_interval(6, Trial3)),
-	?assertEqual(129746, error_backoff_interval(7, Trial3)),
-	?assertEqual(291929, error_backoff_interval(8, Trial3)),
-	?assertEqual(656840, error_backoff_interval(9, Trial3)),
-	?assertEqual(1477891, error_backoff_interval(10, Trial3)),
-	?assertEqual(3325256, error_backoff_interval(11, Trial3)),
-	?assertEqual(7481827, error_backoff_interval(12, Trial3)),
-	?assertEqual(16834112, error_backoff_interval(13, Trial3)),
-	?assertEqual(37876752, error_backoff_interval(14, Trial3)),
-	?assertEqual(85222692, error_backoff_interval(15, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(16, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(17, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(18, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(19, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(20, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(21, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(22, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(23, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(24, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(25, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(26, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(27, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(28, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(29, Trial3)),
-	?assertEqual(86400000, error_backoff_interval(30, Trial3)).
+    ?assertEqual(1000, error_backoff_interval(1, Trial3)),
+    ?assertEqual(2250, error_backoff_interval(2, Trial3)),
+    ?assertEqual(5062, error_backoff_interval(3, Trial3)),
+    ?assertEqual(11390, error_backoff_interval(4, Trial3)),
+    ?assertEqual(25628, error_backoff_interval(5, Trial3)),
+    ?assertEqual(57665, error_backoff_interval(6, Trial3)),
+    ?assertEqual(129746, error_backoff_interval(7, Trial3)),
+    ?assertEqual(291929, error_backoff_interval(8, Trial3)),
+    ?assertEqual(656840, error_backoff_interval(9, Trial3)),
+    ?assertEqual(1477891, error_backoff_interval(10, Trial3)),
+    ?assertEqual(3325256, error_backoff_interval(11, Trial3)),
+    ?assertEqual(7481827, error_backoff_interval(12, Trial3)),
+    ?assertEqual(16834112, error_backoff_interval(13, Trial3)),
+    ?assertEqual(37876752, error_backoff_interval(14, Trial3)),
+    ?assertEqual(85222692, error_backoff_interval(15, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(16, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(17, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(18, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(19, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(20, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(21, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(22, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(23, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(24, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(25, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(26, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(27, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(28, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(29, Trial3)),
+    ?assertEqual(86400000, error_backoff_interval(30, Trial3)).
 
 -endif.

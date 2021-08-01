@@ -114,9 +114,11 @@ validate_opts(MixedOpts) ->
     try
         lists:partition(
           fun ({license_key, Value} = Opt) ->
-                  validate_license_key_opt(Value) orelse error({badopt,Opt});
+                  validate_license_key_opt(Value)
+                  orelse error({badopt, Opt});
               ({date, Value} = Opt) ->
-                  validate_date_opt(Value) orelse error({badopt,Opt});
+                  validate_date_opt(Value)
+                  orelse error({badopt, Opt});
               (_) ->
                   false
           end,
@@ -138,7 +140,7 @@ validate_opts(MixedOpts) ->
                     {error, BadOpt}
             end
     catch
-        error:{badopt,BadOpt} ->
+        error:{badopt, BadOpt} ->
             {error, BadOpt}
     end.
 
@@ -173,7 +175,8 @@ init_([OwnerPid, Edition, RequestHeaders, Opts]) ->
     case get_license_key(Opts) of
         {ok, LicenseKey} ->
             URL = build_download_url(Edition, LicenseKey, Opts, "tar.gz"),
-            {ok, DatabaseDownloadPid} = locus_http_download:start_link(URL, RequestHeaders, HttpDownloadOpts),
+            {ok, DatabaseDownloadPid} = locus_http_download:start_link(URL, RequestHeaders,
+                                                                       HttpDownloadOpts),
             State =
                 #state{
                    owner_pid = OwnerPid,
@@ -198,7 +201,7 @@ init_([OwnerPid, Edition, RequestHeaders, Opts]) ->
 init(_) ->
     exit(not_called).
 
--spec handle_call(term(), {pid(),reference()}, state())
+-spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
@@ -332,7 +335,8 @@ checksum_download_opts(DatabaseDownloadSuccess, State) ->
             BaseOpts
     end.
 
--spec date_of_downloaded_database(atom(), locus_http_download:success()) -> calendar:date() | unknown.
+-spec date_of_downloaded_database(atom(), locus_http_download:success())
+        -> calendar:date() | unknown.
 date_of_downloaded_database(Edition, DownloadSuccess) ->
     #{headers := Headers} = DownloadSuccess,
     ParseSuccesses =
@@ -355,20 +359,20 @@ date_of_downloaded_database_from_header({"content-disposition", Value}, Edition)
     RegexOpts = [{capture, all_but_first, list}],
 
     case re:run(Value, Regex, RegexOpts) of
-        {match, [_,_,_] = Parts} ->
+        {match, [_, _, _] = Parts} ->
             date_of_downloaded_database_from_header_str_parts("content-disposition", Parts);
         nomatch ->
             false
     end;
 date_of_downloaded_database_from_header({"last-modified", Value}, _) ->
     try httpd_util:convert_request_date(Value) of
-        {{_,_,_} = Date, _} ->
+        {{_, _, _} = Date, _} ->
             {true, {"last-modified", Date}}
     catch
         _:_ ->
             false
     end;
-date_of_downloaded_database_from_header({_,_}, _) ->
+date_of_downloaded_database_from_header({_, _}, _) ->
     false.
 
 date_of_downloaded_database_from_header_str_parts(HeaderName, Parts) ->
@@ -443,7 +447,7 @@ notify_owner(Msg, State) ->
 
 -spec notify_owner_process(pid(), msg()) -> ok.
 notify_owner_process(OwnerPid, Msg) ->
-    _ = erlang:send(OwnerPid, {self(),Msg}, [noconnect]),
+    _ = erlang:send(OwnerPid, {self(), Msg}, [noconnect]),
     ok.
 
 -spec handle_linked_process_death(pid(), term(), state()) -> {stop, normal, state()}.

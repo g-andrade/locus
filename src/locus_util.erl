@@ -66,10 +66,10 @@
 
 -spec parse_ip_address(binary() | string() | inet:ip_address())
         -> {ok, inet:ip_address()} | {error, einval}.
-parse_ip_address({A,B,C,D} = Address)
+parse_ip_address({A, B, C, D} = Address)
   when ?is_uint8(A), ?is_uint8(B), ?is_uint8(C), ?is_uint8(D) ->
     {ok, Address};
-parse_ip_address({A,B,C,D,E,F,G,H} = Address)
+parse_ip_address({A, B, C, D, E, F, G, H} = Address)
   when ?is_uint16(A), ?is_uint16(B), ?is_uint16(C), ?is_uint16(D),
        ?is_uint16(E), ?is_uint16(F), ?is_uint16(G), ?is_uint16(H) ->
     {ok, Address};
@@ -88,7 +88,8 @@ parse_ip_address(String) when length(String) >= 0 ->
 parse_ip_address(_Invalid) ->
     {error, einval}.
 
--spec lists_anymap(fun ((term()) -> boolean() | {true,term()}), list()) -> {true,term()} | false.
+-spec lists_anymap(fun ((term()) -> boolean() | {true, term()}), list())
+        -> {true, term()} | false.
 lists_anymap(Fun, [H|T]) ->
     case Fun(H) of
         {true, Mapped} -> {true, Mapped};
@@ -134,16 +135,13 @@ filesystem_safe_name(Name) ->
     re:replace(OnlyWordsAndSpaces, "[-\\s]+", "-", [global, unicode, ucp, {return, binary}]).
 
 -spec is_utf8_binary(term()) -> boolean().
-is_utf8_binary(<<0:1,_:7, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<6:3,_:5, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<14:4,_:4, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<30:5,_:3, 2:2,_:6, 2:2,_:6, 2:2,_:6, Next/bytes>>) ->
-    is_utf8_binary(Next);
-is_utf8_binary(<<>>) ->
-    true;
+is_utf8_binary(<<Bytes/bytes>>) ->
+    case unicode:characters_to_binary(Bytes) of
+        <<_/bytes>> ->
+            true;
+        _ ->
+            false
+    end;
 is_utf8_binary(_) ->
     false.
 

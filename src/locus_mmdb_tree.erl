@@ -21,7 +21,8 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
+%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
+%% MaxMind DB File Format Specification</a>
 
 -module(locus_mmdb_tree).
 
@@ -113,14 +114,14 @@ bitstring_ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:
     PrefixSize = 32 - SuffixSize,
     <<Prefix:PrefixSize/bits, _Suffix/bits>> = BitAddress,
     BitBaseAddress = <<Prefix/bits, 0:SuffixSize>>,
-    <<A,B,C,D>> = BitBaseAddress,
-    {{A,B,C,D}, PrefixSize};
+    <<A, B, C, D>> = BitBaseAddress,
+    {{A, B, C, D}, PrefixSize};
 bitstring_ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 128 ->
     PrefixSize = 128 - SuffixSize,
     <<Prefix:PrefixSize/bits, _Suffix/bits>> = BitAddress,
     BitBaseAddress = <<Prefix/bits, 0:SuffixSize>>,
-    <<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>> = BitBaseAddress,
-    {{A,B,C,D,E,F,G,H}, PrefixSize}.
+    <<A:16, B:16, C:16, D:16, E:16, F:16, G:16, H:16>> = BitBaseAddress,
+    {{A, B, C, D, E, F, G, H}, PrefixSize}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Looking Up
@@ -129,24 +130,29 @@ bitstring_ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:
 find_node_index_for_prefix(Bitstring, Metadata, Tree) ->
     #{<<"node_count">> := NodeCount, <<"record_size">> := RecordSize} = Metadata,
     NodeSize = (RecordSize * 2) div 8,
-    find_node_index_for_prefix_recur(Bitstring, Tree, NodeSize, RecordSize, 0, NodeCount).
+    find_node_index_for_prefix_recur(Bitstring, Tree, NodeSize, RecordSize,
+                                     _NodeIndex = 0, NodeCount).
 
-find_node_index_for_prefix_recur(<<Bit:1,NextBits/bits>>, Tree, NodeSize, RecordSize, NodeIndex, NodeCount)
+find_node_index_for_prefix_recur(<<Bit:1, NextBits/bits>>, Tree, NodeSize, RecordSize,
+                                 NodeIndex, NodeCount)
   when NodeIndex < NodeCount ->
     % regular node
     Node = binary:part(Tree, {NodeIndex * NodeSize, NodeSize}),
     ChildNodeIndex = extract_node_record(Bit, Node, RecordSize),
-    find_node_index_for_prefix_recur(NextBits, Tree, NodeSize, RecordSize, ChildNodeIndex, NodeCount);
-find_node_index_for_prefix_recur(<<>>, _Tree, _NodeSize, _RecordSize, NodeIndex, _NodeCount) ->
+    find_node_index_for_prefix_recur(NextBits, Tree, NodeSize, RecordSize,
+                                     ChildNodeIndex, NodeCount);
+find_node_index_for_prefix_recur(<<>>, _Tree, _NodeSize, _RecordSize,
+                                 NodeIndex, _NodeCount) ->
     % the end of the line
     NodeIndex.
 
-ip_address_to_bitstring({A,B,C,D}, IPv4RootIndex, _) ->
-    {ok, <<A,B,C,D>>, IPv4RootIndex};
-ip_address_to_bitstring({A,B,C,D,E,F,G,H}, _, Metadata) ->
+ip_address_to_bitstring({A, B, C, D}, IPv4RootIndex, _) ->
+    {ok, <<A, B, C, D>>, IPv4RootIndex};
+ip_address_to_bitstring({A, B, C, D, E, F, G, H}, _, Metadata) ->
     case maps:get(<<"ip_version">>, Metadata) of
         4 -> {error, ipv4_database};
-        6 -> {ok, <<A:16,B:16,C:16,D:16,E:16,F:16,G:16,H:16>>, 0}
+        6 -> {ok, <<A:16, B:16, C:16, D:16,
+                    E:16, F:16, G:16, H:16>>, 0}
     end.
 
 %% @private
@@ -161,7 +167,7 @@ lookup_(BitAddress, RootNodeIndex, Metadata, Tree) ->
             {error, Reason}
     end.
 
-lookup_recur(<<Bit:1,NextBits/bits>>, Tree, NodeSize, RecordSize, NodeIndex, NodeCount)
+lookup_recur(<<Bit:1, NextBits/bits>>, Tree, NodeSize, RecordSize, NodeIndex, NodeCount)
   when NodeIndex < NodeCount ->
     % regular node
     Node = binary:part(Tree, {NodeIndex * NodeSize, NodeSize}),

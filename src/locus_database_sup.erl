@@ -29,7 +29,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0]).                      -ignore_xref({start_link,0}).
+-export([start_link/0]).                      -ignore_xref(start_link/0).
 -export([start_child/1]).
 
 %% ------------------------------------------------------------------
@@ -50,14 +50,14 @@
 
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-    supervisor:start_link({local,?SERVER}, ?MODULE, []).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
--spec start_child([term()]) -> {ok,pid()} | {error,term()}.
+-spec start_child([term()]) -> {ok, pid()} | {error, term()}.
 start_child(Args) ->
     try supervisor:start_child(?SERVER, Args) of
         Result -> Result
     catch
-        exit:{Reason,{gen_server,call,[?SERVER|_]}}
+        exit:{Reason, {gen_server, call, [?SERVER|_]}}
           when Reason =:= noproc;
                Reason =:= normal;
                Reason =:= shutdown;

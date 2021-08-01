@@ -157,19 +157,20 @@ invalid_args_test(Config) ->
 
     % regular loaders
     ?assertEqual({error, invalid_url}, locus:start_loader(Loader, NotAnURLNorAnEdition)),
-    ?assertEqual({error, {invalid_opt, NotAnOpt}}, locus:start_loader(Loader, LoadFrom, InvalidOpts)),
+    ?assertEqual({error, {invalid_opt, NotAnOpt}}, locus:start_loader(Loader, LoadFrom,
+                                                                      InvalidOpts)),
 
     % child spec'd loaders
-    ?assertMatch({error, {invalid_url,_}},
+    ?assertMatch({error, {invalid_url, _}},
                  custom_loader_sup:start_link(Loader, NotAnURLNorAnEdition)),
-    ?assertMatch({error, {shutdown, {failed_to_start_child,_,{invalid_opt,NotAnOpt}}}},
+    ?assertMatch({error, {shutdown, {failed_to_start_child, _, {invalid_opt, NotAnOpt}}}},
                  custom_loader_sup:start_link(Loader, LoadFrom, InvalidOpts)).
 
 -spec subscriber_death_test(config()) -> ok.
 subscriber_death_test(Config) ->
     LoadFrom = proplists:get_value(load_from, Config),
     Loader = subscriber_death_test,
-    Subscribers = [spawn(fun () -> timer:sleep(X*100) end) || X <- [2,3,4,5]],
+    Subscribers = [spawn(fun () -> timer:sleep(X * 100) end) || X <- [2, 3, 4, 5]],
     LoaderOpts = [{event_subscriber, Pid} || Pid <- Subscribers],
     ok = locus:start_loader(Loader, LoadFrom, LoaderOpts),
     OriginalPid = locus_database:whereis(Loader),
@@ -190,7 +191,7 @@ loader_child_spec_test(Config) ->
     test_successful_loader_await(Loader),
 
     % it conflicts with supervisor-spawned loaders under the same name
-    ?assertMatch({error, {shutdown, {failed_to_start_child,_,{already_started,_}}}},
+    ?assertMatch({error, {shutdown, {failed_to_start_child, _, {already_started, _}}}},
                  custom_loader_sup:start_link(Loader, LoadFrom)),
 
     % it conflicts with regular loaders under the same name
@@ -204,16 +205,16 @@ loader_child_spec_test(Config) ->
     % if stopped like a regular loader,
     % its supervisor will decide whether to restart it
     % (and it will, in this case)
-    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+    ?assertMatch({ok, #{}}, locus:get_info(Loader)),
     ?assertEqual(ok, locus:stop_loader(Loader)),
     timer:sleep(500),
-    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+    ?assertMatch({ok, #{}}, locus:get_info(Loader)),
 
     % it can be permanently stopped by stopping its supervisor
-    ?assertMatch({ok,#{}}, locus:get_info(Loader)),
+    ?assertMatch({ok, #{}}, locus:get_info(Loader)),
     ok = custom_loader_sup:stop(Supervisor),
     timer:sleep(500),
-    ?assertEqual({error,database_unknown}, locus:get_info(Loader)),
+    ?assertEqual({error, database_unknown}, locus:get_info(Loader)),
 
     ok.
 

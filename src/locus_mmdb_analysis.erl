@@ -21,7 +21,8 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
+%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
+%% MaxMind DB File Format Specification</a>
 
 -module(locus_mmdb_analysis).
 
@@ -72,7 +73,7 @@
 run(DatabaseParts) ->
     ParentPid = self(),
     PrevTrapExit = process_flag(trap_exit, true),
-    CoordinatorSpawnOpts = [link, {priority,low}],
+    CoordinatorSpawnOpts = [link, {priority, low}],
     try
         CoordinatorPid =
             spawn_opt(
@@ -83,8 +84,8 @@ run(DatabaseParts) ->
             {CoordinatorPid, {analysis_result, TreeFlaws, DataRecordFlaws}} ->
                 process_flag(trap_exit, PrevTrapExit),
                 receive {'EXIT', CoordinatorPid, _} -> ok after 0 -> ok end,
-                case {TreeFlaws,DataRecordFlaws} of
-                    {[],[]} ->
+                case {TreeFlaws, DataRecordFlaws} of
+                    {[], []} ->
                         ok;
                     _ ->
                         {error, {flawed, TreeFlaws ++ DataRecordFlaws}}
@@ -114,7 +115,7 @@ run_analysis_coordinator(ParentPid, DatabaseParts) ->
         end,
 
     CoordinatorPid = self(),
-    DataAnalyzerSpawnOpts = [link, {priority,normal}],
+    DataAnalyzerSpawnOpts = [link, {priority, normal}],
     DataAnalysisConcurrency = erlang:system_info(schedulers_online),
     DataAnalyzers =
         lists:foldl(
@@ -142,7 +143,7 @@ run_analysis_coordinator(ParentPid, DatabaseParts) ->
 
     DataRecordFlaws =
         maps:fold(
-          fun (DataIndex, {{data_record_decoding_failed,Class,Reason}, TreeRefs}, Acc) ->
+          fun (DataIndex, {{data_record_decoding_failed, Class, Reason}, TreeRefs}, Acc) ->
                   [{data_record_decoding_failed,
                     #{ data_index => DataIndex,
                        class => Class,
@@ -209,7 +210,7 @@ handle_data_analyzer_msg({CoordinatorPid, {analyze, DataIndex, Depth, Prefix}},
             case maps:find(DataIndex, Bad) of
                 {ok, {FlawInfo, BadReferences}} ->
                     % already analyzed and classified as flawed data record
-                    UpdatedBadRefereces = [{Depth,Prefix} | BadReferences],
+                    UpdatedBadRefereces = [{Depth, Prefix} | BadReferences],
                     UpdatedBad = maps:update(DataIndex, {FlawInfo, UpdatedBadRefereces}, Bad),
                     UpdatedState = maps:update(bad, UpdatedBad, State),
                     run_data_analyzer_loop(UpdatedState);
@@ -221,7 +222,7 @@ handle_data_analyzer_msg({CoordinatorPid, {analyze, DataIndex, Depth, Prefix}},
 handle_data_analyzer_msg({CoordinatorPid, collect_bad_results},
                          #{coordinator_pid := CoordinatorPid} = State) ->
     #{bad := Bad} = State,
-    _ = CoordinatorPid ! {self(), {bad_results,Bad}},
+    _ = CoordinatorPid ! {self(), {bad_results, Bad}},
     State.
 
 handle_data_record_analysis(DataIndex, Depth, Prefix, State) ->
@@ -239,7 +240,7 @@ handle_data_record_analysis(DataIndex, Depth, Prefix, State) ->
         Class:Reason ->
             #{bad := Bad} = State,
             FlawInfo = {data_record_decoding_failed, Class, Reason},
-            UpdatedBad = maps:put(DataIndex, {FlawInfo,[{Depth,Prefix}]}, Bad),
+            UpdatedBad = maps:put(DataIndex, {FlawInfo, [{Depth, Prefix}]}, Bad),
             maps:update(bad, UpdatedBad, State)
     end.
 

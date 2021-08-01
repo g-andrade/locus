@@ -96,7 +96,7 @@ fall_from_grace(MsgFmt) ->
 
 fall_from_grace(MsgFmt, MsgArgs) ->
     _ = MsgFmt =/= "" andalso stderr_println("[ERROR] " ++ MsgFmt, MsgArgs),
-    erlang:halt(1, [{flush,true}]).
+    erlang:halt(1, [{flush, true}]).
 
 stderr_println(Fmt) ->
     stderr_println(Fmt, []).
@@ -110,15 +110,20 @@ stderr_println(Fmt, Args) ->
 
 handle_analysis_command(CmdArgs) ->
     OptSpecList =
-        [{load_timeout, undefined, "load-timeout", {integer,30}, "Database load timeout (in seconds)"},
-         {log_level,    undefined, "log-level",    {string,"error"}, "debug | info | warning | error"},
-         {url,          undefined, undefined,      utf8_binary, "Database URL (local or remote)"}],
+        [{load_timeout, undefined, "load-timeout",
+          {integer, 30}, "Database load timeout (in seconds)"},
+
+         {log_level, undefined, "log-level",
+          {string, "error"}, "debug | info | warning | error"},
+
+         {url, undefined, undefined,
+          utf8_binary, "Database URL (local or remote)"}],
 
     case getopt:parse_and_check(OptSpecList, CmdArgs) of
         {ok, {ParsedArgs, []}} ->
-            {load_timeout,LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
-            {log_level,StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
-            {url,DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
+            {load_timeout, LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
+            {log_level, StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
+            {url, DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
             LoadTimeout = timer:seconds(LoadTimeoutSecs),
             LogLevel = list_to_atom(StrLogLevel),
             ok = locus_logger:set_loglevel(LogLevel),

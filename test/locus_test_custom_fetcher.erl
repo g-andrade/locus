@@ -178,22 +178,7 @@ handle_call(get_path, _From, State) ->
     {reply, Path, State};
 handle_call(fetch, _From, #state{database = Database} = State)
   when Database =/= undefined ->
-    case Database#database.modified_on of
-        undefined ->
-            Metadata = #{fetched_from => State#state.path, modified_on => unknown},
-            Success = #{format => Database#database.format,
-                        content => Database#database.content,
-                        metadata => Metadata},
-            Reply = {fetched, Success},
-            {reply, Reply, State};
-        ModifiedOn ->
-            Metadata = #{fetched_from => State#state.path, modified_on => ModifiedOn},
-            Success = #{format => Database#database.format,
-                        content => Database#database.content,
-                        metadata => Metadata},
-            Reply = {fetched, Success},
-            {reply, Reply, State}
-    end;
+    handle_fetch(_PreviouslyModifiedOn = unknown, Database, State);
 handle_call(fetch, _From, State) ->
     Reply = {error, not_found},
     {reply, Reply, State};
@@ -201,27 +186,8 @@ handle_call({conditionally_fetch, PreviousFetchMetadata}, _From,
             #state{database = Database} = State)
   when Database =/= undefined ->
     ?assertEqual(State#state.path, maps:get(fetched_from, PreviousFetchMetadata)),
-    case Database#database.modified_on of
-        undefined ->
-            NewMetadata = #{fetched_from => State#state.path, modified_on => unknown},
-            Success = #{format => Database#database.format,
-                        content => Database#database.content,
-                        metadata => NewMetadata},
-            Reply = {fetched, Success},
-            {reply, Reply, State};
-        ModifiedOn
-          when ModifiedOn =/= map_get(modified_on, PreviousFetchMetadata) ->
-            NewMetadata = #{fetched_from => State#state.path, modified_on => ModifiedOn},
-            Success = #{format => Database#database.format,
-                        content => Database#database.content,
-                        metadata => NewMetadata},
-            Reply = {fetched, Success},
-            {reply, Reply, State};
-        ModifiedOn
-          when ModifiedOn =:= map_get(modified_on, PreviousFetchMetadata) ->
-           Reply = dismissed,
-           {reply, Reply, State}
-    end;
+    PreviouslyModifiedOn = maps:get(modified_on, PreviousFetchMetadata),
+    handle_fetch(PreviouslyModifiedOn, Database, State);
 handle_call({conditionally_fetch, _PreviousFetchMetadata}, _From, State) ->
     Reply = {error, not_found},
     {reply, Reply, State};
@@ -260,3 +226,26 @@ database_format(Extension) ->
                           "tar" => tarball,
                           "mmdb" => mmdb,
                           "mmdb.gz" => gzipped_mmdb}).
+
+handle_fetch(PreviouslyModifiedOn, Database, State) ->
+    case Database#database.modified_on of
+        undefined ->
+            NewMetadata = #{fetched_from => State#state.path, modified_on => unknown},
+            Success = #{format => Database#database.format,
+                        content => Database#database.content,
+                        metadata => NewMetadata},
+            Reply = {fetched, Success},
+            {reply, Reply, State};
+        ModifiedOn
+          when ModifiedOn =/= PreviouslyModifiedOn ->
+            NewMetadata = #{fetched_from => State#state.path, modified_on => ModifiedOn},
+            Success = #{format => Database#database.format,
+                        content => Database#database.content,
+                        metadata => NewMetadata},
+            Reply = {fetched, Success},
+            {reply, Reply, State};
+        ModifiedOn
+          when ModifiedOn =:= PreviouslyModifiedOn ->
+           Reply = dismissed,
+           {reply, Reply, State}
+    end.

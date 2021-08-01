@@ -21,7 +21,8 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
+%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
+%% MaxMind DB File Format Specification</a>
 
 -module(locus_mmdb_data).
 
@@ -73,7 +74,9 @@
 -type decoded_map() :: #{unicode:unicode_binary() => decoded_value()}.
 -export_type([decoded_map/0]).
 
--type extended_decoded_map(K,V) :: #{unicode:unicode_binary() => decoded_value(), K := V}.
+-type extended_decoded_map(K, V)
+    :: #{unicode:unicode_binary() => decoded_value(),
+         K := V}.
 -export_type([extended_decoded_map/2]).
 
 -type decoded_array() :: [decoded_value()].
@@ -145,7 +148,7 @@ decode_utf8_string(Bytes) ->
     Copy = binary:copy(Bytes),
     case locus_util:is_utf8_binary(Copy) of
         true -> Copy;
-        _ -> error({not_utf8_text,Copy})
+        _ -> error({not_utf8_text, Copy})
     end.
 
 decode_map(Count, Chunk, FullData, Path) ->
@@ -160,7 +163,7 @@ decode_map_recur(0, RemainingData, _, _, KvAcc) ->
 decode_map_recur(Count, Chunk, FullData, Path, KvAcc) ->
     {Key, RemainingData} = decode_map_key(Chunk, FullData, Path),
     {Value, RemainingData2} = decode_chunk(RemainingData, FullData, Path),
-    UpdatedKvAcc = [{Key,Value} | KvAcc],
+    UpdatedKvAcc = [{Key, Value} | KvAcc],
     decode_map_recur(Count - 1, RemainingData2, FullData, Path, UpdatedKvAcc).
 
 decode_map_key(Chunk, FullData, Path) ->

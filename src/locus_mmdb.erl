@@ -21,7 +21,8 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB File Format Specification</a>
+%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
+%% MaxMind DB File Format Specification</a>
 
 -module(locus_mmdb).
 
@@ -52,7 +53,7 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
--type bin_database() :: <<_:64,_:_*8>>.
+-type bin_database() :: <<_:64, _:_*8>>.
 -export_type([bin_database/0]).
 
 -type source() :: locus_loader:source().
@@ -74,7 +75,7 @@
 -type lookup_success() :: lookup_success(prefix, ip_address_prefix()).
 -export_type([lookup_success/0]).
 
--type lookup_success(K,V) ::
+-type lookup_success(K, V) ::
     locus_mmdb_data:extended_decoded_map(K, V) |
     {locus_mmdb_data:decoded_array(), #{K := V}} |
     {locus_mmdb_data:decoded_simple_value(), #{K := V}}.
@@ -94,7 +95,7 @@
 %% @private
 create_table(Id) ->
     Table = table_name(Id),
-    _ = ets:new(Table, [named_table, protected, {read_concurrency,true}]),
+    _ = ets:new(Table, [named_table, protected, {read_concurrency, true}]),
     ok.
 
 -spec decode_database_parts(source(), bin_database()) -> {calendar:datetime(), parts()}.
@@ -125,7 +126,7 @@ decode_database_parts(Source, BinDatabase) ->
 %% @private
 update(Id, DatabaseParts) ->
     Table = table_name(Id),
-    ets:insert(Table, {database,DatabaseParts}).
+    ets:insert(Table, {database, DatabaseParts}).
 
 -spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
         -> {ok, lookup_success()} |
@@ -176,7 +177,7 @@ is_known_database_format(FmtMajorVersion) ->
 
 -spec epoch_to_datetime(integer()) -> calendar:datetime().
 epoch_to_datetime(Epoch) ->
-    GregorianEpoch = calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
+    GregorianEpoch = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}),
     calendar:gregorian_seconds_to_datetime(GregorianEpoch + Epoch).
 
 with_database_parts(Id, Fun) ->
@@ -186,7 +187,7 @@ with_database_parts(Id, Fun) ->
             {error, database_unknown};
         [] ->
             {error, database_not_loaded};
-        [{_,DatabaseParts}] ->
+        [{_, DatabaseParts}] ->
             Fun(DatabaseParts)
     end.
 

@@ -37,7 +37,13 @@
         when DatabaseId :: atom(),
              Event :: event().
 
--ignore_xref({behaviour_info,1}).
+-ignore_xref({behaviour_info, 1}).
+
+%% ------------------------------------------------------------------
+%% "Private" API Function Exports
+%% ------------------------------------------------------------------
+
+-export([report/3]).
 
 %% ------------------------------------------------------------------
 %% Type Definitions
@@ -45,3 +51,15 @@
 
 -type event() :: locus_database:event().
 -export_type([event/0]).
+
+%% ------------------------------------------------------------------
+%% "Private" API Function Definitions
+%% ------------------------------------------------------------------
+
+-spec report(Module, DatabaseId, Event) -> ok
+        when Module :: module(),
+             DatabaseId :: atom(),
+             Event :: event().
+%% @private
+report(Module, DatabaseId, Event) ->
+    Module:report(DatabaseId, Event).

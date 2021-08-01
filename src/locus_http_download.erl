@@ -181,15 +181,19 @@ validate_opts(MixedOpts) ->
     try
         lists:partition(
           fun ({connect_timeout, Value} = Opt) ->
-                  ?is_timeout(Value) orelse error({badopt,Opt});
+                  ?is_timeout(Value)
+                  orelse error({badopt, Opt});
               ({download_start_timeout, Value} = Opt) ->
-                  ?is_timeout(Value) orelse error({badopt,Opt});
+                  ?is_timeout(Value)
+                  orelse error({badopt, Opt});
               ({idle_download_timeout, Value} = Opt) ->
-                  ?is_timeout(Value) orelse error({badopt,Opt});
+                  ?is_timeout(Value)
+                  orelse error({badopt, Opt});
               (insecure) ->
                   true;
               ({insecure, Insecure} = Opt) ->
-                  is_boolean(Insecure) orelse error({badopt,Opt});
+                  is_boolean(Insecure)
+                  orelse error({badopt, Opt});
               ({censor_query, CensoredKeys} = Opt) ->
                   ?is_list_of_censored_query_keys(CensoredKeys)
                   orelse error({badopt, Opt});
@@ -201,7 +205,7 @@ validate_opts(MixedOpts) ->
         {MyOpts, OtherOpts} ->
             {ok, {MyOpts, OtherOpts}}
     catch
-        error:{badopt,BadOpt} ->
+        error:{badopt, BadOpt} ->
             {error, BadOpt}
     end.
 
@@ -235,7 +239,7 @@ init([OwnerPid, URL, Headers, Opts]) ->
             redirections = 0
            }}.
 
--spec handle_call(term(), {pid(),reference()}, state())
+-spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
@@ -258,7 +262,7 @@ handle_info(send_request, State) ->
 handle_info({http, Msg}, State)
   when element(1, Msg) =:= State#state.request_id ->
     handle_httpc_message(Msg, State);
-handle_info({timeout,OptName}, State) ->
+handle_info({timeout, OptName}, State) ->
     #state{timeouts = Timeouts} = State,
     #{OptName := _} = Timeouts,
     UpdatedTimeouts = maps:remove(OptName, Timeouts),
@@ -339,12 +343,12 @@ handle_httpc_message(Msg, State)
             State4 = State3#state{ response_headers = CiHeaders, response_body = <<>> },
             report_event({download_started, CiHeaders}, State4),
             {noreply, State4};
-        {_, {{_,StatusCode,StatusDesc}, Headers, Body}} ->
+        {_, {{_, StatusCode, StatusDesc}, Headers, Body}} ->
             CiHeaders = lists:keymap(fun string:to_lower/1, 1, Headers),
             handle_download_start_http_failure(StatusCode, StatusDesc, CiHeaders, Body, State);
         {_, {error, Reason}} ->
             report_event({download_failed_to_start, {error, Reason}}, State),
-            notify_owner({finished, {error, {http,Reason}}}, State),
+            notify_owner({finished, {error, {http, Reason}}}, State),
             {stop, normal, State}
     end;
 handle_httpc_message(Msg, State)
@@ -362,20 +366,21 @@ handle_httpc_message(Msg, State)
             Headers = lists:usort(HeadersAcc ++ CiTrailingHeaders),
             Body = iolist_to_binary(BodyAcc),
             BodySize = byte_size(Body),
-            report_event({download_finished, BodySize, {ok,CiTrailingHeaders}}, State),
+            report_event({download_finished, BodySize, {ok, CiTrailingHeaders}}, State),
             handle_successful_download_conclusion(Headers, Body, State);
         {_, {error, Reason}} ->
             #state{response_body = BodyAcc} = State,
             BodySizeSoFar = iolist_size(BodyAcc),
             report_event({download_finished, BodySizeSoFar, {error, Reason}}, State),
-            notify_owner({finished, {error, {http,Reason}}}, State),
+            notify_owner({finished, {error, {http, Reason}}}, State),
             {stop, normal, State}
     end.
 
 handle_download_start_http_failure(StatusCode, StatusDesc, CiHeaders, Body, State) ->
     case stream_start_failure_type(StatusCode, CiHeaders, State) of
         not_modified ->
-            report_event({download_dismissed, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
+            report_event({download_dismissed, {http, {StatusCode, StatusDesc},
+                                               CiHeaders, Body}}, State),
             notify_owner({finished, dismissed}, State),
             {stop, normal, State};
         {redirection, Redirection} when State#state.redirections < ?MAX_REDIRECTIONS ->
@@ -399,11 +404,12 @@ handle_download_start_http_failure(StatusCode, StatusDesc, CiHeaders, Body, Stat
         {invalid_redirection, Reason} ->
             %% TODO test coverage of redirections
             report_event({download_failed_to_start, {invalid_redirection, Reason}}, State),
-            notify_owner({finished, {error, {invalid_redirection,Reason}}}, State),
+            notify_owner({finished, {error, {invalid_redirection, Reason}}}, State),
             {stop, normal, State};
         error ->
-            report_event({download_failed_to_start, {http, {StatusCode, StatusDesc}, CiHeaders, Body}}, State),
-            notify_owner({finished, {error, {http,StatusCode,StatusDesc}}}, State),
+            report_event({download_failed_to_start, {http, {StatusCode, StatusDesc},
+                                                     CiHeaders, Body}}, State),
+            notify_owner({finished, {error, {http, StatusCode, StatusDesc}}}, State),
             {stop, normal, State}
     end.
 
@@ -478,7 +484,7 @@ schedule_timeout(OptName, DefaultValue, State) ->
             UpdatedTimeouts = Timeouts#{ OptName => infinity },
             State#state{ timeouts = UpdatedTimeouts };
         Interval ->
-            TimeoutMsg = {timeout,OptName},
+            TimeoutMsg = {timeout, OptName},
             Timer = erlang:send_after(Interval, self(), TimeoutMsg),
             UpdatedTimeouts = Timeouts#{ OptName => Timer },
             State#state{ timeouts = UpdatedTimeouts }
@@ -492,7 +498,7 @@ cancel_timeout(OptName, State) ->
         infinity ->
             State#state{ timeouts = UpdatedTimeouts };
         Timer ->
-            TimeoutMsg = {timeout,OptName},
+            TimeoutMsg = {timeout, OptName},
             true = cancel_or_flush_timer(Timer, TimeoutMsg),
             State#state{ timeouts = UpdatedTimeouts }
     end.
@@ -528,12 +534,12 @@ handle_timeout(idle_download_timeout, State) ->
 
 -spec report_event(event(), state()) -> ok.
 report_event(Event, State) ->
-    notify_owner({event,Event}, State).
+    notify_owner({event, Event}, State).
 
 -spec notify_owner(msg(), state()) -> ok.
 notify_owner(Msg, State) ->
     #state{owner_pid = OwnerPid} = State,
-    _ = erlang:send(OwnerPid, {self(),Msg}, [noconnect]),
+    _ = erlang:send(OwnerPid, {self(), Msg}, [noconnect]),
     ok.
 
 %% ------------------------------------------------------------------

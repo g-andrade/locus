@@ -104,9 +104,9 @@
 
 -type msg() ::
     {event, event()} |
-    {finished, {success,success()}} |
+    {finished, {success, success()}} |
     {finished, dismissed} |
-    {finished, {error,term()}}.
+    {finished, {error, term()}}.
 -export_type([msg/0]).
 
 -type event() ::
@@ -201,7 +201,7 @@ handle_continue(fetch, State) ->
             handle_conditional_fetch(PreviousFetchMetadata, State)
     end.
 
--spec handle_call(term(), {pid(),reference()}, state())
+-spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
@@ -336,10 +336,10 @@ handle_error(Reason, State) ->
 
 -spec report_event(event(), state()) -> ok.
 report_event(Event, State) ->
-    notify_owner({event,Event}, State).
+    notify_owner({event, Event}, State).
 
 -spec notify_owner(msg(), state()) -> ok.
 notify_owner(Msg, State) ->
     #state{owner_pid = OwnerPid} = State,
-    _ = erlang:send(OwnerPid, {self(),Msg}, [noconnect]),
+    _ = erlang:send(OwnerPid, {self(), Msg}, [noconnect]),
     ok.

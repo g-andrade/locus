@@ -117,7 +117,7 @@
 -spec start(atom(), origin(), [opt()])
         -> ok |
            {error, already_started} |
-           {error, {invalid_opt,term()}} |
+           {error, {invalid_opt, term()}} |
            {error, application_not_running}.
 %% @private
 start(Id, Origin, Opts) ->
@@ -140,7 +140,7 @@ stop(Id) ->
         exit:noproc -> {error, not_found};
         exit:normal -> ok;
         exit:shutdown -> ok;
-        exit:{shutdown,_} -> ok
+        exit:{shutdown, _} -> ok
     end.
 
 -spec start_link(atom(), origin(), [opt()]) -> {ok, pid()}.
@@ -148,7 +148,7 @@ stop(Id) ->
 start_link(Id, Origin, Opts) ->
     ServerName = server_name(Id),
     ServerOpts = [{hibernate_after, ?HIBERNATE_AFTER}],
-    gen_server:start_link({local,ServerName}, ?MODULE, [Id, Origin, Opts], ServerOpts).
+    gen_server:start_link({local, ServerName}, ?MODULE, [Id, Origin, Opts], ServerOpts).
 
 -spec dynamic_child_spec(term()) -> supervisor:child_spec().
 %% @private
@@ -200,7 +200,7 @@ list_subscribers(Id) ->
 
 -spec init([atom() | origin() | [opt()], ...])
     -> {ok, state()} |
-       {stop, {invalid_opt,term()}}.
+       {stop, {invalid_opt, term()}}.
 %% @private
 init([Id, Origin, Opts]) ->
     _ = process_flag(trap_exit, true),
@@ -208,10 +208,10 @@ init([Id, Origin, Opts]) ->
         {ok, {DatabaseOpts, LoaderOpts, FetcherOpts}} ->
             init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts);
         {error, BadOpt} ->
-            {stop, {invalid_opt,BadOpt}}
+            {stop, {invalid_opt, BadOpt}}
     end.
 
--spec handle_call(term(), {pid(),reference()}, state())
+-spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
@@ -319,13 +319,13 @@ init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts) ->
     init_opts(DatabaseOpts, BaseState).
 
 -spec init_opts([database_opt()], state()) -> {ok, state()}.
-init_opts([{event_subscriber,Module} | Opts], State)
+init_opts([{event_subscriber, Module} | Opts], State)
   when is_atom(Module) ->
     #state{subscribers = Subscribers} = State,
     UpdatedSubscribers = [Module | Subscribers],
     UpdatedState = State#state{ subscribers = UpdatedSubscribers },
     init_opts(Opts, UpdatedState);
-init_opts([{event_subscriber,Pid} | Opts], State) ->
+init_opts([{event_subscriber, Pid} | Opts], State) ->
     #state{subscribers = Subscribers, subscriber_mons = SubscriberMons} = State,
     Mon = monitor(process, Pid),
     UpdatedSubscribers = [Pid | Subscribers],
@@ -345,17 +345,17 @@ handle_loader_msg({load_success, Source, Version, Parts}, State) ->
     #state{id = Id} = State,
     locus_mmdb:update(Id, Parts),
     State2 = State#state{ last_version = Version },
-    report_event({load_attempt_finished, Source, {ok,Version}}, State),
+    report_event({load_attempt_finished, Source, {ok, Version}}, State),
     {noreply, State2};
 handle_loader_msg({load_failure, Source, Reason}, State) ->
-    report_event({load_attempt_finished, Source, {error,Reason}}, State),
+    report_event({load_attempt_finished, Source, {error, Reason}}, State),
     {noreply, State}.
 
 -spec report_event(event(), state()) -> ok.
 report_event(Event, #state{id = Id, subscribers = Subscribers}) ->
     lists:foreach(
       fun (Module) when is_atom(Module) ->
-              Module:report(Id, Event);
+              locus_event_subscriber:report(Module, Id, Event);
           (Pid) ->
               erlang:send(Pid, {locus, Id, Event}, [noconnect])
       end,
