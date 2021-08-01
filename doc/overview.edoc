@@ -9,7 +9,7 @@
 `locus' is library for Erlang/OTP and Elixir that allows you to pinpoint the country, city or ASN
 of IP addresses using <a target="_parent" href="https://dev.maxmind.com/geoip/geoip2/geolite2/">MaxMind GeoIP2</a> and <a href="#alternative-providers">other providers</a>.
 
-The databases will be loaded on-demand and, if using HTTP, cached on the filesystem and updated automatically.
+The databases will be loaded on-demand and, when retrieved from the network, cached on the filesystem and updated automatically.
 
 <blockquote>
 &#x26a0;&#xfe0f; Starting on December 31st, 2019, <b>a license key is now <a
@@ -42,7 +42,11 @@ application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 
 <pre lang="erlang"  class="erlang">
 ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
-% You can also use a HTTP URL or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
+% You can also use:
+% * an HTTP(S) URL,
+% * or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
+% * or a `{custom, Module, Args}` tuple, with `Module'
+%   implementing the `locus_custom_fetcher` behaviour.
 </pre>
 
 <h5>3. Wait for the database to load (optional)</h5>
@@ -104,9 +108,9 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 <li><a href="#supported-file-formats">Supported File Formats</a></li>
 <li><a href="#database-types-and-loading">Database Types and Loading</a></li>
 <li><a href="#database-validation">Database Validation</a></li>
-<li><a href="#maxmind-sources--http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</a></li>
-<li><a href="#maxmind-sources--http-urls-caching">MaxMind sources / HTTP URLs: Caching</a></li>
-<li><a href="#filesystem-urls-loading-and-updating">Filesystem URLs: Loading and Updating</a></li>
+<li><a href="#remote-sources-downloading-and-updating">Remote sources: Downloading and Updating</a></li>
+<li><a href="#remote-sources-caching">Remote sources: Caching</a></li>
+<li><a href="#local-sources-loading-and-updating">Local sources: Loading and Updating</a></li>
 <li><a href="#logging">Logging</a></li>
 <li><a href="#event-subscriptions">Event Subscriptions</a></li>
 <li><a href="#api-reference">API Reference</a></li>
@@ -164,7 +168,7 @@ Alternatively, they can also be checked from the command line by use of the `loc
 The script will exit with code 1 in case of failure, and 0 otherwise.
 Run `./locus analyze --help' for a description of supported options and arguments.
 
-<h5 id="maxmind-sources--http-urls-downloading-and-updating">MaxMind sources / HTTP URLs: Downloading and Updating</h5>
+<h5 id="remote-sources-downloading-and-updating">Remote sources: Downloading and Updating</h5>
 
 <ul>
 <li>The downloaded database files, when compressed, are inflated in memory</li>
@@ -180,31 +184,47 @@ Run `./locus analyze --help' for a description of supported options and argument
   Both of these behaviours can be tweaked through the `error_retries' and `update_period'
   loader settings (see <a href="#api-reference">function reference</a>.)
   </li>
-<li>When downloading from a MaxMind edition or HTTPS URL, the remote certificate will be authenticated
-  against a <a target="_parent" href="https://hexdocs.pm/tls_certificate_check/">list of known Certificate Authorities</a>
+<li>When downloading from a MaxMind edition or an HTTPS URL, the remote certificate will be authenticated
+  against <a target="_parent" href="https://hexdocs.pm/tls_certificate_check/">a list of known Certification Authorities</a>
   and connection negotiation will fail in case of an expired certificate, mismatched hostname,
-  self-signed certificate or unknown certificate authority.
+  self-signed certificate or unknown certification authority.
   These checks can be disabled by specifying the `insecure' loader option.
   </li>
 </ul>
 
-<h5 id="maxmind-sources---http-urls-caching">MaxMind sources / HTTP URLs: Caching</h5>
+<h5 id="remote-sources-caching">Remote sources: Caching</h5>
 
 <ul>
 <li>Caching is a best effort; the system falls back to relying exclusively on the network if needed</li>
 <li>A caching directory named `locus_erlang' is created under the <a target="_parent" href="http://erlang.org/doc/man/filename.html#basedir-3">'user_cache' basedir</a></li>
-<li>Cached databases are named after the MaxMind database edition name, or alternatively after the SHA256 hash of their source URL</li>
-<li>Modification time of the databases is extracted from `last-modified' response header (when present)
-  and used to condition downloads on subsequent boots and save bandwidth
-  </li>
+<li>A cached database is named after either:
+    <ul>
+        <li>the MaxMind database edition name (when explicitly downloading from MaxMind), or</li>
+        <li>the SHA256 hash of the HTTP(S) URL, or</li>
+        <li>for `{custom_fetcher, Module, Args}' sources,
+            a filesystem-safe version of `Module''s name
+            concatenated with the 32-bit
+            <a target="_parent" href="https://erlang.org/doc/man/erlang.html#phash2-2">`erlang:phash2/2'</a>
+            value of the opaque database source as returned by the callbacks.
+        </li>
+    </ul>
+</li>
+<li>Modification time of the databases is retrieved from either:
+    <ul>
+        <li>the `last-modified' response header (when present, for MaxMind and HTTP(S) sources)</li>
+        <li>the `modified_on' metadata property for successful `locus_custom_fetcher:fetch/1'
+            and `:conditionally_fetch/2` callbacks (for databases loaded with `locus_custom_fetcher')
+        </li>
+    </ul>
+</li>
 <li>Caching can be disabled by specifying the `no_cache' option when running `:start_loader'</li>
 </ul>
 
-<h5 id="filesystem-urls-loading-and-updating">Filesystem URLs: Loading and Updating</h5>
+<h5 id="local-sources-loading-and-updating">Local sources: Loading and Updating</h5>
 
 <ul>
 <li>The loaded database files, when compressed, are inflated in memory</li>
-<li>The database file modification timestamp is used to condition subsequent load
+<li>The database modification timestamp is used to condition subsequent load
   attempts in order to lower I/O activity
   </li>
 <li>Database load attempts are retried upon error according to an exponential backoff policy
