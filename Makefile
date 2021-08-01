@@ -16,7 +16,7 @@ endif
 
 CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
 
-.PHONY: all build clean check dialyzer xref
+.PHONY: all build clean check dialyzer xref elvis-linter
 .PHONY: test cover
 .PHONY: shell console doc publish cli
 
@@ -34,13 +34,16 @@ $(REBAR3):
 clean: $(REBAR3)
 	@$(REBAR3) clean
 
-check: dialyzer xref
+check: dialyzer xref elvis-linter
 
 dialyzer: $(REBAR3)
 	@$(REBAR3) dialyzer
 
 xref: $(REBAR3)
 	@$(REBAR3) xref
+
+elvis-linter: $(REBAR3)
+	@$(REBAR3) lint
 
 test: $(REBAR3) cli
 	@$(REBAR3) do eunit, ct, cover
