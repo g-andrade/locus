@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - support for retrieving databases using consumer-defined `locus_custom_fetcher's
-- linting check with `rebar3_lint`
+- linting checks with `rebar3_lint`
+- dead code checks with `rebar3_hank`
 
 ### Changed
 
