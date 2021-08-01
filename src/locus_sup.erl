@@ -29,7 +29,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0]).                      -ignore_xref({start_link,0}).
+-export([start_link/0]).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
