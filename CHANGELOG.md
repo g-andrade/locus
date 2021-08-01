@@ -21,6 +21,8 @@ cached
 ### Fixed
 
 - erroneous decoding of 32-bit signed integers as signed when they're less than 4 bytes in length
+- small risk of API functions `:await_loader` and `:await_loaders` blocking indefinitely longer
+than they should
 
 ## [1.16.0] - 2021-05-13
 

@@ -825,18 +825,35 @@ flush_waiter_replies(ReplyRef) ->
     end.
 
 stop_waiters(Waiters) ->
-    lists:foreach(
-      fun ({_DatabaseId, WaiterPid}) ->
-              WaiterMon = monitor(process, WaiterPid),
-              unlink(WaiterPid),
-              exit(WaiterPid, normal),
-              receive
-                  {'DOWN', WaiterMon, _, _, _} ->
-                      ok
-              after
-                  5000 -> % TODO make this concurrent, lest waiting periods accumulate
+    Deadline = erlang:monotonic_time(millisecond) + 5000,
+    PidPerMonitor
+        = lists:foldl(
+            fun ({_DatabaseId, WaiterPid}, Acc) ->
+                    WaiterMon = monitor(process, WaiterPid),
+                    unlink(WaiterPid),
+                    exit(WaiterPid, normal),
+                    Acc#{WaiterMon => WaiterPid}
+            end,
+            #{}, Waiters),
+
+    await_waiters_termination(PidPerMonitor, Deadline).
+
+await_waiters_termination(PidPerMonitor, Deadline)
+  when map_size(PidPerMonitor) > 0 ->
+    Timeout = max(0, Deadline - erlang:monotonic_time(millisecond)),
+    receive
+        {'DOWN', WaiterMon, _, _, _}
+          when is_map_key(WaiterMon, PidPerMonitor) ->
+            {_, Remaining} = maps:take(WaiterMon, PidPerMonitor),
+            await_waiters_termination(Remaining, Deadline)
+    after
+        Timeout ->
+            lists:foreach(
+              fun ({WaiterMon, WaiterPid}) ->
                       demonitor(WaiterMon, [flush]),
                       exit(WaiterPid, kill)
-              end
-      end,
-      Waiters).
+              end,
+              maps:to_list(PidPerMonitor))
+    end;
+await_waiters_termination(#{}, _Deadline) ->
+    ok.
