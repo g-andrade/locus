@@ -873,17 +873,7 @@ extract_mmdb_from_tarball_blob(Tarball) ->
         erl_tar:extract({binary,Tarball}, [{files, [DatabasePath]}, memory]),
     BinDatabase.
 
-%-spec has_mmdb_extension(nonempty_string()) -> boolean().
-has_mmdb_extension({Filename, _Type, _Size, _MTime, _Mode, _Uid, _Gid}) ->
-    % FIXME: this a placeholder for OTP 20; due to the incomplete spec
-    % of erl_tar:table/2, Dialyzer comes to believe that no strings
-    % can be returned, only the above tuple, which in fact is only returned
-    % if the 'verbose' option is picked, something that we are definitely
-    % not doing.
-    case filename_extension_parts(Filename) of
-        ["mmdb"|_] -> {true, Filename};
-        _ -> false
-    end;
+-spec has_mmdb_extension(nonempty_string()) -> boolean().
 has_mmdb_extension(Filename) ->
     case filename_extension_parts(Filename) of
         ["mmdb"|_] -> true;
