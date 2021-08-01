@@ -50,7 +50,7 @@
 -define(extended_uint64, 2).
 -define(extended_uint128, 3).
 -define(extended_array, 4).
--define(extended_data_cache_container, 5).
+% -define(extended_data_cache_container, 5). % Unimplemented
 -define(extended_end_marker, 6).
 -define(extended_boolean, 7).
 -define(extended_float, 8).
