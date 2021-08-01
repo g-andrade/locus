@@ -8,8 +8,8 @@ the country, city or ASN of IP addresses using [MaxMind
 GeoIP2](https://dev.maxmind.com/geoip/geoip2/geolite2/) and [other
 providers](#alternative-providers).
 
-The databases will be loaded on-demand and, when retrieved from the
-network, cached on the filesystem and updated automatically.
+The databases will be loaded on-demand and, if using HTTP, cached on the
+filesystem and updated automatically.
 
 > ⚠️ Starting on December 31st, 2019, **a license key is now
 > [required](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
@@ -39,17 +39,13 @@ application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 
 ``` erlang
 ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
-% You can also use:
-% * an HTTP(S) URL,
-% * or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
-% * or a {custom, Module, Args}` tuple, with `Module
-%   implementing the locus_custom_fetcher` behaviour.
-</pre>
+% You can also use a HTTP URL or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
+```
 
-<h5>3. Wait for the database to load (optional)</h5>
+##### 3\. Wait for the database to load (optional)
 
-<pre lang="erlang" class="erlang">
-{ok, _DatabaseVersion} = locus:await_loader(country). % or &#x60;{error, Reason}
+``` erlang
+{ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
 ```
 
 ##### 4\. Look up IP addresses
@@ -103,11 +99,12 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 1.  [Supported File Formats](#supported-file-formats)
 2.  [Database Types and Loading](#database-types-and-loading)
 3.  [Database Validation](#database-validation)
-4.  [Remote sources: Downloading and
-    Updating](#remote-sources-downloading-and-updating)
-5.  [Remote sources: Caching](#remote-sources-caching)
-6.  [Local sources: Loading and
-    Updating](#local-sources-loading-and-updating)
+4.  [MaxMind sources / HTTP URLs: Downloading and
+    Updating](#maxmind-sources--http-urls-downloading-and-updating)
+5.  [MaxMind sources / HTTP URLs:
+    Caching](#maxmind-sources--http-urls-caching)
+6.  [Filesystem URLs: Loading and
+    Updating](#filesystem-urls-loading-and-updating)
 7.  [Logging](#logging)
 8.  [Event Subscriptions](#event-subscriptions)
 9.  [API Reference](#api-reference)
@@ -169,7 +166,7 @@ The script will exit with code 1 in case of failure, and 0 otherwise.
 Run `./locus analyze --help` for a description of supported options and
 arguments.
 
-##### Remote sources: Downloading and Updating
+##### MaxMind sources / HTTP URLs: Downloading and Updating
 
   - The downloaded database files, when compressed, are inflated in
     memory
@@ -186,45 +183,34 @@ arguments.
     hours. Both of these behaviours can be tweaked through the
     `error_retries` and `update_period` loader settings (see [function
     reference](#api-reference).)
-  - When downloading from a MaxMind edition or an HTTPS URL, the remote
-    certificate will be authenticated against [a list of known
-    Certification
-    Authorities](https://hexdocs.pm/tls_certificate_check/) and
-    connection negotiation will fail in case of an expired certificate,
-    mismatched hostname, self-signed certificate or unknown
-    certification authority. These checks can be disabled by specifying
+  - When downloading from a MaxMind edition or HTTPS URL, the remote
+    certificate will be authenticated against a [list of known
+    Certificate Authorities](https://hexdocs.pm/tls_certificate_check/)
+    and connection negotiation will fail in case of an expired
+    certificate, mismatched hostname, self-signed certificate or unknown
+    certificate authority. These checks can be disabled by specifying
     the `insecure` loader option.
 
-##### Remote sources: Caching
+##### MaxMind sources / HTTP URLs: Caching
 
   - Caching is a best effort; the system falls back to relying
     exclusively on the network if needed
   - A caching directory named `locus_erlang` is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
-  - A cached database is named after either:
-      - the MaxMind database edition name (when explicitly downloading
-        from MaxMind), or
-      - the SHA256 hash of the HTTP(S) URL, or
-      - for `{custom_fetcher, Module, Args}` sources, a filesystem-safe
-        version of `Module`'s name concatenated with the 32-bit
-        [`erlang:phash2/2`](https://erlang.org/doc/man/erlang.html#phash2-2)
-        value of the opaque database source as returned by the
-        callbacks.
-  - Modification time of the databases is retrieved from either:
-      - the `last-modified` response header (when present, for MaxMind
-        and HTTP(S) sources)
-      - the `modified_on` metadata property for successful
-        `locus_custom_fetcher:fetch/1` and ``:conditionally_fetch/2`
-        callbacks (for databases loaded with `locus_custom_fetcher``)
+  - Cached databases are named after the MaxMind database edition name,
+    or alternatively after the SHA256 hash of their source URL
+  - Modification time of the databases is extracted from `last-modified`
+    response header (when present) and used to condition downloads on
+    subsequent boots and save bandwidth
   - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
 
-##### Local sources: Loading and Updating
+##### Filesystem URLs: Loading and Updating
 
   - The loaded database files, when compressed, are inflated in memory
-  - The database modification timestamp is used to condition subsequent
-    load attempts in order to lower I/O activity
+  - The database file modification timestamp is used to condition
+    subsequent load attempts in order to lower I/O activity
   - Database load attempts are retried upon error according to an
     exponential backoff policy - quickly at first (every few seconds)
     but gradually slowing down to every 30 seconds. Successful and
