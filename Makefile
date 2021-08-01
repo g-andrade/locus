@@ -50,7 +50,7 @@ cover: test
 
 shell: export ERL_FLAGS = +pc unicode
 shell:
-	@$(REBAR3) as development shell
+	@$(REBAR3) as shell shell
 
 console: shell
 
@@ -67,7 +67,7 @@ README.md: doc
 	@rm "README.md_"
 
 publish: $(REBAR3)
-	@$(REBAR3) as publish hex publish
+	@$(REBAR3) hex publish
 
 cli: $(REBAR3)
 	@$(REBAR3) as escriptize escriptize
