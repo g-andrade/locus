@@ -24,8 +24,6 @@
 -module(locus_custom_fetcher).
 -behaviour(gen_server).
 
--include_lib("stdlib/include/assert.hrl").
-
 %% ------------------------------------------------------------------
 %% Callback Declarations
 %% ------------------------------------------------------------------
