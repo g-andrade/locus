@@ -55,9 +55,9 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
-% * <code>{ok, Entry}</code> in case of success;
-% * <code>not_found</code> if no entry was found
-% * <code>{error, _}</code> if something bad happened
+% * '{ok, Entry}' in case of success;
+% * 'not_found' if no entry was found
+% * '{error, _}' if something bad happened
 
 {ok,#{<<"continent">> =>
           #{<<"code">> => <<"NA">>,
