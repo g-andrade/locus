@@ -25,7 +25,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 be cached
 - imported version of `tls_certificate_check` to '~> 1.7'
 - single CT suite covering both filesystem and HTTP sources into one for each
-cached
 - test coverage for the better
 
 ### Removed
