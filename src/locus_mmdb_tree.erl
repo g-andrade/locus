@@ -368,10 +368,8 @@ validate_recur(NodeIndex, NotFreshlyReceived, Path, Depth,
             LeftPath = Path bsl 1,
             RightPath = LeftPath bor 1,
             UpdatedDepth = Depth + 1,
-            validate_recur(Left, _NotFreshlyReceived = true, LeftPath,
-                                     UpdatedDepth, Aux),
-            validate_recur(Right, _NotFreshlyReceived = true, RightPath,
-                                     UpdatedDepth, Aux);
+            validate_recur(Left, true, LeftPath, UpdatedDepth, Aux),
+            validate_recur(Right, true, RightPath, UpdatedDepth, Aux);
         true ->
             ok
     end;
