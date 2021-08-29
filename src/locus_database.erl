@@ -24,17 +24,30 @@
 -module(locus_database).
 -behaviour(gen_server).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
 
 -export(
+   [version/1
+   ]).
+
+%% ------------------------------------------------------------------
+%% "Private" API Function Exports
+%% ------------------------------------------------------------------
+
+-export(
    [start/3,
-    stop/1,
+    stop/2,
     start_link/3,
     dynamic_child_spec/1,
     static_child_spec/4,
-    async_get_version_or_subscribe/1
+    async_get_version_or_subscribe/1,
+    find/1
    ]).
 
 -ignore_xref(
@@ -65,8 +78,10 @@
 
 -define(HIBERNATE_AFTER, (timer:seconds(5))).
 
+-define(SHARED_STATE_KEY(DatabaseId), {'locus_database.shared_state', DatabaseId}).
+
 %% ------------------------------------------------------------------
-%% Record and Type Definitions
+%% API Record and Type Definitions
 %% ------------------------------------------------------------------
 
 -type opt() ::
@@ -87,16 +102,6 @@
      }.
 -export_type([static_child_spec/0]).
 
--record(state, {
-          id :: atom(),
-          loader_pid :: pid(),
-          subscribers :: [atom() | pid()],
-          subscriber_mons :: #{monitor() => pid()},
-          last_version :: calendar:datetime() | undefined
-         }).
--type state() :: #state{}.
--type monitor() :: reference().
-
 -type origin() :: locus_loader:origin().
 -export_type([origin/0]).
 
@@ -111,7 +116,38 @@
 -export_type([event_load_attempt_finished/0]).
 
 %% ------------------------------------------------------------------
+%% Internal Record and Type Definitions
+%% ------------------------------------------------------------------
+
+-record(state, {
+          id :: atom(),
+          loader_pid :: pid(),
+          subscribers :: [atom() | pid()],
+          subscriber_mons :: #{monitor() => pid()}
+         }).
+-type state() :: #state{}.
+-type monitor() :: reference().
+
+-record(shared_state, {
+          database :: locus_mmdb:database(),
+          source :: locus_loader:source(),
+          version :: calendar:datetime()
+         }).
+
+%% ------------------------------------------------------------------
 %% API Function Definitions
+%% ------------------------------------------------------------------
+
+%% @doc Returns the database version based on its build epoch (UNIX timestamp)
+-spec version(BuildEpoch) -> Version
+        when BuildEpoch :: non_neg_integer(),
+             Version :: calendar:datetime().
+version(BuildEpoch) ->
+    GregorianEpoch = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}),
+    calendar:gregorian_seconds_to_datetime(GregorianEpoch + BuildEpoch).
+
+%% ------------------------------------------------------------------
+%% "Private" API Function Definitions
 %% ------------------------------------------------------------------
 
 -spec start(atom(), origin(), [opt()])
@@ -130,11 +166,11 @@ start(Id, Origin, Opts) ->
             {error, Reason}
     end.
 
--spec stop(atom()) -> ok | {error, not_found}.
+-spec stop(atom(), term()) -> ok | {error, not_found}.
 %% @private
-stop(Id) ->
+stop(Id, Reason) ->
     ServerName = server_name(Id),
-    try gen:stop(ServerName, normal, 5000) of
+    try gen:stop(ServerName, Reason, 5000) of
         ok -> ok
     catch
         exit:noproc -> {error, not_found};
@@ -181,6 +217,22 @@ async_get_version_or_subscribe(Id) ->
     gen_server:cast(ServerPid, {get_version_or_subscribe, {self(), Ref}}),
     {await, Ref}.
 
+-spec find(atom()) -> {ok, locus_mmdb:database(), locus_loader:source(), calendar:datetime()}
+                      | {error, database_not_loaded}
+                      | {error, database_unknown}.
+%% @private
+find(Id) ->
+    case find_shared_state(Id) of
+        {ok, #shared_state{database = Database, source = Source, version = Version}} ->
+            {ok, Database, Source, Version};
+        error ->
+            ServerName = server_name(Id),
+            DoesLoaderExist = (erlang:whereis(ServerName) =/= undefined),
+            ErrorReason = maps:get(DoesLoaderExist, #{true => database_not_loaded,
+                                                      false => database_unknown}),
+            {error, ErrorReason}
+    end.
+
 -ifdef(TEST).
 %% @private
 whereis(Id) ->
@@ -222,15 +274,15 @@ handle_call(_Call, _From, State) ->
            {stop, unexpected_cast, state()}.
 %% @private
 handle_cast({get_version_or_subscribe, {Pid, Ref}}, State) ->
-    case State#state.last_version of
-        undefined ->
+    case find_shared_state(State#state.id) of
+        error ->
             Mon = monitor(process, Pid),
             UpdatedSubscribers = [Pid | State#state.subscribers],
             UpdatedSubscriberMons = maps:put(Mon, Pid, State#state.subscriber_mons),
             UpdatedState = State#state{ subscribers = UpdatedSubscribers,
                                         subscriber_mons = UpdatedSubscriberMons },
             {noreply, UpdatedState};
-        LastVersion ->
+        {ok, #shared_state{version = LastVersion}} ->
             _ = Pid ! {Ref, {version, LastVersion}},
             {noreply, State}
     end;
@@ -253,7 +305,12 @@ handle_info(_Info, State) ->
 
 -spec terminate(term(), state()) -> ok.
 %% @private
-terminate(_Reason, _State) ->
+terminate(Reason, State) ->
+    _ = (locus_util:is_termination_reason_harmless(Reason)
+         % Avoid erasing shared state if we're in a crash cycle
+         % (as frequent restarts could put quite a strain on
+         %  the GC and/or memory consumption.)
+         andalso erase_shared_state(State#state.id)),
     ok.
 
 -spec code_change(term(), state(), term()) -> {ok, state()}.
@@ -262,7 +319,7 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
     {ok, State}.
 
 %% ------------------------------------------------------------------
-%% Internal Function Definitions
+%% Internal Function Definitions - Initialization and Event Handling
 %% ------------------------------------------------------------------
 
 -spec server_name(atom()) -> atom().
@@ -334,19 +391,17 @@ init_opts([{event_subscriber, Pid} | Opts], State) ->
                                 subscriber_mons = UpdatedSubscriberMons },
     init_opts(Opts, UpdatedState);
 init_opts([], State) ->
-    locus_mmdb:create_table(State#state.id),
+    _ = process_flag(trap_exit, true), % ensure `:terminate/2' is called (unless killed)
     {ok, State}.
 
 -spec handle_loader_msg(locus_loader:msg(), state()) -> {noreply, state()}.
 handle_loader_msg({event, Event}, State) ->
     report_event(Event, State),
     {noreply, State};
-handle_loader_msg({load_success, Source, Version, Parts}, State) ->
-    #state{id = Id} = State,
-    locus_mmdb:update(Id, Parts),
-    State2 = State#state{ last_version = Version },
+handle_loader_msg({load_success, Source, Version, Database}, State) ->
+    update_shared_state(State#state.id, Database, Source, Version),
     report_event({load_attempt_finished, Source, {ok, Version}}, State),
-    {noreply, State2};
+    {noreply, State};
 handle_loader_msg({load_failure, Source, Reason}, State) ->
     report_event({load_attempt_finished, Source, {error, Reason}}, State),
     {noreply, State}.
@@ -375,3 +430,118 @@ handle_monitored_process_death(Ref, State) ->
 handle_linked_process_death(Pid, Reason, State)
   when Pid =:= State#state.loader_pid ->
     {stop, {loader_stopped, Pid, Reason}, State}.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Shared State Management
+%% ------------------------------------------------------------------
+
+erase_shared_state(DatabaseId) ->
+    Key = ?SHARED_STATE_KEY(DatabaseId),
+    persistent_term:erase(Key).
+
+find_shared_state(DatabaseId) ->
+    Key = ?SHARED_STATE_KEY(DatabaseId),
+    try persistent_term:get(Key) of
+        SharedState ->
+            {ok, SharedState}
+    catch
+        error:badarg ->
+            error
+    end.
+
+update_shared_state(DatabaseId, Database, Source, Version) ->
+    Key = ?SHARED_STATE_KEY(DatabaseId),
+    SharedState = #shared_state{database = Database, source = Source, version = Version},
+    persistent_term:put(Key, SharedState).
+
+%% ------------------------------------------------------------------
+%% Unit Tests
+%% ------------------------------------------------------------------
+-ifdef(TEST).
+
+large_binaries_in_gcollected_persistent_term_are_copied_by_ref_test() ->
+    %
+    % Confirm that the VM behaves as we expect it to - otherwise
+    % using `persistent_term' to publish `#shared_state{}' would be
+    % a giant foot gun.
+    %
+    Key = {?MODULE, ?FUNCTION_NAME, make_ref()},
+
+    Randomizer = rand:uniform(1024),
+    BinarySize = 1024 * 1024, % large enough to be ref counted
+    Binary = <<0:BinarySize/integer-unit:8>>,
+    SubBinarySize = 1024 + Randomizer,
+    <<SubBinary:SubBinarySize/bytes, _/bytes>> = Binary,
+    persistent_term:put(Key, SubBinary),
+
+    TestPid = self(),
+    HelperPid
+        = spawn_link(
+            fun () ->
+                    RetrievedSubBinary = persistent_term:get(Key),
+                    TestPid ! ready_to_check,
+                    receive
+                        check_it ->
+                            erlang:garbage_collect(), % just to be sure
+                            ?assertEqual(BinarySize,
+                                         binary:referenced_byte_size(RetrievedSubBinary))
+                    end
+            end),
+
+    receive ready_to_check -> ok end,
+    RetrievedSubBinary = persistent_term:get(Key),
+    persistent_term:put(Key, updated_value),
+    HelperPid ! check_it,
+    erlang:garbage_collect(), % just to be sure
+
+    ?assertEqual(BinarySize, binary:referenced_byte_size(RetrievedSubBinary)).
+
+shared_state_is_cleared_when_gracefully_stopped_test() ->
+    {ok, _} = application:ensure_all_started(locus),
+    PrevTrapExit = process_flag(trap_exit, true),
+
+    try
+        Id = ?FUNCTION_NAME,
+        launch_database_loader_and_await_it(Id),
+        ?assertMatch({ok, #shared_state{}}, find_shared_state(Id)),
+        ok = stop(Id, _Reason = normal),
+        ?assertMatch(error, find_shared_state(Id))
+    after
+        true = process_flag(trap_exit, PrevTrapExit)
+    end.
+
+shared_state_is_kept_when_crashed_test() ->
+    {ok, _} = application:ensure_all_started(locus),
+    PrevTrapExit = process_flag(trap_exit, true),
+
+    try
+        Id = ?FUNCTION_NAME,
+        launch_database_loader_and_await_it(Id),
+        ?assertMatch({ok, #shared_state{}}, find_shared_state(Id)),
+        ok = stop(Id, _Reason = {shutdown, simulated_crash}),
+        ?assertMatch({ok, #shared_state{}}, find_shared_state(Id))
+    after
+        true = process_flag(trap_exit, PrevTrapExit)
+    end.
+
+launch_database_loader_and_await_it(Id) ->
+    Origin = {filesystem, "test/priv/GeoLite2-Country.mmdb"},
+    {ok, _Pid} = start_link(Id, Origin, _Opts = []),
+    {await, Ref} = async_get_version_or_subscribe(Id),
+    {ok, _} = wait_for_database_to_load(Ref, Id),
+    ok.
+
+wait_for_database_to_load(Ref, Id) ->
+    receive
+        {Ref, {version, _Version}} ->
+            ok;
+        {locus, Id, {load_attempt_finished, _, Result}} ->
+            {ok, Result};
+        {locus, Id, _Event} ->
+            % ct:pal("~p", [Event]),
+            wait_for_database_to_load(Ref, Id);
+        {'DOWN', Ref, process, _, Reason} ->
+            exit(Reason)
+    end.
+
+-endif. % -ifdef(TEST).

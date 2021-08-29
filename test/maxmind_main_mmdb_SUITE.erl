@@ -81,11 +81,13 @@ init_per_group(Group, Config) ->
              | Config];
         {error, enoent} ->
             [{bin_database, BinDatabase},
+             {json_group_def_filename, SourceFilename},
              {is_broken, IsBroken}
              | Config]
     end.
 
 end_per_group(_Group, _Config) ->
+    ok = application:stop(jsx),
     ok = application:stop(locus).
 
 %% ------------------------------------------------------------------
@@ -95,17 +97,18 @@ end_per_group(_Group, _Config) ->
 load_database_test(Config) ->
     case lists:member({is_broken, true}, Config) of
         false ->
-            ?assertMatch(
-               {{{_, _, _}, {_, _, _}}, % DatabaseVersion,
-                #{tree := _}}, % DatabaseParts,
-               decode_database_parts(Config));
+            ?assertMatch({ok, #{}}, unpack_database(Config));
         true ->
-            ?assertError(
-               _,
+            ?assertMatch(
+               {errors, [_|_], _},
                begin
-                   {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
-                   ct:pal("Loaded version ~p", [DatabaseVersion]),
-                   ok = locus_mmdb_analysis:run_(DatabaseParts)
+                   case unpack_database(Config) of
+                       {ok, Database} ->
+                           ct:pal("Database unpacked", []),
+                           locus_mmdb_check:run(Database);
+                       {error, Reason} ->
+                           {errors, [Reason], []} % Dirty hack
+                   end
                end)
     end.
 
@@ -114,16 +117,18 @@ expected_lookup_results_test(Config) ->
         true ->
             {json_group_def_filename, SourceFilename} = lists:keyfind(json_group_def_filename,
                                                                       1, Config),
-            {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
-            ct:pal("Database version: ~p", [DatabaseVersion]),
+            {ok, Database} = unpack_database(Config),
+            ct:pal("Database unpacked (~p)", [SourceFilename]),
             lists:foreach(
               fun ({TestCaseIndex, Address, Expectation}) ->
-                      Reality = determine_lookup_reality(DatabaseParts, Address),
+                      Reality = determine_lookup_reality(Database, Address),
                       ?assertEqual(Expectation, Reality,
                                    unicode:characters_to_list(
                                      io_lib:format("Source filename: '~ts'"
-                                                   ", test case index: ~b",
-                                                   [SourceFilename, TestCaseIndex])
+                                                   ", test case index: ~b"
+                                                   ", address ~p",
+                                                   [SourceFilename, TestCaseIndex,
+                                                    Address])
                                     ))
               end,
               expected_lookup_results(Config));
@@ -143,10 +148,9 @@ guess_brokenness(GroupName) ->
       end,
       ["-broken-", "-invalid-"]).
 
-decode_database_parts(Config) ->
+unpack_database(Config) ->
     BinDatabase = proplists:get_value(bin_database, Config),
-    Source = {filesystem, ""},
-    locus_mmdb:decode_database_parts(Source, BinDatabase).
+    locus_mmdb:unpack_database(BinDatabase).
 
 expected_lookup_results(Config) ->
     JsonGroupDef = proplists:get_value(json_group_def, Config),
@@ -168,12 +172,10 @@ expected_lookup_results(TestCaseIndex, Address, UncomparableSuccess, Acc) ->
     ComparableSuccess = comparable_lookup_success(UncomparableSuccess),
     [{TestCaseIndex, Address, {ok, ComparableSuccess}} | Acc].
 
-determine_lookup_reality(DatabaseParts, Address) ->
-    ct:pal("Looking up ~s", [Address]),
-    {ok, ParsedAddress} = locus_util:parse_ip_address(Address),
-    case locus_mmdb:lookup_(ParsedAddress, DatabaseParts) of
-        {ok, UncomparableSuccessWithExtras} ->
-            UncomparableSuccess = maps:without([prefix], UncomparableSuccessWithExtras),
+determine_lookup_reality(Database, Address) ->
+    case locus_mmdb:lookup_address(Address, Database) of
+        {ok, UncomparableSuccess} ->
+            % UncomparableSuccess = maps:without([prefix], UncomparableSuccessWithExtras),
             Success = comparable_lookup_success(UncomparableSuccess),
             {ok, Success};
         {error, Reason} ->

@@ -39,7 +39,7 @@
 -export([lookup/2]).                      -ignore_xref(lookup/2).
 -export([get_info/1]).                    -ignore_xref(get_info/1).
 -export([get_info/2]).                    -ignore_xref(get_info/2).
--export([analyze/1]).                     -ignore_xref(analyze/1).
+-export([check/1]).                       -ignore_xref(check/1).
 
 -ifdef(TEST).
 -export([parse_database_edition/1]).
@@ -98,10 +98,10 @@
 -type database_error() :: database_unknown | database_not_loaded.
 -export_type([database_error/0]).
 
--type database_entry() :: locus_mmdb:lookup_success().
+-type database_entry() :: locus_mmdb_data:value().
 -export_type([database_entry/0]).
 
--type ip_address_prefix() :: locus_mmdb:ip_address_prefix().
+-type ip_address_prefix() :: locus_mmdb_tree:ip_address_prefix().
 -export_type([ip_address_prefix/0]).
 
 -type database_info() ::
@@ -111,7 +111,7 @@
      }.
 -export_type([database_info/0]).
 
--type database_metadata() :: locus_mmdb:metadata().
+-type database_metadata() :: locus_mmdb_metadata:t().
 -export_type([database_metadata/0]).
 
 -type database_source() :: locus_loader:source().
@@ -230,7 +230,7 @@ start_loader(DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts)
             when DatabaseId :: atom(),
                  Error :: not_found.
 stop_loader(DatabaseId) ->
-    locus_database:stop(DatabaseId).
+    locus_database:stop(DatabaseId, _Reason = normal).
 
 %% @doc Like `:loader_child_spec/2' but with default options
 %%
@@ -482,7 +482,7 @@ await_loaders(DatabaseIds, Timeout) ->
 %% Returns:
 %% <ul>
 %% <li>`{ok, Entry}' in case of success</li>
-%% <li>`{error, not_found}' if no data was found for this `Address'.</li>
+%% <li>`not_found' if no data was found for this `Address'.</li>
 %% <li>`{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
 %%    tuple or a valid textual representation of an IP address.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
@@ -490,15 +490,20 @@ await_loaders(DatabaseIds, Timeout) ->
 %% <li>`{error, ipv4_database}' if `Address' represents an IPv6 address and the database
 %%      only supports IPv4 addresses.</li>
 %% </ul>
--spec lookup(DatabaseId, Address) -> {ok, Entry} | {error, Error}
+-spec lookup(DatabaseId, Address) -> {ok, Entry} | not_found | {error, Error}
             when DatabaseId :: atom(),
-                 Address :: inet:ip_address() | nonempty_string() | binary(),
+                 Address :: inet:ip_address() | string() | binary(),
                  Entry :: database_entry(),
-                 Error :: (not_found | invalid_address |
-                           database_unknown | database_not_loaded |
+                 Error :: (database_unknown | database_not_loaded |
+                           {invalid_address, Address} |
                            ipv4_database).
 lookup(DatabaseId, Address) ->
-    locus_mmdb:lookup(DatabaseId, Address).
+    case locus_database:find(DatabaseId) of
+        {ok, Database, _Source, _Version} ->
+            locus_mmdb:lookup_address(Address, Database);
+        Error ->
+            Error
+    end.
 
 %% @doc Returns the properties of a currently loaded database.
 %%
@@ -518,11 +523,12 @@ lookup(DatabaseId, Address) ->
                  Info :: database_info(),
                  Error :: database_unknown | database_not_loaded.
 get_info(DatabaseId) ->
-    case locus_mmdb:get_parts(DatabaseId) of
-        {ok, Parts} ->
-            {ok, info_from_db_parts(Parts)};
-        {error, Error} ->
-            {error, Error}
+    case locus_database:find(DatabaseId) of
+        {ok, Database, Source, Version} ->
+            Info = database_info(Database, Source, Version),
+            {ok, Info};
+        Error ->
+            Error
     end.
 
 %% @doc Returns a specific property of a currently loaded database.
@@ -561,20 +567,31 @@ get_info(DatabaseId, Property) ->
 %%
 %% Returns:
 %% <ul>
-%% <li>`ok' if the database is wholesome</li>
-%% <li>`{error, {flawed, [Flaw, ...]]}}' in case of corruption or incompatibility
-%%    (see the definition of {@link locus_mmdb:analysis_flaw/0})
-%% </li>
+%% <li>`ok' if the database is wholesome.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
 %% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% <li>`{validation_warnings, [CheckWarning, ...]}' in case something smells within the database
+%%    (see the definition of {@link locus_mmdb_check:warning/0})
+%% </li>
+%% <li>`{validation_errors, [CheckError], [...]}' in case of corruption or incompatibility
+%%    (see the definition of {@link locus_mmdb_check:error/0})
+%% </li>
 %% </ul>
--spec analyze(DatabaseId) -> ok | {error, Error}
+-spec check(DatabaseId) -> ok
+                           | {error, Error}
+                           | {validation_warnings, [ValidationWarning, ...]}
+                           | {validation_errors, [ValidationError, ...], [ValidationWarning]}
             when DatabaseId :: atom(),
-                 Error :: ({flawed, [locus_mmdb:analysis_flaw(), ...]} |
-                           database_unknown |
-                           database_not_loaded).
-analyze(DatabaseId) ->
-    locus_mmdb:analyze(DatabaseId).
+                 Error :: database_unknown | database_not_loaded,
+                 ValidationWarning :: locus_mmdb_check:warning(),
+                 ValidationError :: locus_mmdb_check:error().
+check(DatabaseId) ->
+    case locus_database:find(DatabaseId) of
+        {ok, Database, _Source, _Version} ->
+            check_(Database);
+        {error, _} = Error ->
+            Error
+    end.
 
 %% ------------------------------------------------------------------
 %% Deprecated API Function Definitions
@@ -785,8 +802,11 @@ parse_filesystem_url(DatabaseURL) ->
         error:badarg -> false
     end.
 
-info_from_db_parts(Parts) ->
-    maps:with([metadata, source, version], Parts).
+-spec database_info(locus_mmdb:database(), locus_loader:source(), calendar:datetime())
+        -> database_info().
+database_info(Database, Source, Version) ->
+    #{metadata := Metadata} = Database,
+    #{metadata => Metadata, source => Source, version => Version}.
 
 opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
@@ -873,3 +893,13 @@ await_waiters_termination(PidPerMonitor, Deadline)
     end;
 await_waiters_termination(#{}, _Deadline) ->
     ok.
+
+check_(Database) ->
+    case locus_mmdb_check:run(Database) of
+        ok ->
+            ok;
+        {warnings, Warnings} ->
+            {validation_warnings, Warnings};
+        {errors, Errors, Warnings} ->
+            {validation_errors, Errors, Warnings}
+    end.

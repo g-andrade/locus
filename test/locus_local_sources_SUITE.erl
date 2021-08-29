@@ -161,13 +161,13 @@ corrupt_database_test(Config) ->
                                          {filesystem, _}}}),
             ?assertRecv({locus, Loader, {load_attempt_finished,
                                          {filesystem, _},
-                                         {error, {decode_database_from, _, _}}}});
+                                         {error, {unpack_database_from, _, _}}}});
         custom_fetcher ->
             ?assertRecv({locus, Loader, {load_attempt_started,
                                          {local, {custom, _}}}}),
             ?assertRecv({locus, Loader, {load_attempt_finished,
                                          {local, {custom,  _}},
-                                         {error, {decode_database_from, _, _}}}})
+                                         {error, {unpack_database_from, _, _}}}})
     end,
     ok = locus:stop_loader(Loader).
 

@@ -62,8 +62,11 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
-{ok,#{prefix => {{93,184,216,0},31},
-      <<"continent">> =>
+% * `{ok, Entry}' in case of success;
+% * `not_found' if no entry was found
+% * `{error, _}' if something bad happened
+
+{ok,#{<<"continent">> =>
           #{<<"code">> => <<"NA">>,
             <<"geoname_id">> => 6255149,
             <<"names">> =>
@@ -142,31 +145,34 @@ is mostly complete.
   were all successfully tested; presumably `locus' can deal with <a href="#alternative-providers">any MMDB database</a> that maps IP address prefixes to arbitrary data
   </li>
 <li>The databases are loaded into memory (mostly) as is; reference counted binaries are shared with the
-  application callers using ETS tables, and the original binary search tree is used to lookup addresses.
+  application callers using
+  <a target="_parent" href="https://erlang.org/doc/man/persistent_term.html">`persistent_term'</a>,
+  and the original binary search tree is used to lookup addresses.
   The data for each entry is decoded on the fly upon successful lookups.
   </li>
 </ul>
 
 <h5 id="database-validation">Database Validation</h5>
 
-Databases, local or remote, can have their compatibility validated through the `locus:analyze/1'
+Databases, local or remote, can have their compatibility validated through the `locus:check/1'
 function after they've been loaded (see <a href="#api-reference">function reference</a>.)
 
 Alternatively, they can also be checked from the command line by use of the `locus' CLI utility:
 <ol>
 <li>Run `make cli' to build the script, named `locus', which will be deployed to the current directory.</li>
-<li>Run analysis:
+<li>Check the database:
 <pre lang="shell" class="shell">
-./locus analyze GeoLite2-City.mmdb
+./locus check GeoLite2-City.mmdb
 # Loading database from "GeoLite2-City.mmdb"...
 # Database version {{2019,11,6},{11,58,0}} successfully loaded
-# Analyzing database for flaws...
+# Checking database for flaws...
 # Database is wholesome.
 </pre>
 </li>
 </ol>
 The script will exit with code 1 in case of failure, and 0 otherwise.
-Run `./locus analyze --help' for a description of supported options and arguments.
+Warnings can produce failure through the `--warnings-as-errors` flag.
+Run `./locus check --help' for a description of supported options and arguments.
 
 <h5 id="remote-sources-downloading-and-updating">Remote sources: Downloading and Updating</h5>
 

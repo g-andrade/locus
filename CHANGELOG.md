@@ -9,15 +9,25 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - support for retrieving databases using consumer-defined `locus_custom_fetcher's
+- `locus:check/1` to API (which replaces `locus:analyze/1` and can be up to *3200% faster* 🏎️)
 - linting checks with `rebar3_lint`
 - dead code checks with `rebar3_hank`
 
 ### Changed
 
+- ⚠️ **return type of `locus:lookup/2`** (see MIGRATION.md)
+- MMDB decoder to perform stricter metadata validations
+- MMDB decoder to not crash upon maps containing duplicate keys
+- MMDB unpacking errors to detailed ones
+- databases downloaded through HTTP(S) without a `last-modified` response header to no longer
+be cached
 - imported version of `tls_certificate_check` to '~> 1.7'
 - single CT suite covering both filesystem and HTTP sources into one for each
-- databases downloaded through HTTP(S) without a `last-modified` response header are no longer
 cached
+
+### Removed
+
+- ⚠️ **`locus:analyze/1` from API** (`locus:check/1` now fullfils this role - see MIGRATION.md)
 
 ## [1.16.1] - 2021-07-12
 

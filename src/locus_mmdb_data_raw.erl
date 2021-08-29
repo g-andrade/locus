@@ -1,4 +1,4 @@
-%% Copyright (c) 2017-2021 Guilherme Andrade
+%% Copyright (c) 2021 Guilherme Andrade
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -24,65 +24,76 @@
 %% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
 %% MaxMind DB File Format Specification</a>
 
--module(locus_mmdb_data).
+-module(locus_mmdb_data_raw).
 
 %% ------------------------------------------------------------------
 %% Type Definitions
 %% ------------------------------------------------------------------
 
 -type value()
-    :: map_()
-    |  nonmap_value().
-
--export_type([value/0]).
-
--type nonmap_value()
     :: utf8_string()
     |  double()
     |  bytes()
     |  uint16()
     |  uint32()
+    |  map_()
     |  int32()
     |  uint64()
     |  uint128()
     |  array()
-    |  boolean()
+    |  boolean_()
     |  float_().
 
--export_type([nonmap_value/0]).
+-export_type([value/0]).
 
--type utf8_string() :: unicode:unicode_binary().
+-type utf8_string() :: {utf8_string, locus_mmdb_data:utf8_string()}.
 -export_type([utf8_string/0]).
 
--type double() :: float().
+-type double() :: {double, locus_mmdb_data:double()}.
 -export_type([double/0]).
 
--type bytes() :: binary().
+-type bytes() :: {bytes, locus_mmdb_data:bytes()}.
 -export_type([bytes/0]).
 
--type uint16() :: 0..((1 bsl 16) - 1).
+-type uint16() :: {uint16, locus_mmdb_data:uint16()}.
 -export_type([uint16/0]).
 
--type uint32() :: 0..((1 bsl 32) - 1).
+-type uint32() :: {uint32, locus_mmdb_data:uint32()}.
 -export_type([uint32/0]).
 
--type map_() :: #{unicode:unicode_binary() => value()}.
--export_type([map/0]).
+-type map_() :: {map, #{locus_mmdb_data:utf8_string() => value()}}.
+-export_type([map_/0]).
 
--type int32() :: -(1 bsl 31)..((1 bsl 31) - 1).
+-type int32() :: {int32, locus_mmdb_data:int32()}.
 -export_type([int32/0]).
 
--type uint64() :: 0..((1 bsl 64) - 1).
+-type uint64() :: {uint64, locus_mmdb_data:uint64()}.
 -export_type([uint64/0]).
 
--type uint128() :: 0..((1 bsl 128) - 1).
+-type uint128() :: {uint128, locus_mmdb_data:uint128()}.
 -export_type([uint128/0]).
 
--type array() :: [value()].
+-type array() :: {array, [value()]}.
 -export_type([array/0]).
 
--type boolean_() :: boolean().
+-type boolean_() :: {bool, boolean()}.
 -export_type([boolean_/0]).
 
--type float_() :: float().
+-type float_() :: {float, float()}.
 -export_type([float_/0]).
+
+-type value_tag()
+    :: pointer
+    |  utf8_string
+    |  double
+    |  bytes
+    |  uint16
+    |  uint32
+    |  map
+    |  int32
+    |  uint64
+    |  int128
+    |  array
+    |  bool
+    |  float.
+-export_type([value_tag/0]).

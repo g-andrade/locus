@@ -511,13 +511,13 @@ corrupt_database_localtest(Config) ->
                                          {ok, _TrailingHeaders}}}),
             ?assertRecv({locus, Loader, {load_attempt_finished,
                                          {remote, URL},
-                                         {error, {decode_database_from, _, _}}}});
+                                         {error, {unpack_database_from, _, _}}}});
         {custom_fetcher, _, _} ->
             ?assertRecv({locus, Loader, {load_attempt_started,
                                          {remote, {custom, _}}}}),
             ?assertRecv({locus, Loader, {load_attempt_finished,
                                          {remote, {custom, _}},
-                                         {error, {decode_database_from, _, _}}}})
+                                         {error, {unpack_database_from, _, _}}}})
     end,
     ok = locus:stop_loader(Loader).
 
