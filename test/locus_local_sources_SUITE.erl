@@ -185,24 +185,3 @@ loader_child_spec_test(Config) ->
 
 await_loader_failures_test(_Config) ->
     locus_common_tests:await_loader_failures_test().
-
-wait_for_loader_failures_test(_Config) ->
-    locus_common_tests:wait_for_loader_failures_test().
-
-%%%
-
-test_successful_loader_await(Loader) ->
-    case rand:uniform(2) of
-        1 ->
-            {ok, LoadedVersion} = locus:await_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
-            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
-            LoadedVersion;
-        2 ->
-            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
-            {ok, LoadedVersion} = locus:await_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
-            LoadedVersion
-    end.

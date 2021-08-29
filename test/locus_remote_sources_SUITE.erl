@@ -545,7 +545,6 @@ database_still_loading_localtest(Config) ->
     end,
 
     ?assertEqual({error, database_not_loaded}, locus:lookup(Loader, "127.0.0.1")),
-    ?assertEqual({error, database_not_loaded}, locus:get_version(Loader)),
     ?assertEqual({error, database_not_loaded}, locus:get_info(Loader)),
     ?assertEqual({error, database_not_loaded}, locus:get_info(Loader, metadata)),
     ?assertEqual({error, database_not_loaded}, locus:get_info(Loader, source)),
@@ -563,9 +562,6 @@ loader_child_spec_test(Config) ->
 
 await_loader_failures_test(_Config) ->
     locus_common_tests:await_loader_failures_test().
-
-wait_for_loader_failures_test(_Config) ->
-    locus_common_tests:wait_for_loader_failures_test().
 
 %%%
 

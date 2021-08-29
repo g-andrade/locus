@@ -28,6 +28,85 @@ case locus:lookup(country, "93.184.216.34") of
 end.
 ```
 
+- calls to `wait_for_loader/1` to invoke `await_loader/1` instead:
+
+```erlang
+% before
+case locus:wait_for_loader(country) of
+    {ok, _LoadedVersion} ->
+        % [...]
+    {error, {loading, LoadAttemptFailure}} ->
+        % [...]
+end.
+
+% after
+case locus:await_loader(country) of
+    {ok, _LoadedVersion} ->
+        % [...]
+    {error, {timeout, LoadAttemptFailures}} ->
+        % Notice how `LoadAttemptFailures' is a list
+        % [...]
+end.
+```
+
+- calls to `wait_for_loader/2` to invoke `await_loader/2` instead:
+
+```erlang
+% before
+case locus:wait_for_loader(country, _Timeout = 30000) of
+    {ok, _LoadedVersion} ->
+        % [...]
+    {error, {loading, LoadAttemptFailure}} ->
+        % [...]
+    {error, timeout} ->
+        % [...]
+end.
+
+% after
+case locus:await_loader(country, _Timeout = 30000) of
+    {ok, _LoadedVersion} ->
+        % [...]
+    {error, {timeout, LoadAttemptFailures}} ->
+        % Notice how `LoadAttemptFailures' is a list
+        % and there's no longer a separate return type for `timeout`
+        % [...]
+end.
+```
+
+- calls to `wait_for_loaders/2` to invoke `await_loaders/2` instead:
+
+```erlang
+% before
+case locus:wait_for_loaders([country, asn], _Timeout = 30000) of
+    {ok, _LoadedVersionPerDatabase} ->
+        % [...]
+    {error, {DatabaseId, LoaderFailure}} ->
+        % [...]
+    {error, timeout} ->
+        % [...]
+end.
+
+% after
+case locus:await_loaders([country, asn], _Timeout = 30000) of
+    {ok, _LoadedVersionPerDatabase} ->
+        % [...]
+    {error, ErrorPerDatabase, PartialSuccesses} ->
+        % Notice how `ErrorPerDatabase' and `PartialSuccesses' are maps
+        % and there's no longer a separate return type for `timeout`
+        % [...]
+end.
+```
+
+- calls to `get_version/1` to invoke `get_info/2` instead:
+
+```erlang
+% before
+{ok, LoadedVersion} = locus:get_version(country),
+
+% after
+{ok, LoadedVersion} = locus:get_info(country, version),
+```
+
 - any code matching/using `metadata`, whether through `locus:get_info/1` or `locus:get_info/2`,
 to use atom keys instead of binary ones:
 

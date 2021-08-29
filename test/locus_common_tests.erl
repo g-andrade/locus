@@ -43,8 +43,7 @@
          invalid_args_test/1,
          subscriber_death_test/1,
          loader_child_spec_test/1,
-         await_loader_failures_test/0,
-         wait_for_loader_failures_test/0]).
+         await_loader_failures_test/0]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -75,20 +74,9 @@
 
 -spec test_successful_loader_await(atom()) -> ok.
 test_successful_loader_await(Loader) ->
-    case rand:uniform(2) of
-        1 ->
-            {ok, LoadedVersion} = locus:await_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
-            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
-            LoadedVersion;
-        2 ->
-            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
-            {ok, LoadedVersion} = locus:await_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
-            LoadedVersion
-    end.
+    {ok, LoadedVersion} = locus:await_loader(Loader),
+    {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
+    LoadedVersion.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -140,7 +128,6 @@ ipv6_invalid_addr_test(Config) ->
 database_unknown_test() ->
     Loader = database_unknown_test,
     ?assertEqual({error, database_unknown}, locus:lookup(Loader, "127.0.0.1")),
-    ?assertEqual({error, database_unknown}, locus:get_version(Loader)),
     ?assertEqual({error, database_unknown}, locus:get_info(Loader)),
     ?assertEqual({error, database_unknown}, locus:get_info(Loader, metadata)),
     ?assertEqual({error, database_unknown}, locus:get_info(Loader, source)),
@@ -228,24 +215,6 @@ await_loader_failures_test() ->
     ?assertMatch({error, {#{Loader := database_unknown}, PartialSuccesses}}
                    when map_size(PartialSuccesses) =:= 0,
                  locus:await_loaders([Loader], 500)),
-    ok.
-
--spec wait_for_loader_failures_test() -> ok.
-wait_for_loader_failures_test() ->
-    Loader = wait_for_loader_failures_test,
-
-    ?assertEqual({error, database_unknown},
-                 locus:wait_for_loader(Loader)),
-
-    ?assertEqual({error, timeout},
-                 locus:wait_for_loader(Loader, 0)),
-    ?assertEqual({error, database_unknown},
-                 locus:wait_for_loader(Loader, 500)),
-
-    ?assertMatch({error, timeout},
-                 locus:wait_for_loaders([Loader], 0)),
-    ?assertMatch({error, {Loader, database_unknown}},
-                 locus:wait_for_loaders([Loader], 500)),
     ok.
 
 %% ------------------------------------------------------------------

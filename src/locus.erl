@@ -46,20 +46,6 @@
 -endif.
 
 %% ------------------------------------------------------------------
-%% Deprecated API Function Exports
-%% ------------------------------------------------------------------
-
--export([wait_for_loader/1]).             -ignore_xref(wait_for_loader/1).
--export([wait_for_loader/2]).             -ignore_xref(wait_for_loader/2).
--export([wait_for_loaders/2]).            -ignore_xref(wait_for_loaders/2).
--export([get_version/1]).                 -ignore_xref(get_version/1).
-
--deprecated([{wait_for_loader, 1, eventually}]).
--deprecated([{wait_for_loader, 2, eventually}]).
--deprecated([{wait_for_loaders, 2, eventually}]).
--deprecated([{get_version, 1, eventually}]).
-
-%% ------------------------------------------------------------------
 %% CLI-only Function Exports
 %% ------------------------------------------------------------------
 
@@ -466,10 +452,8 @@ await_loader(DatabaseId, Timeout) ->
 await_loaders(DatabaseIds, Timeout) ->
     ReplyRef = make_ref(),
     UniqueDatabaseIds = lists:usort(DatabaseIds),
-    WaiterOpts = [],
-    Waiters = launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds),
-    EmulateLegacyBehaviour = false,
-    perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
+    Waiters = launch_waiters(ReplyRef, Timeout, UniqueDatabaseIds),
+    perform_wait(ReplyRef, Waiters, #{}, #{}).
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses.
 %%
@@ -594,113 +578,6 @@ check(DatabaseId) ->
     end.
 
 %% ------------------------------------------------------------------
-%% Deprecated API Function Definitions
-%% ------------------------------------------------------------------
-
-%% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails.
-%% @deprecated Use {@link await_loader/1} instead.
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
-%% </ul>
--spec wait_for_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadedVersion :: database_version(),
-                 Error :: database_unknown | {loading, LoadingError},
-                 LoadingError :: term().
-wait_for_loader(DatabaseId) ->
-    wait_for_loader(DatabaseId, infinity).
-
-%% @doc Like `wait_for_loader/1' but it can time-out.
-%% @deprecated Use {@link await_loader/2} instead.
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
-%% </ul>
--spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
-            when DatabaseId :: atom(),
-                 Timeout :: timeout(),
-                 LoadedVersion :: database_version(),
-                 Reason :: database_unknown | {loading, term()} | timeout.
-wait_for_loader(DatabaseId, Timeout) ->
-    case wait_for_loaders([DatabaseId], Timeout) of
-        {ok, #{DatabaseId := LoadedVersion}} ->
-            {ok, LoadedVersion};
-        {error, {DatabaseId, Reason}} ->
-            {error, Reason};
-        {error, timeout} ->
-            {error, timeout}
-    end.
-
-%% @doc Like `wait_for_loader/2' but it can concurrently await status from more than one database.
-%% @deprecated Use {@link await_loaders/2} instead.
-%%
-%% <ul>
-%% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
-%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
-%% <li>`{error, {DatabaseId, database_unknown}}'
-%%      if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {DatabaseId, {loading, term()}}}'
-%%      if loading `DatabaseId' failed for some reason.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
-%% </ul>
--spec wait_for_loaders(DatabaseIds, Timeout) -> {ok, LoadedVersionPerDatabase} | {error, Reason}
-            when DatabaseIds :: [DatabaseId],
-                 Timeout :: timeout(),
-                 LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
-                 LoadedVersion :: database_version(),
-                 Reason ::{DatabaseId, LoaderFailure} | timeout,
-                 LoaderFailure :: database_unknown | {loading, term()}.
-wait_for_loaders(DatabaseIds, Timeout) ->
-    ReplyRef = make_ref(),
-    UniqueDatabaseIds = lists:usort(DatabaseIds),
-    EmulateLegacyBehaviour = true,
-    WaiterOpts = [{emulate_legacy_behaviour, EmulateLegacyBehaviour}],
-    Waiters = launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds),
-    perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
-
-%% @doc Returns the currently loaded database version.
-%% @deprecated Please use {@link get_info/2} instead.
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' in case of success</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
-%% </ul>
--spec get_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadedVersion :: database_version(),
-                 Error :: database_unknown | database_not_loaded.
-get_version(DatabaseId) ->
-    get_info(DatabaseId, version).
-
-%% ------------------------------------------------------------------
 %% CLI-only Function Definitions
 %% ------------------------------------------------------------------
 
@@ -811,39 +688,27 @@ database_info(Database, Source, Version) ->
 opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
 
-launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds) ->
-    [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
+launch_waiters(ReplyRef, Timeout, UniqueDatabaseIds) ->
+    [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout)}
      || DatabaseId <- UniqueDatabaseIds].
 
-perform_wait(_ReplyRef, [], Successes, Failures, EmulateLegacyBehaviour) ->
+perform_wait(_ReplyRef, [], Successes, Failures) ->
     case map_size(Failures) =:= 0 of
         true ->
             {ok, Successes};
         false ->
-            false = EmulateLegacyBehaviour, % an assertion of self-consistency
             {error, {Failures, Successes}}
     end;
-perform_wait(ReplyRef, WaitersLeft, Successes, Failures, EmulateLegacyBehaviour) ->
+perform_wait(ReplyRef, WaitersLeft, Successes, Failures) ->
     case receive_waiter_reply(ReplyRef) of
         {DatabaseId, {ok, Version}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
             UpdatedSuccesses = Successes#{ DatabaseId => Version },
-            perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses,
-                         Failures, EmulateLegacyBehaviour);
-        {DatabaseId, {error, Reason}}
-          when EmulateLegacyBehaviour ->
-            {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
-            stop_waiters(RemainingWaitersLeft),
-            flush_waiter_replies(ReplyRef),
-            case Reason =:= timeout of
-                true  -> {error, timeout};
-                false -> {error, {DatabaseId, Reason}}
-            end;
+            perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses, Failures);
         {DatabaseId, {error, Reason}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
             UpdatedFailures = Failures#{ DatabaseId => Reason },
-            perform_wait(ReplyRef, RemainingWaitersLeft, Successes,
-                         UpdatedFailures, EmulateLegacyBehaviour)
+            perform_wait(ReplyRef, RemainingWaitersLeft, Successes, UpdatedFailures)
     end.
 
 receive_waiter_reply(ReplyRef) ->
@@ -851,48 +716,6 @@ receive_waiter_reply(ReplyRef) ->
         {ReplyRef, DatabaseId, Reply} ->
             {DatabaseId, Reply}
     end.
-
-flush_waiter_replies(ReplyRef) ->
-    receive
-        {ReplyRef, _, _} ->
-            flush_waiter_replies(ReplyRef)
-    after
-        0 -> ok
-    end.
-
-stop_waiters(Waiters) ->
-    Deadline = erlang:monotonic_time(millisecond) + 5000,
-    PidPerMonitor
-        = lists:foldl(
-            fun ({_DatabaseId, WaiterPid}, Acc) ->
-                    WaiterMon = monitor(process, WaiterPid),
-                    unlink(WaiterPid),
-                    exit(WaiterPid, normal),
-                    Acc#{WaiterMon => WaiterPid}
-            end,
-            #{}, Waiters),
-
-    await_waiters_termination(PidPerMonitor, Deadline).
-
-await_waiters_termination(PidPerMonitor, Deadline)
-  when map_size(PidPerMonitor) > 0 ->
-    Timeout = max(0, Deadline - erlang:monotonic_time(millisecond)),
-    receive
-        {'DOWN', WaiterMon, _, _, _}
-          when is_map_key(WaiterMon, PidPerMonitor) ->
-            {_, Remaining} = maps:take(WaiterMon, PidPerMonitor),
-            await_waiters_termination(Remaining, Deadline)
-    after
-        Timeout ->
-            lists:foreach(
-              fun ({WaiterMon, WaiterPid}) ->
-                      demonitor(WaiterMon, [flush]),
-                      exit(WaiterPid, kill)
-              end,
-              maps:to_list(PidPerMonitor))
-    end;
-await_waiters_termination(#{}, _Deadline) ->
-    ok.
 
 check_(Database) ->
     case locus_mmdb_check:run(Database) of
