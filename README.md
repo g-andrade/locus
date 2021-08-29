@@ -8,15 +8,11 @@ the country, city or ASN of IP addresses using [MaxMind
 GeoIP2](https://dev.maxmind.com/geoip/geoip2/geolite2/) and [other
 providers](#alternative-providers).
 
-The databases will be loaded on-demand and, if using HTTP, cached on the
-filesystem and updated automatically.
+The databases will be loaded on-demand and, when retrieved from the
+network, cached on the filesystem and updated automatically.
 
-> ⚠️ Starting on December 31st, 2019, **a license key is now
-> [required](https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/)
-> to download MaxMind GeoLite2 databases**.
-> 
-> Previous URLs have been discontinued; you should upgrade `locus` to a
-> recent version if you used them.
+> ⚠️ For instructions on how to upgrade from to 2.x, check
+> [`MIGRATION.md`](https://github.com/g-andrade/locus/blob/master/MIGRATION.md)
 
 #### Usage
 
@@ -39,13 +35,17 @@ application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 
 ``` erlang
 ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
-% You can also use a HTTP URL or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
-```
+% You can also use:
+% * an HTTP(S) URL,
+% * or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
+% * or a {custom, Module, Args}` tuple, with `Module
+%   implementing the locus_custom_fetcher` behaviour.
+</pre>
 
-##### 3\. Wait for the database to load (optional)
+<h5>3. Wait for the database to load (optional)</h5>
 
-``` erlang
-{ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
+<pre lang="erlang" class="erlang">
+{ok, _DatabaseVersion} = locus:await_loader(country). % or &#x60;{error, Reason}
 ```
 
 ##### 4\. Look up IP addresses
@@ -55,8 +55,11 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
-{ok,#{prefix => {{93,184,216,0},31},
-      <<"continent">> =>
+% * <code>{ok, Entry}</code> in case of success;
+% * <code>not_found</code> if no entry was found
+% * <code>{error, _}</code> if something bad happened
+
+{ok,#{<<"continent">> =>
           #{<<"code">> => <<"NA">>,
             <<"geoname_id">> => 6255149,
             <<"names">> =>
@@ -99,12 +102,11 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 1.  [Supported File Formats](#supported-file-formats)
 2.  [Database Types and Loading](#database-types-and-loading)
 3.  [Database Validation](#database-validation)
-4.  [MaxMind sources / HTTP URLs: Downloading and
-    Updating](#maxmind-sources--http-urls-downloading-and-updating)
-5.  [MaxMind sources / HTTP URLs:
-    Caching](#maxmind-sources--http-urls-caching)
-6.  [Filesystem URLs: Loading and
-    Updating](#filesystem-urls-loading-and-updating)
+4.  [Remote sources: Downloading and
+    Updating](#remote-sources-downloading-and-updating)
+5.  [Remote sources: Caching](#remote-sources-caching)
+6.  [Local sources: Loading and
+    Updating](#local-sources-loading-and-updating)
 7.  [Logging](#logging)
 8.  [Event Subscriptions](#event-subscriptions)
 9.  [API Reference](#api-reference)
@@ -135,15 +137,15 @@ format](https://maxmind.github.io/MaxMind-DB/) is mostly complete.
     database](#alternative-providers) that maps IP address prefixes to
     arbitrary data
   - The databases are loaded into memory (mostly) as is; reference
-    counted binaries are shared with the application callers using ETS
-    tables, and the original binary search tree is used to lookup
-    addresses. The data for each entry is decoded on the fly upon
-    successful lookups.
+    counted binaries are shared with the application callers using
+    [`persistent_term`](https://erlang.org/doc/man/persistent_term.html),
+    and the original binary search tree is used to lookup addresses. The
+    data for each entry is decoded on the fly upon successful lookups.
 
 ##### Database Validation
 
 Databases, local or remote, can have their compatibility validated
-through the `locus:analyze/1` function after they've been loaded (see
+through the `locus:check/1` function after they've been loaded (see
 [function reference](#api-reference).)
 
 Alternatively, they can also be checked from the command line by use of
@@ -152,21 +154,22 @@ the `locus` CLI utility:
 1.  Run `make cli` to build the script, named `locus`, which will be
     deployed to the current directory.
 
-2.  Run analysis:
+2.  Check the database:
     
     ``` shell
-    ./locus analyze GeoLite2-City.mmdb
+    ./locus check GeoLite2-City.mmdb
     # Loading database from "GeoLite2-City.mmdb"...
     # Database version {{2019,11,6},{11,58,0}} successfully loaded
-    # Analyzing database for flaws...
+    # Checking database for flaws...
     # Database is wholesome.
     ```
 
 The script will exit with code 1 in case of failure, and 0 otherwise.
-Run `./locus analyze --help` for a description of supported options and
+Warnings can produce failure through the ``--warnings-as-errors` flag.
+Run `./locus check --help`` for a description of supported options and
 arguments.
 
-##### MaxMind sources / HTTP URLs: Downloading and Updating
+##### Remote sources: Downloading and Updating
 
   - The downloaded database files, when compressed, are inflated in
     memory
@@ -183,34 +186,45 @@ arguments.
     hours. Both of these behaviours can be tweaked through the
     `error_retries` and `update_period` loader settings (see [function
     reference](#api-reference).)
-  - When downloading from a MaxMind edition or HTTPS URL, the remote
-    certificate will be authenticated against a [list of known
-    Certificate Authorities](https://hexdocs.pm/tls_certificate_check/)
-    and connection negotiation will fail in case of an expired
-    certificate, mismatched hostname, self-signed certificate or unknown
-    certificate authority. These checks can be disabled by specifying
+  - When downloading from a MaxMind edition or an HTTPS URL, the remote
+    certificate will be authenticated against [a list of known
+    Certification
+    Authorities](https://hexdocs.pm/tls_certificate_check/) and
+    connection negotiation will fail in case of an expired certificate,
+    mismatched hostname, self-signed certificate or unknown
+    certification authority. These checks can be disabled by specifying
     the `insecure` loader option.
 
-##### MaxMind sources / HTTP URLs: Caching
+##### Remote sources: Caching
 
   - Caching is a best effort; the system falls back to relying
     exclusively on the network if needed
   - A caching directory named `locus_erlang` is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
-  - Cached databases are named after the MaxMind database edition name,
-    or alternatively after the SHA256 hash of their source URL
-  - Modification time of the databases is extracted from `last-modified`
-    response header (when present) and used to condition downloads on
-    subsequent boots and save bandwidth
+  - A cached database is named after either:
+      - the MaxMind database edition name (when explicitly downloading
+        from MaxMind), or
+      - the SHA256 hash of the HTTP(S) URL, or
+      - for `{custom_fetcher, Module, Args}` sources, a filesystem-safe
+        version of `Module`'s name concatenated with the 32-bit
+        [`erlang:phash2/2`](https://erlang.org/doc/man/erlang.html#phash2-2)
+        value of the opaque database source as returned by the
+        callbacks.
+  - Modification time of the databases is retrieved from either:
+      - the `last-modified` response header (when present, for MaxMind
+        and HTTP(S) sources)
+      - the `modified_on` metadata property for successful
+        `locus_custom_fetcher:fetch/1` and ``:conditionally_fetch/2`
+        callbacks (for databases loaded with `locus_custom_fetcher``)
   - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
 
-##### Filesystem URLs: Loading and Updating
+##### Local sources: Loading and Updating
 
   - The loaded database files, when compressed, are inflated in memory
-  - The database file modification timestamp is used to condition
-    subsequent load attempts in order to lower I/O activity
+  - The database modification timestamp is used to condition subsequent
+    load attempts in order to lower I/O activity
   - Database load attempts are retried upon error according to an
     exponential backoff policy - quickly at first (every few seconds)
     but gradually slowing down to every 30 seconds. Successful and
