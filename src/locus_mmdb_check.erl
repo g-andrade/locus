@@ -183,8 +183,8 @@ collect_data_indices_batches_in_tree(BitArray, DataSection, WalkManager, Journal
       WalkManager, Journal, Tree).
 
 validate_data_indices(BitArray, DataSection, Journal) ->
-    VisitedBitArray = locus_shared_bitarray:new(_Length = byte_size(DataSection)),
-    MapKeysBitArray = locus_shared_bitarray:new(_Length = byte_size(DataSection)),
+    VisitedBitArray = locus_shared_bitarray:new(byte_size(DataSection)),
+    MapKeysBitArray = locus_shared_bitarray:new(byte_size(DataSection)),
 
     case run_concurrent_tasks(
            fun (TaskIndex, Concurrency) ->
