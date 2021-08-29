@@ -34,6 +34,7 @@ cached
 - ⚠️ **`locus:analyze/1` from API** (`locus:check/1` now fullfils this role - see MIGRATION.md)
 - **deprecated loader options** `pre_readiness_update_period` and `post_readiness_update_period`
 (see MIGRATION.md)
+- warnings on the use of discontinued GeoLite2 HTTP URLs
 
 ## [1.16.1] - 2021-07-12
 
