@@ -76,10 +76,10 @@
 -type array() :: {array, [value()]}.
 -export_type([array/0]).
 
--type boolean_() :: {bool, boolean()}.
+-type boolean_() :: {bool, locus_mmdb_data:boolean_()}.
 -export_type([boolean_/0]).
 
--type float_() :: {float, float()}.
+-type float_() :: {float, locus_mmdb_data:float_()}.
 -export_type([float_/0]).
 
 -type value_tag()

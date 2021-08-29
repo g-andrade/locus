@@ -54,7 +54,7 @@
 -type utf8_string() :: unicode:unicode_binary().
 -export_type([utf8_string/0]).
 
--type double() :: float().
+-type double() :: float() | '#Inf' | '#-Inf'.
 -export_type([double/0]).
 
 -type bytes() :: binary().
@@ -84,5 +84,5 @@
 -type boolean_() :: boolean().
 -export_type([boolean_/0]).
 
--type float_() :: float().
+-type float_() :: double().
 -export_type([float_/0]).

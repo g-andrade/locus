@@ -257,6 +257,12 @@ parse_chunk_head(Data) ->
 
         <<?double:3, 8:5, Value:64/float, RemainingData/bytes>> ->
             {double, Value, RemainingData};
+        <<?double:3, 8:5, Signal:1, Exponent:11, Mantissa:52, RemainingData/bytes>>
+          when Signal =:= 0, Exponent =:= ((1 bsl 11) - 1), Mantissa =:= 0 ->
+            {double, '#Inf', RemainingData};
+        <<?double:3, 8:5, Signal:1, Exponent:11, Mantissa:52, RemainingData/bytes>>
+          when Signal =:= 1, Exponent =:= ((1 bsl 11) - 1), Mantissa =:= 0 ->
+            {double, '#-Inf', RemainingData};
 
         <<?bytes:3, Size:5, Bytes:Size/bytes, RemainingData/bytes>>
           when Size < 29 ->
@@ -335,6 +341,12 @@ parse_chunk_head(Data) ->
 
         <<0:3, 4:5, ?extended_float, Value:32/float, RemainingData/bytes>> ->
             {float, Value, RemainingData};
+        <<0:3, 4:5, ?extended_float, Signal:1, Exponent:8, Mantissa:23, RemainingData/bytes>>
+          when Signal =:= 0, Exponent =:= ((1 bsl 8) - 1), Mantissa =:= 0 ->
+            {float, '#Inf', RemainingData};
+        <<0:3, 4:5, ?extended_float, Signal:1, Exponent:8, Mantissa:23, RemainingData/bytes>>
+          when Signal =:= 1, Exponent =:= ((1 bsl 8) - 1), Mantissa =:= 0 ->
+            {float, '#-Inf', RemainingData};
 
         <<>> ->
             {error, {finished, no_more_data}};

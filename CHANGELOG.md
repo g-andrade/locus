@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - support for retrieving databases using consumer-defined `locus_custom_fetcher's
+- support for decoding IEEE-754 infinities in MMDB data
 - `locus:check/1` to API (which replaces `locus:analyze/1` and can be up to *3200% faster* 🏎️)
 - details to MMDB unpacking errors
 - linting checks with `rebar3_lint`
