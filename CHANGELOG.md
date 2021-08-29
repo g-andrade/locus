@@ -32,6 +32,8 @@ cached
 - ⚠️ **`locus:wait_for_loaders/2` from API** (deprecated in 1.10.0 - see MIGRATION.md)
 - ⚠️ **`locus:get_version/1` from API** (deprecated in 1.4.0 - see MIGRATION.md)
 - ⚠️ **`locus:analyze/1` from API** (`locus:check/1` now fullfils this role - see MIGRATION.md)
+- **deprecated loader options** `pre_readiness_update_period` and `post_readiness_update_period`
+(see MIGRATION.md)
 
 ## [1.16.1] - 2021-07-12
 

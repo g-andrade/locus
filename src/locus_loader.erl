@@ -86,8 +86,7 @@
 -type loader_opt() ::
     {update_period, milliseconds_interval()} |
     {error_retries, error_retry_behaviour()} |
-    no_cache |
-    deprecated_loader_opt().
+    no_cache.
 -export_type([loader_opt/0]).
 
 -type milliseconds_interval() :: pos_integer().
@@ -105,11 +104,6 @@
       growth_exponent := number()
      }.
 -export_type([exponential_backoff_params/0]).
-
--type deprecated_loader_opt() ::
-    {pre_readiness_update_period, milliseconds_interval()} |
-    {post_readiness_update_period, milliseconds_interval()}.
--export_type([deprecated_loader_opt/0]).
 
 -type fetcher_opt() :: locus_maxmind_download:opt() | locus_http_download:opt().
 -export_type([fetcher_opt/0]).
@@ -247,7 +241,7 @@ valid_blob_formats() ->
 init([OwnerPid, DatabaseId, Origin, LoaderOpts, FetcherOpts]) ->
     _ = process_flag(trap_exit, true),
     DefaultSettings = default_settings(Origin),
-    Settings = customized_settings(DatabaseId, DefaultSettings, LoaderOpts),
+    Settings = customized_settings(DefaultSettings, LoaderOpts),
     State =
         #state{
            owner_pid = OwnerPid,
@@ -339,15 +333,6 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
                   orelse error({badopt, Opt});
               (no_cache) ->
                   true;
-              %
-              % Legacy options
-              %
-              ({pre_readiness_update_period, Interval} = Opt) ->
-                  ?is_pos_integer(Interval)
-                  orelse error({badopt, Opt});
-              ({post_readiness_update_period, Interval} = Opt) ->
-                  ?is_pos_integer(Interval)
-                  orelse error({badopt, Opt});
               (_) ->
                   false
           end,
@@ -420,41 +405,17 @@ default_local_origin_error_retry_behaviour() ->
                             growth_base => timer:seconds(2),
                             growth_exponent => 1.0}}.
 
--spec customized_settings(atom(), settings(), [loader_opt()]) -> settings().
-customized_settings(DatabaseId, Settings, LoaderOpts) ->
+-spec customized_settings(settings(), [loader_opt()]) -> settings().
+customized_settings(Settings, LoaderOpts) ->
     lists:foldl(
       fun ({update_period, Interval}, Acc) ->
               Acc#settings{ update_period = Interval };
           ({error_retries, Behaviour}, Acc) ->
               Acc#settings{ error_retry_behaviour = Behaviour };
           (no_cache, Acc) ->
-              Acc#settings{ use_cache = false};
-          %
-          % Legacy options
-          %
-          ({pre_readiness_update_period, Interval} = Opt, Acc) ->
-              log_warning_on_use_of_legacy_opt(DatabaseId, Opt),
-              ErrorRetryBehaviour = {backoff, Interval},
-              Acc#settings{ error_retry_behaviour = ErrorRetryBehaviour,
-                            error_retry_behaviour_applies_after_readiness = false };
-          ({post_readiness_update_period, Interval} = Opt, Acc) ->
-              log_warning_on_use_of_legacy_opt(DatabaseId, Opt),
-              Acc#settings{ update_period = Interval }
+              Acc#settings{ use_cache = false}
       end,
       Settings, LoaderOpts).
-
-log_warning_on_use_of_legacy_opt(DatabaseId, {pre_readiness_update_period, Interval}) ->
-    locus_logger:log_warning(
-      "[~ts] You've specified the following legacy option: {pre_readiness_update_period, ~b}.~n"
-      "However, the default behaviour is now exponential backoff, and therefore much improved.~n"
-      "If you don't want to give it a chance and prefer to keep constant backoffs~n"
-      "while silencing this warning, use `{error_retries, {backoff, ~b}}` instead.",
-      [DatabaseId, Interval, Interval]);
-log_warning_on_use_of_legacy_opt(DatabaseId, {post_readiness_update_period, Interval}) ->
-    locus_logger:log_warning(
-      "[~ts] You've specified the following legacy option: {post_readiness_update_period, ~b}.~n"
-      "To silence this warning, use {update_period, ~b} instead.",
-      [DatabaseId, Interval, Interval]).
 
 -spec finish_initialization(state()) -> state().
 finish_initialization(State)

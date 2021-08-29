@@ -107,6 +107,27 @@ end.
 {ok, LoadedVersion} = locus:get_info(country, version),
 ```
 
+- any use of the `{pre_readiness_update_period, Interval}` loader option,
+if exponential backoff (the default for some time) is not to your liking:
+
+```erlang
+% before
+{pre_readiness_update_period, Interval}
+
+% after
+{error_retries, {backoff, Interval}}
+```
+
+- any use of the `{post_readiness_update_period, Interval}` loader option:
+
+```erlang
+% before
+{post_readiness_update_period, Interval}
+
+% after
+{update_period, Interval}
+```
+
 - any code matching/using `metadata`, whether through `locus:get_info/1` or `locus:get_info/2`,
 to use atom keys instead of binary ones:
 
