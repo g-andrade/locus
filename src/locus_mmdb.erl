@@ -182,20 +182,3 @@ lookup_address_data(DataIndex, DataSection) ->
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             erlang:raise(Class, SaferReason, SaferStacktrace)
     end.
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions - Unit Tests
-%% ------------------------------------------------------------------
-%-ifdef(TEST).
-%
-%speed_test_() ->
-%    {timeout, 600,
-%     fun () ->
-%             {ok, EncodedDatabase}
-%                    = file:read_file("GeoLite2-City.mmdb"),
-%
-%             {ok, Database} = unpack_database(EncodedDatabase),
-%             ?assertEqual(ok, locus_mmdb_check:run(Database))
-%     end}.
-%
-%-endif.
