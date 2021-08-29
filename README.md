@@ -38,14 +38,14 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % You can also use:
 % * an HTTP(S) URL,
 % * or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
-% * or a {custom, Module, Args}` tuple, with `Module
-%   implementing the locus_custom_fetcher` behaviour.
-</pre>
+% * or a {custom, Module, Args} tuple, with Module
+%   implementing the locus_custom_fetcher behaviour.
+```
 
-<h5>3. Wait for the database to load (optional)</h5>
+##### 3\. Wait for the database to load (optional)
 
-<pre lang="erlang" class="erlang">
-{ok, _DatabaseVersion} = locus:await_loader(country). % or &#x60;{error, Reason}
+``` erlang
+{ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
 ```
 
 ##### 4\. Look up IP addresses
