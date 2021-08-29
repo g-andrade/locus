@@ -12,7 +12,7 @@ of IP addresses using <a target="_parent" href="https://dev.maxmind.com/geoip/ge
 The databases will be loaded on-demand and, when retrieved from the network, cached on the filesystem and updated automatically.
 
 <blockquote>
-⚠️  For instructions on how to upgrade from to 2.x, check
+⚠️  For instructions on how to upgrade to 2.x, check
 <a target="_parent" href="https://github.com/g-andrade/locus/blob/master/MIGRATION.md">
 `MIGRATION.md'</a>
 </blockquote>

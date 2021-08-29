@@ -11,7 +11,7 @@ providers](#alternative-providers).
 The databases will be loaded on-demand and, when retrieved from the
 network, cached on the filesystem and updated automatically.
 
-> ⚠️ For instructions on how to upgrade from to 2.x, check
+> ⚠️ For instructions on how to upgrade to 2.x, check
 > [`MIGRATION.md`](https://github.com/g-andrade/locus/blob/master/MIGRATION.md)
 
 #### Usage
