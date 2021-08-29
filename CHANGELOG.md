@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 
 - ⚠️ **return type of `locus:lookup/2`** (see MIGRATION.md)
+- database loader to use `persistent_term` instead of ETS
 - MMDB decoder to perform stricter metadata validations
 - MMDB decoder to not crash upon maps containing duplicate keys
 - databases downloaded through HTTP(S) without a `last-modified` response header to no longer
