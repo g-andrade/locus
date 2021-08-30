@@ -12,10 +12,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `locus_mmdb_data_codec:parse_on_index/3` to the API
 - CI on Windows
 
-### Changed
-
-- CI to be faster
-
 ### Removed
 
 - no longer warranted run time dependency (`public_key`)
