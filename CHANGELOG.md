@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- `locus_mmdb_data_codec:parse_on_index/3` to the API
+
 ### Removed
 
 - no longer warranted run time dependency (`public_key`)

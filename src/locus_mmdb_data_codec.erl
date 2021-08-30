@@ -24,7 +24,6 @@
 %% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
 %% MaxMind DB File Format Specification</a>
 
-%% @private
 -module(locus_mmdb_data_codec).
 
 -hank([{unnecessary_function_arguments, [{just_the_value, 2, 1}]}]).
@@ -33,10 +32,13 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export(
-   [parse_on_index/3,
-    validate_indices_in_tree/7
-   ]).
+-export([parse_on_index/3]).
+
+%% ------------------------------------------------------------------
+%% "Private" API Function Exports
+%% ------------------------------------------------------------------
+
+-export([validate_indices_in_tree/7]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -90,12 +92,28 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec parse_on_index(index(), binary(), true) -> {locus_mmdb_data_raw:value(), binary()};
-                    (index(), binary(), false) -> {locus_mmdb_data:value(), binary()}.
+%% @doc Attempts to parse either the `Value' or `RawValue'
+%% (depending on the `Raw' flag) at `Index' in `DataSection'.
+%%
+%% Will crash upon invalid/unrecognized data, invalid pointers
+%% or cyclic pointer chasing (i.e. loops.)
+%%
+-spec parse_on_index(Index, DataSection, Raw)
+    -> {Value | RawValue, RemainingData}
+         when Index :: index(),
+              DataSection :: binary(),
+              Raw :: boolean(),
+              Value :: locus_mmdb_data:value(),
+              RawValue :: locus_mmdb_data_raw:value(),
+              RemainingData :: binary().
 parse_on_index(Index, FullData, Raw) ->
     WrappingFun = parser_wrapping_fun(Raw),
     Opts = #parse_opts{wrapping_fun = WrappingFun},
     parse_on_index(Index, FullData, Opts, []).
+
+%% ------------------------------------------------------------------
+%% "Private" API Function Definitions
+%% ------------------------------------------------------------------
 
 -spec validate_indices_in_tree(locus_shared_bitarray:t(),
                                locus_shared_bitarray:t(),
@@ -103,6 +121,7 @@ parse_on_index(Index, FullData, Raw) ->
                                pos_integer(), non_neg_integer(),
                                binary(),
                                locus_mmdb_check_journal:t()) -> ok.
+%% @private
 validate_indices_in_tree(BitArray, VisitedBitArray, MapKeysBitArray,
                          BatchSize, BatchOffset, Data, Journal) ->
     Aux = #validation_aux{indices_in_tree = BitArray,
