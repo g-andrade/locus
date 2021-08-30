@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - `locus_mmdb:unpack_tree_data_and_data_section/2` to the API
 - `locus_mmdb_data_codec:parse_on_index/3` to the API
+- CI on Windows
 
 ### Removed
 
