@@ -18,10 +18,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
-- no longer warranted type definition
-- wrong paths in `:check/1` errors or warnings concerning maps
 - wrong return of errors during `:check/1` for maps containing maps or arrays
 which had been checked previously
+- wrong paths in `:check/1` errors or warnings concerning maps
+- no longer warranted type definition
 
 ## [2.0.0] - 2021-08-30
 
