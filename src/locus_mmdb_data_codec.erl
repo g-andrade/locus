@@ -748,14 +748,16 @@ validate_indirect_map_value(Aux, Pointer, DataAfterValue, Path) ->
     ok = validate_position_if_unvisited(Aux, _Position = Pointer, Path),
     DataAfterValue.
 
-validate_direct_map_value(Aux, Position, {_, _, DataAfterValue} = ParseResult, Path) ->
-    try locus_shared_bitarray:is_set(Aux#validation_aux.visited, Position)
-         orelse validate_parsed_chunk(Aux, Position, Path, ParseResult)
+validate_direct_map_value(Aux, Position, {Type, _, DataAfterValue} = ParseResult, Path) ->
+    CanSkip = not is_map_key(Type, #{array => [], map => []}),
+
+    try (CanSkip andalso locus_shared_bitarray:is_set(Aux#validation_aux.visited, Position))
+        orelse validate_parsed_chunk(Aux, Position, Path, ParseResult)
     of
         true ->
             DataAfterValue;
-        {ok, _RemainingData} ->
-            DataAfterValue
+        {ok, RemainingData} ->
+            RemainingData
     catch
         throw:{position_out_of_bounds, Position} ->
             locus_mmdb_check_journal:invalid_position_in_data_section(
@@ -796,14 +798,16 @@ validate_indirect_array_value(Aux, Pointer, DataAfterValue, Path) ->
     ok = validate_position_if_unvisited(Aux, _Position = Pointer, Path),
     {ok, DataAfterValue}.
 
-validate_direct_array_value(Aux, Position, {_, _, DataAfterValue} = ParseResult, Path) ->
-    try locus_shared_bitarray:is_set(Aux#validation_aux.visited, Position)
+validate_direct_array_value(Aux, Position, {Type, _, DataAfterValue} = ParseResult, Path) ->
+    CanSkip = not is_map_key(Type, #{array => [], map => []}),
+
+    try (CanSkip andalso locus_shared_bitarray:is_set(Aux#validation_aux.visited, Position))
          orelse validate_parsed_chunk(Aux, Position, Path, ParseResult)
     of
         true ->
             {ok, DataAfterValue};
-        {ok, _RemainingData} ->
-            {ok, DataAfterValue}
+        {ok, RemainingData} ->
+            {ok, RemainingData}
     catch
         throw:{position_out_of_bounds, Position} ->
             locus_mmdb_check_journal:invalid_position_in_data_section(

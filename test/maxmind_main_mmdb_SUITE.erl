@@ -30,11 +30,6 @@
 -define(TEST_SOURCES_REL_PATH, "_build/test/lib/maxmind_test_data/source-data/").
 -define(TEST_DBS_REL_PATH, "_build/test/lib/maxmind_test_data/test-data/").
 
--define(CURSED_TESTS, % TODO investigate deeper and open PR in MaxMindDB
-        ['MaxMind-DB-test-decoder', % has `map_key_of_wrong_type_in_data_section'
-         'MaxMind-DB-test-pointer-decoder' % has `map_key_of_wrong_type_in_data_section'
-        ]).
-
 %% ------------------------------------------------------------------
 %% Setup
 %% ------------------------------------------------------------------
@@ -64,7 +59,7 @@ init_per_group(Group, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     {ok, _} = application:ensure_all_started(jsx),
     GroupName = atom_to_list(Group),
-    IsBroken = guess_brokenness(GroupName) orelse lists:member(Group, ?CURSED_TESTS),
+    IsBroken = guess_brokenness(GroupName),
     SourceFilename = GroupName ++ ".json",
     SourcePath = filename:join([?PROJECT_ROOT, ?TEST_SOURCES_REL_PATH, SourceFilename]),
     DatabaseFilename = GroupName ++ ".mmdb",
