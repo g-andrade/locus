@@ -90,21 +90,25 @@
 %% ------------------------------------------------------------------
 
 %% @doc Parses and validates `Metadata' out of `EncodedDatabase'
--spec parse_and_validate(EncodedDatabase) -> {ok, Metadata, OtherSections}
+%%
+%% To proceed further with `TreeAndDataSection',
+%% see {@link locus_mmdb:unpack_tree_data_and_data_section/2}.
+%%
+-spec parse_and_validate(EncodedDatabase) -> {ok, Metadata, TreeAndDataSection}
                                              | {error, Reason}
     when EncodedDatabase :: binary(),
          Metadata :: t(),
-         OtherSections :: binary(),
+         TreeAndDataSection :: binary(),
          Reason :: parse_or_validation_error().
 parse_and_validate(EncodedDatabase) ->
     case binary:matches(EncodedDatabase, <<?METADATA_MARKER>>) of
         [_|_] = PossibleMetadataMarkers ->
             {MetadataStart, _} = lists:last(PossibleMetadataMarkers),
-            <<OtherSections:MetadataStart/bytes,
+            <<TreeAndDataSection:MetadataStart/bytes,
               ?METADATA_MARKER,
               EncodedMetadata/bytes>> = EncodedDatabase,
 
-            parse_and_validate(EncodedMetadata, OtherSections);
+            parse_and_validate(EncodedMetadata, TreeAndDataSection);
 
         [] ->
             {error, {marker_not_found, <<?METADATA_MARKER>>}}
@@ -114,19 +118,19 @@ parse_and_validate(EncodedDatabase) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-parse_and_validate(EncodedMetadata, OtherSections) ->
+parse_and_validate(EncodedMetadata, TreeAndDataSection) ->
     try locus_mmdb_data_codec:parse_on_index(0, EncodedMetadata, _Raw = true) of
         {RawMetadata, _RemainingData} ->
-            validate(RawMetadata, OtherSections)
+            validate(RawMetadata, TreeAndDataSection)
     catch
         Class:Reason:Stacktrace ->
             {error, {Class, Reason, Stacktrace}}
     end.
 
-validate({map, MetadataMap}, OtherSections) ->
+validate({map, MetadataMap}, TreeAndDataSection) ->
     case validate_version(MetadataMap) of
         {ok, Metadata} ->
-            {ok, Metadata, OtherSections};
+            {ok, Metadata, TreeAndDataSection};
         {error, _} = Error ->
             Error
     end;
