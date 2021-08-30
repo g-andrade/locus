@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 - no longer warranted type definition
+- wrong paths in `:check/1` errors or warnings concerning maps
 
 ## [2.0.0] - 2021-08-30
 

@@ -636,15 +636,16 @@ validate_map(Aux, Count, RemainingData, Path) ->
 
 validate_map_recur(Aux, Count, RemainingData, Path)
   when Count > 0 ->
-    validate_map_pair(Aux, Count, RemainingData, Path);
+    DataAfterPair = validate_map_pair(Aux, RemainingData, Path),
+    validate_map_recur(Aux, Count - 1, DataAfterPair, Path);
 validate_map_recur(_Aux, Count, RemainingData, _Path)
   when Count =:= 0 ->
     {ok, RemainingData}.
 
-validate_map_pair(Aux, Count, RemainingData, Path) ->
+validate_map_pair(Aux, RemainingData, Path) ->
     {ok, DataAfterKey} = validate_map_key(Aux, RemainingData, Path),
     Position = byte_size(Aux#validation_aux.data) - byte_size(DataAfterKey),
-    validate_map_value(Aux, Count, Position, DataAfterKey, Path).
+    validate_map_value(Aux, Position, DataAfterKey, Path).
 
 validate_map_key(Aux, RemainingData, Path) ->
     Position = byte_size(Aux#validation_aux.data) - byte_size(RemainingData),
@@ -734,27 +735,27 @@ validate_indirect_map_key_chunk(Aux, Pointer, Chunk, DataAfterKey, Path) ->
             throw(controlled_validation_error)
     end.
 
-validate_map_value(Aux, Count, Position, DataAfterKey, Path) ->
+validate_map_value(Aux, Position, DataAfterKey, Path) ->
     case parse_chunk_head(DataAfterKey) of
         {pointer, Pointer, DataAfterValue} ->
             UpdatedPath = [{Position, {pointer, Pointer}} | Path],
-            validate_indirect_map_value(Aux, Count, Pointer, DataAfterValue, UpdatedPath);
+            validate_indirect_map_value(Aux, Pointer, DataAfterValue, UpdatedPath);
         ParseResult ->
-            validate_direct_map_value(Aux, Count, Position, ParseResult, Path)
+            validate_direct_map_value(Aux, Position, ParseResult, Path)
     end.
 
-validate_indirect_map_value(Aux, Count, Pointer, DataAfterValue, Path) ->
+validate_indirect_map_value(Aux, Pointer, DataAfterValue, Path) ->
     ok = validate_position_if_unvisited(Aux, _Position = Pointer, Path),
-    validate_map_recur(Aux, Count - 1, DataAfterValue, Path).
+    DataAfterValue.
 
-validate_direct_map_value(Aux, Count, Position, {_, _, DataAfterValue} = ParseResult, Path) ->
+validate_direct_map_value(Aux, Position, {_, _, DataAfterValue} = ParseResult, Path) ->
     try locus_shared_bitarray:is_set(Aux#validation_aux.visited, Position)
          orelse validate_parsed_chunk(Aux, Position, Path, ParseResult)
     of
         true ->
-            validate_map_recur(Aux, Count - 1, DataAfterValue, Path);
+            DataAfterValue;
         {ok, _RemainingData} ->
-            validate_map_recur(Aux, Count - 1, DataAfterValue, Path)
+            DataAfterValue
     catch
         throw:{position_out_of_bounds, Position} ->
             locus_mmdb_check_journal:invalid_position_in_data_section(
@@ -762,7 +763,7 @@ validate_direct_map_value(Aux, Count, Position, {_, _, DataAfterValue} = ParseRe
             ),
             throw(controlled_validation_error)
     end;
-validate_direct_map_value(Aux, _Count, Position, {error, Reason}, Path) ->
+validate_direct_map_value(Aux, Position, {error, Reason}, Path) ->
     locus_mmdb_check_journal:bad_chunk_in_data_section(Aux#validation_aux.journal,
                                                           Position, Reason,
                                                           lists:reverse(Path)),
