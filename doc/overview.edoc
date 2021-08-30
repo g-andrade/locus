@@ -131,7 +131,9 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 For tarball files, the first file to be found within it with an `.mmdb' extension is the one that's chosen for loading.
 
 The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a>
-is mostly complete.
+is complete except for the
+<a target="_parent" href="https://maxmind.github.io/MaxMind-DB/#data-cache-container---12">
+`data cache container'</a> data type.
 
 <h5 id="database-types-and-loading">Database Types and Loading</h5>
 

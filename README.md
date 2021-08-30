@@ -127,7 +127,10 @@ For tarball files, the first file to be found within it with an `.mmdb`
 extension is the one that's chosen for loading.
 
 The implementation of [MaxMind DB
-format](https://maxmind.github.io/MaxMind-DB/) is mostly complete.
+format](https://maxmind.github.io/MaxMind-DB/) is complete except for
+the [`data cache
+container`](https://maxmind.github.io/MaxMind-DB/#data-cache-container---12)
+data type.
 
 ##### Database Types and Loading
 

@@ -54,7 +54,7 @@
 -define(extended_uint64, 2).
 -define(extended_uint128, 3).
 -define(extended_array, 4).
-% -define(extended_data_cache_container, 5). % Unimplemented
+-define(extended_data_cache_container, 5). % Unimplemented
 -define(extended_end_marker, 6).
 -define(extended_boolean, 7).
 -define(extended_float, 8).
@@ -330,6 +330,9 @@ parse_chunk_head(Data) ->
         <<0:3, _:5, ?extended_array, BaseCount:24, RemainingData/bytes>> ->
             Count = BaseCount + 65821,
             {array, Count, RemainingData};
+
+        <<0:3, _:5, ?extended_data_cache_container, _RemainingData/bytes>> ->
+            {error, '`data cache container` type not yet supported'};
 
         <<0:3, 0:5, ?extended_end_marker>> ->
             {error, {finished, extended_end_marker}};
