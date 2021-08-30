@@ -24,8 +24,6 @@
 -module(locus_custom_fetcher).
 -behaviour(gen_server).
 
--include_lib("stdlib/include/assert.hrl").
-
 %% ------------------------------------------------------------------
 %% Callback Declarations
 %% ------------------------------------------------------------------
@@ -52,7 +50,7 @@
 -ignore_xref(behaviour_info/1).
 
 %% ------------------------------------------------------------------
-%% API Function Exports
+%% "Private" API Function Exports
 %% ------------------------------------------------------------------
 
 -export(
@@ -99,15 +97,8 @@
 -export_type([successful_fetch_metadata/0]).
 
 %% ------------------------------------------------------------------
-%% "Internal" Record and Type Definitions
+%% API Record and Type Definitions
 %% ------------------------------------------------------------------
-
--type msg() ::
-    {event, event()} |
-    {finished, {success, success()}} |
-    {finished, dismissed} |
-    {finished, {error, term()}}.
--export_type([msg/0]).
 
 -type event() ::
     event_load_attempt_started() |
@@ -123,6 +114,17 @@
 -type source() :: {local|remote, {custom, term()}}.
 -export_type([source/0]).
 
+%% ------------------------------------------------------------------
+%% "Private" Record and Type Definitions
+%% ------------------------------------------------------------------
+
+-type msg() ::
+    {event, event()} |
+    {finished, {success, success()}} |
+    {finished, dismissed} |
+    {finished, {error, term()}}.
+-export_type([msg/0]).
+
 -record(state, {
           owner_pid :: pid(),
           source :: source(),
@@ -133,7 +135,7 @@
 -type state() :: #state{}.
 
 %% ------------------------------------------------------------------
-%% API Function Definitions
+%% "Private" API Function Definitions
 %% ------------------------------------------------------------------
 
 -spec source(module(), term()) -> source().

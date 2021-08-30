@@ -30,8 +30,10 @@
 -define(TEST_SOURCES_REL_PATH, "_build/test/lib/maxmind_test_data/source-data/").
 -define(TEST_DBS_REL_PATH, "_build/test/lib/maxmind_test_data/test-data/").
 
--define(BLACKLIST, ["MaxMind-DB-no-ipv4-search-tree",
-                    "MaxMind-DB-test-metadata-pointers"]).
+-define(CURSED_TESTS, % TODO investigate deeper and open PR in MaxMindDB
+        ['MaxMind-DB-test-decoder', % has `map_key_of_wrong_type_in_data_section'
+         'MaxMind-DB-test-pointer-decoder' % has `map_key_of_wrong_type_in_data_section'
+        ]).
 
 %% ------------------------------------------------------------------
 %% Setup
@@ -47,11 +49,8 @@ groups() ->
       fun (DatabasePath) ->
               DatabaseFilename = filename:basename(DatabasePath),
               GroupName = filename:rootname(DatabaseFilename),
-              (not lists:member(GroupName, ?BLACKLIST) andalso
-               begin
-                   Group = list_to_atom(GroupName),
-                   {true, {Group, [parallel], test_cases()}}
-               end)
+              Group = list_to_atom(GroupName),
+              {true, {Group, [parallel], test_cases()}}
       end,
       DatabasePaths).
 
@@ -65,7 +64,7 @@ init_per_group(Group, Config) ->
     {ok, _} = application:ensure_all_started(locus),
     {ok, _} = application:ensure_all_started(jsx),
     GroupName = atom_to_list(Group),
-    IsBroken = guess_brokenness(GroupName),
+    IsBroken = guess_brokenness(GroupName) orelse lists:member(Group, ?CURSED_TESTS),
     SourceFilename = GroupName ++ ".json",
     SourcePath = filename:join([?PROJECT_ROOT, ?TEST_SOURCES_REL_PATH, SourceFilename]),
     DatabaseFilename = GroupName ++ ".mmdb",
@@ -81,49 +80,46 @@ init_per_group(Group, Config) ->
              | Config];
         {error, enoent} ->
             [{bin_database, BinDatabase},
+             {json_group_def_filename, SourceFilename},
              {is_broken, IsBroken}
              | Config]
     end.
 
 end_per_group(_Group, _Config) ->
+    ok = application:stop(jsx),
     ok = application:stop(locus).
 
 %% ------------------------------------------------------------------
 %% Test Cases
 %% ------------------------------------------------------------------
 
-load_database_test(Config) ->
+unpack_and_check_database_test(Config) ->
     case lists:member({is_broken, true}, Config) of
         false ->
-            ?assertMatch(
-               {{{_, _, _}, {_, _, _}}, % DatabaseVersion,
-                #{tree := _}}, % DatabaseParts,
-               decode_database_parts(Config));
+            ?assertMatch(ok, unpack_and_check_database(Config));
         true ->
-            ?assertError(
-               _,
-               begin
-                   {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
-                   ct:pal("Loaded version ~p", [DatabaseVersion]),
-                   ok = locus_mmdb_analysis:run_(DatabaseParts)
-               end)
+            ?assertMatch(
+               {errors, [_|_], _},
+               unpack_and_check_database(Config))
     end.
+
 
 expected_lookup_results_test(Config) ->
     case lists:keymember(json_group_def, 1, Config) of
         true ->
             {json_group_def_filename, SourceFilename} = lists:keyfind(json_group_def_filename,
                                                                       1, Config),
-            {DatabaseVersion, DatabaseParts} = decode_database_parts(Config),
-            ct:pal("Database version: ~p", [DatabaseVersion]),
+            {ok, Database} = unpack_database(Config),
             lists:foreach(
               fun ({TestCaseIndex, Address, Expectation}) ->
-                      Reality = determine_lookup_reality(DatabaseParts, Address),
+                      Reality = determine_lookup_reality(Database, Address),
                       ?assertEqual(Expectation, Reality,
                                    unicode:characters_to_list(
                                      io_lib:format("Source filename: '~ts'"
-                                                   ", test case index: ~b",
-                                                   [SourceFilename, TestCaseIndex])
+                                                   ", test case index: ~b"
+                                                   ", address ~p",
+                                                   [SourceFilename, TestCaseIndex,
+                                                    Address])
                                     ))
               end,
               expected_lookup_results(Config));
@@ -143,10 +139,17 @@ guess_brokenness(GroupName) ->
       end,
       ["-broken-", "-invalid-"]).
 
-decode_database_parts(Config) ->
+unpack_and_check_database(Config) ->
+    case unpack_database(Config) of
+        {ok, Database} ->
+            locus_mmdb_check:run(Database);
+        {error, Reason} ->
+            {errors, [Reason], []} % Dirty hack
+    end.
+
+unpack_database(Config) ->
     BinDatabase = proplists:get_value(bin_database, Config),
-    Source = {filesystem, ""},
-    locus_mmdb:decode_database_parts(Source, BinDatabase).
+    locus_mmdb:unpack_database(BinDatabase).
 
 expected_lookup_results(Config) ->
     JsonGroupDef = proplists:get_value(json_group_def, Config),
@@ -168,12 +171,10 @@ expected_lookup_results(TestCaseIndex, Address, UncomparableSuccess, Acc) ->
     ComparableSuccess = comparable_lookup_success(UncomparableSuccess),
     [{TestCaseIndex, Address, {ok, ComparableSuccess}} | Acc].
 
-determine_lookup_reality(DatabaseParts, Address) ->
-    ct:pal("Looking up ~s", [Address]),
-    {ok, ParsedAddress} = locus_util:parse_ip_address(Address),
-    case locus_mmdb:lookup_(ParsedAddress, DatabaseParts) of
-        {ok, UncomparableSuccessWithExtras} ->
-            UncomparableSuccess = maps:without([prefix], UncomparableSuccessWithExtras),
+determine_lookup_reality(Database, Address) ->
+    case locus_mmdb:lookup_address(Address, Database) of
+        {ok, UncomparableSuccess} ->
+            % UncomparableSuccess = maps:without([prefix], UncomparableSuccessWithExtras),
             Success = comparable_lookup_success(UncomparableSuccess),
             {ok, Success};
         {error, Reason} ->

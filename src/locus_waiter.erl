@@ -28,36 +28,29 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start/4]).
-
-%% ------------------------------------------------------------------
-%% Record and Type Definitions
-%% ------------------------------------------------------------------
-
--type opt() :: {emulate_legacy_behaviour, boolean()}.
--export_type([opt/0]).
+-export([start/3]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start(reference(), [atom()], timeout(), [opt()]) -> pid().
-start(ReplyRef, DatabaseId, Timeout, Opts) ->
+-spec start(reference(), [atom()], timeout()) -> pid().
+start(ReplyRef, DatabaseId, Timeout) ->
     OwnerPid = self(),
     spawn_link(
       fun () ->
-              run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout, Opts)
+              run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout)
       end).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout, Opts) ->
+run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout) ->
     _ = process_flag(trap_exit, true),
     _ = maybe_schedule_timeout(Timeout),
     {await, SubscriptionRef} = locus_database:async_get_version_or_subscribe(DatabaseId),
-    wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId, Timeout, Opts, []).
+    wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId, Timeout, []).
 
 -spec reply_to_owner(pid(), reference(), atom(), tuple()) -> no_return().
 reply_to_owner(OwnerPid, ReplyRef, DatabaseId, Reply) ->
@@ -66,44 +59,31 @@ reply_to_owner(OwnerPid, ReplyRef, DatabaseId, Reply) ->
     exit(normal).
 
 wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                 Timeout, Opts, LoadAttemptFailures) ->
-    EmulateLegacyBehaviour = proplists:get_value(emulate_legacy_behaviour, Opts),
+                 Timeout, LoadAttemptFailures) ->
 
     case receive_message(OwnerPid, SubscriptionRef, DatabaseId) of
         {already_loaded, Version} ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {ok, Version});
-        database_unknown
-          when EmulateLegacyBehaviour, Timeout =:= 0 ->
-            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, timeout});
         database_unknown ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, database_unknown});
 
         {event, {load_attempt_finished, {cache, _}, {error, not_found}}} ->
             wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                             Timeout, Opts, LoadAttemptFailures);
+                             Timeout, LoadAttemptFailures);
         {event, {load_attempt_finished, _, {ok, Version}}} ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {ok, Version});
-        {event, {load_attempt_finished, _, {error, Reason}}}
-          when EmulateLegacyBehaviour ->
-            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, {loading, Reason}});
         {event, {load_attempt_finished, _, {error, Reason}}} ->
             UpdatedLoadAttemptFailures = [Reason | LoadAttemptFailures],
             wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                             Timeout, Opts, UpdatedLoadAttemptFailures);
+                             Timeout, UpdatedLoadAttemptFailures);
         {event, _} ->
             wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                             Timeout, Opts, LoadAttemptFailures);
+                             Timeout, LoadAttemptFailures);
 
-        timeout
-          when EmulateLegacyBehaviour ->
-            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, timeout});
         timeout ->
             Reason = {timeout, lists:reverse(LoadAttemptFailures)},
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, Reason});
 
-        {database_stopped, _Reason}
-          when EmulateLegacyBehaviour, Timeout =:= 0 ->
-            reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, database_unknown});
         {database_stopped, Reason} ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, {stopped, Reason}});
         owner_stopped ->

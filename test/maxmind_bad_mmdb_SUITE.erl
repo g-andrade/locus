@@ -24,7 +24,7 @@
 -module(maxmind_bad_mmdb_SUITE).
 -compile(export_all).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(PROJECT_ROOT, "../../../../").
 -define(DATABASES_ROOT_DIR, "_build/test/lib/maxmind_test_data/bad-data").
@@ -86,16 +86,13 @@ bad_unicode_in_map_key_test(_Config) ->
 
 expect_database_decode_failure(TailPath) ->
     {ok, BinDatabase} = read_database(TailPath),
-    try decode_database_parts(BinDatabase) of
-        {_DatabaseParts, Version} ->
-            ct:pal("Database version ~p successfully decoded", [Version]),
-            error(unexpected_success)
-    catch
-        Class:Reason:Stacktrace ->
-            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
-            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            ct:pal("Unable to decode database because of ~p:~p on ~p",
-                   [Class, SaferReason, SaferStacktrace])
+    case locus_mmdb:unpack_database(BinDatabase) of
+        {ok, _Database} ->
+            ct:pal("Database version successfully unpacked", []),
+            error(unexpected_success);
+        {error, Reason} ->
+            ct:pal("Unable to unpack database: ~p", [Reason]),
+            ok
     end.
 
 read_database(TailPath) ->
@@ -104,7 +101,3 @@ read_database(TailPath) ->
 
 database_path(TailPath) ->
     filename:join([?PROJECT_ROOT, ?DATABASES_ROOT_DIR, TailPath]).
-
-decode_database_parts(BinDatabase) ->
-    Source = {filesystem, ""},
-    locus_mmdb:decode_database_parts(Source, BinDatabase).

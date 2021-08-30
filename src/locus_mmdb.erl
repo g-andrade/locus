@@ -26,182 +26,65 @@
 
 -module(locus_mmdb).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([create_table/1]).
--export([decode_database_parts/2]).
--export([update/2]).
--export([lookup/2]).
--export([get_parts/1]).
--export([analyze/1]).
-
--ifdef(TEST).
--export([lookup_/2]).
--endif.
+-export([unpack_database/1,
+         lookup_address/2]).
 
 %% ------------------------------------------------------------------
-%% Macro Definitions
+%% API Type Definitions
 %% ------------------------------------------------------------------
 
--define(METADATA_MARKER, "\xab\xcd\xefMaxMind.com").
+-type database()
+    :: #{ metadata := locus_mmdb_metadata:t(),
+          tree := locus_mmdb_tree:t(),
+          data_section := binary()
+        }.
+-export_type([database/0]).
 
--define(assert(Cond, Error), ((Cond) orelse error((Error)))).
+-type unpack_error()
+    :: {bad_metadata, locus_mmdb_metadata:parse_or_validation_error()}
 
-%% ------------------------------------------------------------------
-%% Type Definitions
-%% ------------------------------------------------------------------
+    |  {intermediate_128bits_of_zero_not_found_after_tree,
+        {{not_zeroes, binary()},
+         {at_offset, non_neg_integer()},
+         {with_metadata, locus_mmdb_metadata:t()}}}
 
--type bin_database() :: <<_:64, _:_*8>>.
--export_type([bin_database/0]).
+    |  {missing_data_after_tree,
+        {{required, {128, bits}},
+         {but_got, {0..127, bits}},
+         {at_offset, non_neg_integer()},
+         {with_metadata, locus_mmdb_metadata:t()}}}
 
--type source() :: locus_loader:source().
--export_type([source/0]).
+    | {not_enough_data_for_tree,
+       {{required, {pos_integer(), bytes}},
+        {but_got, {non_neg_integer(), bytes}},
+        {with_metadata, locus_mmdb_metadata:t()}}}
 
--type parts() ::
-    #{ tree := binary(),
-       data_section := binary(),
-       metadata := metadata(),
-       ipv4_root_index := non_neg_integer(),
-       source := source(),
-       version := calendar:datetime()
-     }.
--export_type([parts/0]).
+    | {bad_tree,
+       {{because, locus_mmdb_tree:bad_tree_error()},
+        {with_metadata, locus_mmdb_metadata:t()}}}.
 
--type metadata() :: locus_mmdb_data:decoded_map().
--export_type([metadata/0]).
-
--type lookup_success() :: lookup_success(prefix, ip_address_prefix()).
--export_type([lookup_success/0]).
-
--type lookup_success(K, V) ::
-    locus_mmdb_data:extended_decoded_map(K, V) |
-    {locus_mmdb_data:decoded_array(), #{K := V}} |
-    {locus_mmdb_data:decoded_simple_value(), #{K := V}}.
--export_type([lookup_success/2]).
-
--type ip_address_prefix() :: locus_mmdb_tree:ip_address_prefix().
--export_type([ip_address_prefix/0]).
-
--type analysis_flaw() :: locus_mmdb_analysis:flaw().
--export_type([analysis_flaw/0]).
+-export_type([unpack_error/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec create_table(atom()) -> ok.
-%% @private
-create_table(Id) ->
-    Table = table_name(Id),
-    _ = ets:new(Table, [named_table, protected, {read_concurrency, true}]),
-    ok.
-
--spec decode_database_parts(source(), bin_database()) -> {calendar:datetime(), parts()}.
-%% @private
-decode_database_parts(Source, BinDatabase) ->
-    BinMetadataMarkerParts = binary:matches(BinDatabase, <<?METADATA_MARKER>>),
-    {BinMetadataStart, _BinMetadataMarkerLength} = lists:last(BinMetadataMarkerParts),
-    <<TreeAndDataSection:BinMetadataStart/bytes, ?METADATA_MARKER, BinMetadata/bytes>>
-        = BinDatabase,
-    Metadata = decode_metadata(BinMetadata),
-    RecordSize = maps:get(<<"record_size">>, Metadata),
-    NodeCount = maps:get(<<"node_count">>, Metadata),
-    BuildEpoch = maps:get(<<"build_epoch">>, Metadata),
-    FmtMajorVersion = maps:get(<<"binary_format_major_version">>, Metadata),
-    FmtMinorVersion = maps:get(<<"binary_format_minor_version">>, Metadata),
-    ?assert(is_known_database_format(FmtMajorVersion),
-            {unknown_database_format_version, FmtMajorVersion, FmtMinorVersion}),
-    TreeSize = ((RecordSize * 2) div 8) * NodeCount,
-    <<Tree:TreeSize/bytes, 0:128, DataSection/bytes>> = TreeAndDataSection,
-    IPv4RootIndex = locus_mmdb_tree:find_ipv4_root_index(Metadata, Tree),
-    Version = epoch_to_datetime(BuildEpoch),
-    DatabaseParts = #{ tree => Tree, data_section => DataSection,
-                       metadata => Metadata, ipv4_root_index => IPv4RootIndex,
-                       source => Source, version => Version },
-    {Version, DatabaseParts}.
-
--spec update(atom(), parts()) -> true.
-%% @private
-update(Id, DatabaseParts) ->
-    Table = table_name(Id),
-    ets:insert(Table, {database, DatabaseParts}).
-
--spec lookup(atom(), inet:ip_address() | nonempty_string() | binary())
-        -> {ok, lookup_success()} |
-           {error, (not_found | invalid_address | ipv4_database |
-                    database_unknown | database_not_loaded)}.
-%% @private
-lookup(Id, Address) ->
-    case locus_util:parse_ip_address(Address) of
-        {ok, ParsedAddress} ->
-            with_database_parts(
-              Id,
-              fun (DatabaseParts) ->
-                      lookup_(ParsedAddress, DatabaseParts)
-              end);
-        {error, einval} ->
-            {error, invalid_address}
-    end.
-
--spec get_parts(atom()) -> {ok, parts()} | {error, database_unknown | database_not_loaded}.
-%% @private
-get_parts(Id) ->
-    with_database_parts(Id, fun (DatabaseParts) -> {ok, DatabaseParts} end).
-
--spec analyze(atom())
-        -> ok |
-           {error, {flawed, [analysis_flaw(), ...]}} |
-           {error, database_unknown} |
-           {error, database_not_loaded}.
-%% @private
-analyze(Id) ->
-    with_database_parts(Id, fun locus_mmdb_analysis:run/1).
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions
-%% ------------------------------------------------------------------
-
--spec table_name(atom()) -> atom().
-table_name(Id) ->
-    list_to_atom("locus_mmdb_" ++ atom_to_list(Id)).
-
--spec decode_metadata(binary()) -> metadata().
-decode_metadata(BinMetadata) ->
-    {#{} = Metadata, _FinalChunk} = locus_mmdb_data:decode_on_index(0, BinMetadata),
-    Metadata.
-
-is_known_database_format(FmtMajorVersion) ->
-    FmtMajorVersion =:= 2.
-
--spec epoch_to_datetime(integer()) -> calendar:datetime().
-epoch_to_datetime(Epoch) ->
-    GregorianEpoch = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}),
-    calendar:gregorian_seconds_to_datetime(GregorianEpoch + Epoch).
-
-with_database_parts(Id, Fun) ->
-    Table = table_name(Id),
-    case ets:info(Table, name) =:= Table andalso ets:lookup(Table, database) of
-        false ->
-            {error, database_unknown};
-        [] ->
-            {error, database_not_loaded};
-        [{_, DatabaseParts}] ->
-            Fun(DatabaseParts)
-    end.
-
-lookup_(Address, DatabaseParts) ->
-    #{data_section := DataSection, ipv4_root_index := IPv4RootIndex,
-      metadata := Metadata, tree := Tree} = DatabaseParts,
-
-    try locus_mmdb_tree:lookup(Address, IPv4RootIndex, Metadata, Tree) of
-        {ok, {DataIndex, Prefix}} ->
-            {Entry, _} = locus_mmdb_data:decode_on_index(DataIndex, DataSection),
-            Success = lookup_success(Entry, #{ prefix => Prefix }),
-            {ok, Success};
-        {error, Reason} ->
-            {error, Reason}
+%% @doc Unpacks an `EncodedDatabase' binary
+-spec unpack_database(EncodedDatabase) -> {ok, Database} | {error, ErrorReason}
+        when EncodedDatabase :: binary(),
+             Database :: database(),
+             ErrorReason :: unpack_error().
+unpack_database(<<EncodedDatabase/bytes>>) ->
+    try
+        unpack_database_(EncodedDatabase)
     catch
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
@@ -209,8 +92,93 @@ lookup_(Address, DatabaseParts) ->
             erlang:raise(Class, SaferReason, SaferStacktrace)
     end.
 
-lookup_success(Entry, ExtraAttributes)
-  when is_map(Entry) ->
-    maps:merge(Entry, ExtraAttributes);
-lookup_success(Entry, ExtraAttributes) ->
-    {Entry, ExtraAttributes}.
+%% @doc Looks up for an entry matching `Address' within `Database'
+-spec lookup_address(Address, Database) -> {ok, Entry} | not_found | {error, ErrorReason}
+    when Address :: inet:ip_address() | string() | unicode:unicode_binary(),
+         Database :: database(),
+         Entry :: locus_mmdb_data:value(),
+         ErrorReason :: term().
+lookup_address(Address, Database) ->
+    case locus_util:parse_ip_address(Address) of
+        {ok, ParsedAddress} ->
+            lookup_parsed_address(ParsedAddress, Database);
+        {error, einval} ->
+            {error, {invalid_address, Address}}
+    end.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+unpack_database_(EncodedDatabase) ->
+    case locus_mmdb_metadata:parse_and_validate(EncodedDatabase) of
+        {ok, Metadata, OtherSections} ->
+            TreeAndDataSection = OtherSections,
+            unpack_tree_and_data_section(Metadata, TreeAndDataSection);
+        {error, Reason} ->
+            {error, {bad_metadata, Reason}}
+    end.
+
+unpack_tree_and_data_section(Metadata, TreeAndDataSection) ->
+    #{node_count := NodeCount, record_size := RecordSize} = Metadata,
+    TreeSize = ((RecordSize * 2) div 8) * NodeCount,
+
+    case TreeAndDataSection of
+        <<TreeData:TreeSize/bytes, 0:128, DataSection/bytes>> ->
+            instantiate_database(Metadata, TreeData, DataSection);
+        <<_:TreeSize/bytes, NotZeroes:128/bits, _NotZeroes/bytes>> ->
+            {error, {intermediate_128bits_of_zero_not_found_after_tree,
+                     {{not_zeroes, NotZeroes},
+                      {at_offset, TreeSize},
+                      {with_metadata, Metadata}}}};
+        <<_:TreeSize/bytes, MissingData/bits>> ->
+            {error, {missing_data_after_tree,
+                     {{required, {128, bits}},
+                      {bot_got, {bit_size(MissingData), bits}},
+                      {at_offset, TreeSize},
+                      {with_metadata, Metadata}}}};
+        <<MissingTree/bytes>> ->
+            {error, {not_enough_data_for_tree,
+                     {{required, {TreeSize, bytes}},
+                      {but_got, {byte_size(MissingTree), bytes}},
+                      {with_metadata, Metadata}}}}
+    end.
+
+instantiate_database(Metadata, TreeData, DataSection) ->
+    #{node_count := NodeCount, record_size := RecordSize, ip_version := IpVersion} = Metadata,
+
+    case locus_mmdb_tree:new(TreeData, NodeCount, RecordSize, IpVersion,
+                             byte_size(DataSection))
+    of
+        {ok, Tree} ->
+            {ok, #{metadata => Metadata,
+                   tree => Tree,
+                   data_section => DataSection}};
+        {error, Reason} ->
+            {error, {bad_tree,
+                     {{because, Reason},
+                      {with_metadata, Metadata}}}}
+    end.
+
+lookup_parsed_address(ParsedAddress, Database) ->
+    #{tree := Tree, data_section := DataSection} = Database,
+
+    case locus_mmdb_tree:lookup(ParsedAddress, Tree) of
+        {ok, DataIndex} ->
+            lookup_address_data(DataIndex, DataSection);
+        not_found ->
+            not_found;
+        {error, _} = Error ->
+            Error
+    end.
+
+lookup_address_data(DataIndex, DataSection) ->
+    try locus_mmdb_data_codec:parse_on_index(DataIndex, DataSection, _Raw = false) of
+        {Entry, _RemainingData} ->
+            {ok, Entry}
+    catch
+        Class:Reason:Stacktrace ->
+            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
+            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
+            erlang:raise(Class, SaferReason, SaferStacktrace)
+    end.

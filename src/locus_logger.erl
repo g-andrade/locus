@@ -41,7 +41,9 @@
 %% Private Function Exports
 %% ------------------------------------------------------------------
 
+-ifdef(ESCRIPTIZING).
 -export([log_warning/2]).
+-endif.
 
 %% ------------------------------------------------------------------
 %% Macro Definitions

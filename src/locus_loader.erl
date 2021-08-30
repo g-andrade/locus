@@ -86,8 +86,7 @@
 -type loader_opt() ::
     {update_period, milliseconds_interval()} |
     {error_retries, error_retry_behaviour()} |
-    no_cache |
-    deprecated_loader_opt().
+    no_cache.
 -export_type([loader_opt/0]).
 
 -type milliseconds_interval() :: pos_integer().
@@ -105,11 +104,6 @@
       growth_exponent := number()
      }.
 -export_type([exponential_backoff_params/0]).
-
--type deprecated_loader_opt() ::
-    {pre_readiness_update_period, milliseconds_interval()} |
-    {post_readiness_update_period, milliseconds_interval()}.
--export_type([deprecated_loader_opt/0]).
 
 -type fetcher_opt() :: locus_maxmind_download:opt() | locus_http_download:opt().
 -export_type([fetcher_opt/0]).
@@ -205,7 +199,7 @@
 
 -type msg() ::
     {event, event()} |
-    {load_success, source(), calendar:datetime(), locus_mmdb:parts()} |
+    {load_success, source(), calendar:datetime(), locus_mmdb:database()} |
     {load_failure, source(), Reason :: term()}.
 -export_type([msg/0]).
 
@@ -247,7 +241,7 @@ valid_blob_formats() ->
 init([OwnerPid, DatabaseId, Origin, LoaderOpts, FetcherOpts]) ->
     _ = process_flag(trap_exit, true),
     DefaultSettings = default_settings(Origin),
-    Settings = customized_settings(DatabaseId, DefaultSettings, LoaderOpts),
+    Settings = customized_settings(DefaultSettings, LoaderOpts),
     State =
         #state{
            owner_pid = OwnerPid,
@@ -339,15 +333,6 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
                   orelse error({badopt, Opt});
               (no_cache) ->
                   true;
-              %
-              % Legacy options
-              %
-              ({pre_readiness_update_period, Interval} = Opt) ->
-                  ?is_pos_integer(Interval)
-                  orelse error({badopt, Opt});
-              ({post_readiness_update_period, Interval} = Opt) ->
-                  ?is_pos_integer(Interval)
-                  orelse error({badopt, Opt});
               (_) ->
                   false
           end,
@@ -420,41 +405,17 @@ default_local_origin_error_retry_behaviour() ->
                             growth_base => timer:seconds(2),
                             growth_exponent => 1.0}}.
 
--spec customized_settings(atom(), settings(), [loader_opt()]) -> settings().
-customized_settings(DatabaseId, Settings, LoaderOpts) ->
+-spec customized_settings(settings(), [loader_opt()]) -> settings().
+customized_settings(Settings, LoaderOpts) ->
     lists:foldl(
       fun ({update_period, Interval}, Acc) ->
               Acc#settings{ update_period = Interval };
           ({error_retries, Behaviour}, Acc) ->
               Acc#settings{ error_retry_behaviour = Behaviour };
           (no_cache, Acc) ->
-              Acc#settings{ use_cache = false};
-          %
-          % Legacy options
-          %
-          ({pre_readiness_update_period, Interval} = Opt, Acc) ->
-              log_warning_on_use_of_legacy_opt(DatabaseId, Opt),
-              ErrorRetryBehaviour = {backoff, Interval},
-              Acc#settings{ error_retry_behaviour = ErrorRetryBehaviour,
-                            error_retry_behaviour_applies_after_readiness = false };
-          ({post_readiness_update_period, Interval} = Opt, Acc) ->
-              log_warning_on_use_of_legacy_opt(DatabaseId, Opt),
-              Acc#settings{ update_period = Interval }
+              Acc#settings{ use_cache = false}
       end,
       Settings, LoaderOpts).
-
-log_warning_on_use_of_legacy_opt(DatabaseId, {pre_readiness_update_period, Interval}) ->
-    locus_logger:log_warning(
-      "[~ts] You've specified the following legacy option: {pre_readiness_update_period, ~b}.~n"
-      "However, the default behaviour is now exponential backoff, and therefore much improved.~n"
-      "If you don't want to give it a chance and prefer to keep constant backoffs~n"
-      "while silencing this warning, use `{error_retries, {backoff, ~b}}` instead.",
-      [DatabaseId, Interval, Interval]);
-log_warning_on_use_of_legacy_opt(DatabaseId, {post_readiness_update_period, Interval}) ->
-    locus_logger:log_warning(
-      "[~ts] You've specified the following legacy option: {post_readiness_update_period, ~b}.~n"
-      "To silence this warning, use {update_period, ~b} instead.",
-      [DatabaseId, Interval, Interval]).
 
 -spec finish_initialization(state()) -> state().
 finish_initialization(State)
@@ -657,14 +618,14 @@ handle_database_fetch_dismissal(Source, State)
 -spec handle_database_fetch_success(source(), fetcher_success(), state()) -> {noreply, state()}.
 handle_database_fetch_success(Source, Success, State) ->
     {BlobFormat, Blob} = fetched_database_format_and_blob(Source, Success),
-    case decode_database_from_blob(Source, BlobFormat, Blob) of
-        {ok, Version, Parts, BinDatabase} ->
+    case unpack_database_from_blob(BlobFormat, Blob) of
+        {ok, Database, EncodedDatabase} ->
             LastModified = fetched_database_modification_datetime(Source, Success),
             UpdatedState = maybe_save_fetch_metadata(Source, Success, State),
-            handle_database_decode_success(Source, Version, Parts, BinDatabase,
+            handle_database_unpack_success(Source, Database, EncodedDatabase,
                                            LastModified, UpdatedState);
         {error, Reason} ->
-            handle_database_decode_error(Source, Reason, State)
+            handle_database_unpack_error(Source, Reason, State)
     end.
 
 -spec maybe_save_fetch_metadata(source(), fetcher_success(), state()) -> state().
@@ -688,16 +649,19 @@ maybe_save_fetch_metadata({filesystem, _}, _Success, State) ->
     ?assertEqual(undefined, State#state.fetch_metadata_for_last_successful_load),
     State.
 
--spec handle_database_decode_success(source(), calendar:datetime(), locus_mmdb:parts(),
-                                     binary(), calendar:datetime(), state()) -> {noreply, state()}.
-handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified, State) ->
+-spec handle_database_unpack_success(source(), locus_mmdb:database(),
+                                     binary(),
+                                     calendar:datetime(), state())
+        -> {noreply, state()}.
+handle_database_unpack_success(Source, Database, EncodedDatabase, LastModified, State) ->
+    Version = database_version(Database),
     State2 = State#state{ last_modified = LastModified, last_loaded_version = Version },
-    notify_owner({load_success, Source, Version, Parts}, State2),
+    notify_owner({load_success, Source, Version, Database}, State2),
 
     case Source of
         {remote, _} when (State2#state.settings)#settings.use_cache, LastModified =/= unknown ->
             CachedDatabasePath = cached_database_path(State2),
-            CachedDatabaseBlob = make_cached_database_blob(CachedDatabasePath, BinDatabase),
+            CachedDatabaseBlob = make_cached_database_blob(CachedDatabasePath, EncodedDatabase),
             {ok, CacherPid} = locus_filesystem_store:start_link(CachedDatabasePath,
                                                                 CachedDatabaseBlob,
                                                                 LastModified),
@@ -709,8 +673,14 @@ handle_database_decode_success(Source, Version, Parts, BinDatabase, LastModified
             handle_load_attempt_conclusion(Source, reset, State2)
     end.
 
--spec handle_database_decode_error(source(), term(), state()) -> {noreply, state()}.
-handle_database_decode_error(Source, Reason, State) ->
+-spec database_version(locus_mmdb:database()) -> calendar:datetime().
+database_version(Database) ->
+    #{metadata := Metadata} = Database,
+    #{build_epoch := BuildEpoch} = Metadata,
+    locus_database:version(BuildEpoch).
+
+-spec handle_database_unpack_error(source(), term(), state()) -> {noreply, state()}.
+handle_database_unpack_error(Source, Reason, State) ->
     notify_owner({load_failure, Source, Reason}, State),
     handle_load_attempt_conclusion(Source, +1, State).
 
@@ -768,119 +738,116 @@ exponential_error_backoff_interval(Count, Params) ->
     Growth = (1000 * math:pow(GrowthBase / 1000, MultipliedGrowthExponent)) - Min,
     min(Max, Min + trunc(Growth)).
 
--spec decode_database_from_blob(source(), blob_format(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from, tgz_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
-decode_database_from_blob(Source, tgz, Blob) ->
-    decode_database_from_tgz_blob(Source, Blob);
-decode_database_from_blob(Source, tarball, Blob) ->
-    decode_database_from_tarball_blob(Source, Blob);
-decode_database_from_blob(Source, gzip, Blob) ->
-    decode_database_from_gzip_blob(Source, Blob);
-decode_database_from_blob(Source, gzipped_mmdb, Blob) ->
-    decode_database_from_gzipped_mmdb_blob(Source, Blob);
-decode_database_from_blob(Source, mmdb, Blob) ->
-    decode_database_from_mmdb_blob(Source, Blob);
-decode_database_from_blob(Source, unknown, Blob) ->
-    decode_database_from_unknown_blob(Source, Blob).
+-spec unpack_database_from_blob(blob_format(), binary())
+        -> {ok, locus_mmdb:database(), binary()} |
+           {error, {unpack_database_from, tgz_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, mmdb_blob, locus_mmdb:unpack_error()}}.
+unpack_database_from_blob(tgz, Blob) ->
+    unpack_database_from_tgz_blob(Blob);
+unpack_database_from_blob(tarball, Blob) ->
+    unpack_database_from_tarball_blob(Blob);
+unpack_database_from_blob(gzip, Blob) ->
+    unpack_database_from_gzip_blob(Blob);
+unpack_database_from_blob(gzipped_mmdb, Blob) ->
+    unpack_database_from_gzipped_mmdb_blob(Blob);
+unpack_database_from_blob(mmdb, Blob) ->
+    unpack_database_from_mmdb_blob(Blob);
+unpack_database_from_blob(unknown, Blob) ->
+    unpack_database_from_unknown_blob(Blob).
 
--spec decode_database_from_tgz_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
-decode_database_from_tgz_blob(Source, Blob) ->
+-spec unpack_database_from_tgz_blob(binary())
+        -> {ok, locus_mmdb:database(), binary()} |
+           {error, {unpack_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, mmdb_blob, locus_mmdb:unpack_error()}}.
+unpack_database_from_tgz_blob(Blob) ->
     try zlib:gunzip(Blob) of
         Tarball ->
-            decode_database_from_tarball_blob(Source, Tarball)
+            unpack_database_from_tarball_blob(Tarball)
     catch
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from, tgz_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {unpack_database_from, tgz_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
--spec decode_database_from_gzip_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from, gzip_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
-decode_database_from_gzip_blob(Source, Blob) ->
+-spec unpack_database_from_gzip_blob(binary())
+        -> {ok, locus_mmdb:database(), binary()} |
+           {error, {unpack_database_from, gzip_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, mmdb_blob, locus_mmdb:unpack_error()}}.
+unpack_database_from_gzip_blob(Blob) ->
     try zlib:gunzip(Blob) of
         Uncompressed ->
-            decode_database_from_unknown_blob(Source, Uncompressed)
+            unpack_database_from_unknown_blob(Uncompressed)
     catch
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from, gzip_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {unpack_database_from, gzip_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
--spec decode_database_from_gzipped_mmdb_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from, gzipped_mmdb_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
-decode_database_from_gzipped_mmdb_blob(Source, Blob) ->
+-spec unpack_database_from_gzipped_mmdb_blob(binary())
+        -> {ok, locus_mmdb:database(), binary()} |
+           {error, {unpack_database_from, gzipped_mmdb_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, mmdb_blob, locus_mmdb:unpack_error()}}.
+unpack_database_from_gzipped_mmdb_blob(Blob) ->
     try zlib:gunzip(Blob) of
         Uncompressed ->
-            decode_database_from_mmdb_blob(Source, Uncompressed)
+            unpack_database_from_mmdb_blob(Uncompressed)
     catch
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from, gzipped_mmdb_blob,
+            {error, {unpack_database_from, gzipped_mmdb_blob,
                      {Class, SaferReason, SaferStacktrace}}}
     end.
 
--spec decode_database_from_unknown_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
-decode_database_from_unknown_blob(Source, Blob) ->
-    case decode_database_from_tarball_blob(Source, Blob) of
-        {ok, _, _, _} = Success ->
+-spec unpack_database_from_unknown_blob(binary())
+        -> {ok, locus_mmdb:database(), binary()} |
+           {error, {unpack_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, mmdb_blob, locus_mmdb:unpack_error()}}.
+unpack_database_from_unknown_blob(Blob) ->
+    case unpack_database_from_tarball_blob(Blob) of
+        {ok, _, _} = Success ->
             Success;
         _ ->
-            decode_database_from_mmdb_blob(Source, Blob)
+            unpack_database_from_mmdb_blob(Blob)
     end.
 
--spec decode_database_from_tarball_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from, tarball_blob, {atom(), term(), [term()]}}} |
-           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
-decode_database_from_tarball_blob(Source, Tarball) ->
+-spec unpack_database_from_tarball_blob(binary())
+        -> {ok, locus_mmdb:database(), binary()} |
+           {error, {unpack_database_from, tarball_blob, {atom(), term(), [term()]}}} |
+           {error, {unpack_database_from, mmdb_blob, locus_mmdb:unpack_error()}}.
+unpack_database_from_tarball_blob(Tarball) ->
     try extract_mmdb_from_tarball_blob(Tarball) of
-        BinDatabase ->
-            decode_database_from_mmdb_blob(Source, BinDatabase)
+        EncodedDatabase ->
+            unpack_database_from_mmdb_blob(EncodedDatabase)
     catch
         Class:Reason:Stacktrace ->
             SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from, tarball_blob, {Class, SaferReason, SaferStacktrace}}}
+            {error, {unpack_database_from, tarball_blob, {Class, SaferReason, SaferStacktrace}}}
     end.
 
--spec decode_database_from_mmdb_blob(source(), binary())
-        -> {ok, calendar:datetime(), locus_mmdb:parts(), binary()} |
-           {error, {decode_database_from, mmdb_blob, {atom(), term(), [term()]}}}.
-decode_database_from_mmdb_blob(Source, BinDatabase) ->
-    try locus_mmdb:decode_database_parts(Source, BinDatabase) of
-        {Version, Parts} ->
-            {ok, Version, Parts, BinDatabase}
-    catch
-        Class:Reason:Stacktrace ->
-            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
-            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            {error, {decode_database_from, mmdb_blob, {Class, SaferReason, SaferStacktrace}}}
+-spec unpack_database_from_mmdb_blob(binary())
+        -> {ok, locus_mmdb:database(), binary()} |
+           {error, {unpack_database_from, mmdb_blob, locus_mmdb:unpack_error()}}.
+unpack_database_from_mmdb_blob(EncodedDatabase) ->
+    case locus_mmdb:unpack_database(EncodedDatabase) of
+        {ok, Database} ->
+            {ok, Database, EncodedDatabase};
+        {error, Reason} ->
+            {error, {unpack_database_from, mmdb_blob, Reason}}
     end.
 
 -spec extract_mmdb_from_tarball_blob(binary()) -> binary().
 extract_mmdb_from_tarball_blob(Tarball) ->
     {ok, ContainedPaths} = erl_tar:table({binary, Tarball}),
     {true, DatabasePath} = locus_util:lists_anymap(fun has_mmdb_extension/1, ContainedPaths),
-    {ok, [{DatabasePath, BinDatabase}]} =
+    {ok, [{DatabasePath, EncodedDatabase}]} =
         erl_tar:extract({binary, Tarball}, [{files, [DatabasePath]}, memory]),
-    BinDatabase.
+    EncodedDatabase.
 
 -spec has_mmdb_extension(nonempty_string()) -> boolean().
 has_mmdb_extension(Filename) ->
@@ -967,9 +934,9 @@ fetched_database_modification_datetime({filesystem, _}, #{modified_on := Modific
     ModificationDate.
 
 %-spec make_cached_database_blob(nonempty_string(), binary()) -> binary().
-make_cached_database_blob(CachedTarballPath, BinDatabase) ->
+make_cached_database_blob(CachedTarballPath, EncodedDatabase) ->
     case filename_extension_parts(CachedTarballPath) of
-        ["gz", "mmdb" | _] -> zlib:gzip(BinDatabase)
+        ["gz", "mmdb" | _] -> zlib:gzip(EncodedDatabase)
     end.
 
 %% ------------------------------------------------------------------

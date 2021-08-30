@@ -12,14 +12,9 @@ of IP addresses using <a target="_parent" href="https://dev.maxmind.com/geoip/ge
 The databases will be loaded on-demand and, when retrieved from the network, cached on the filesystem and updated automatically.
 
 <blockquote>
-&#x26a0;&#xfe0f; Starting on December 31st, 2019, <b>a license key is now <a
-	target="_parent"
-	href="https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/">
-required
-</a> to
-download MaxMind GeoLite2 databases</b>.
-
-Previous URLs have been discontinued; you should upgrade `locus' to a recent version if you used them.
+⚠️  For instructions on how to upgrade to 2.x, check
+<a target="_parent" href="https://github.com/g-andrade/locus/blob/master/MIGRATION.md">
+`MIGRATION.md'</a>
 </blockquote>
 
 <h4>Usage</h4>
@@ -45,8 +40,8 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % You can also use:
 % * an HTTP(S) URL,
 % * or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
-% * or a `{custom, Module, Args}` tuple, with `Module'
-%   implementing the `locus_custom_fetcher` behaviour.
+% * or a `{custom, Module, Args}' tuple, with `Module'
+%   implementing the `locus_custom_fetcher' behaviour.
 </pre>
 
 <h5>3. Wait for the database to load (optional)</h5>
@@ -62,8 +57,11 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % > locus:lookup(country, "93.184.216.34").
 % > locus:lookup(country, "2606:2800:220:1:248:1893:25c8:1946").
 
-{ok,#{prefix => {{93,184,216,0},31},
-      <<"continent">> =>
+% * '{ok, Entry}' in case of success;
+% * 'not_found' if no entry was found
+% * '{error, _}' if something bad happened
+
+{ok,#{<<"continent">> =>
           #{<<"code">> => <<"NA">>,
             <<"geoname_id">> => 6255149,
             <<"names">> =>
@@ -133,7 +131,9 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 For tarball files, the first file to be found within it with an `.mmdb' extension is the one that's chosen for loading.
 
 The implementation of <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">MaxMind DB format</a>
-is mostly complete.
+is complete except for the
+<a target="_parent" href="https://maxmind.github.io/MaxMind-DB/#data-cache-container---12">
+`data cache container'</a> data type.
 
 <h5 id="database-types-and-loading">Database Types and Loading</h5>
 
@@ -142,38 +142,42 @@ is mostly complete.
   were all successfully tested; presumably `locus' can deal with <a href="#alternative-providers">any MMDB database</a> that maps IP address prefixes to arbitrary data
   </li>
 <li>The databases are loaded into memory (mostly) as is; reference counted binaries are shared with the
-  application callers using ETS tables, and the original binary search tree is used to lookup addresses.
+  application callers using
+  <a target="_parent" href="https://erlang.org/doc/man/persistent_term.html">`persistent_term'</a>,
+  and the original binary search tree is used to lookup addresses.
   The data for each entry is decoded on the fly upon successful lookups.
   </li>
 </ul>
 
 <h5 id="database-validation">Database Validation</h5>
 
-Databases, local or remote, can have their compatibility validated through the `locus:analyze/1'
+Databases, local or remote, can have their compatibility validated through the `locus:check/1'
 function after they've been loaded (see <a href="#api-reference">function reference</a>.)
 
 Alternatively, they can also be checked from the command line by use of the `locus' CLI utility:
 <ol>
 <li>Run `make cli' to build the script, named `locus', which will be deployed to the current directory.</li>
-<li>Run analysis:
+<li>Check the database:
 <pre lang="shell" class="shell">
-./locus analyze GeoLite2-City.mmdb
+./locus check GeoLite2-City.mmdb
 # Loading database from "GeoLite2-City.mmdb"...
 # Database version {{2019,11,6},{11,58,0}} successfully loaded
-# Analyzing database for flaws...
+# Checking database for flaws...
 # Database is wholesome.
 </pre>
 </li>
 </ol>
-The script will exit with code 1 in case of failure, and 0 otherwise.
-Run `./locus analyze --help' for a description of supported options and arguments.
+<p>The script will exit with code 1 in case of failure, and 0 otherwise.</p>
+<p>Warnings can produce failure through the `--warnings-as-errors' flag.</p>
+Run `./locus check --help' for a description of supported options and arguments.
 
 <h5 id="remote-sources-downloading-and-updating">Remote sources: Downloading and Updating</h5>
 
 <ul>
 <li>The downloaded database files, when compressed, are inflated in memory</li>
-<li>The `last-modified' response header, if present, is used to condition subsequent download
-  attempts (using `if-modified-since' request headers) in order to save bandwidth
+<li>For MaxMind and HTTP downloads, the `last-modified' response header, if present,
+  is used to condition subsequent download attempts (using `if-modified-since' request headers)
+  in order to save bandwidth
   </li>
 <li>The downloaded databases are cached on the filesystem in order to more quickly achieve readiness
   on future launches of the database loader
@@ -184,7 +188,7 @@ Run `./locus analyze --help' for a description of supported options and argument
   Both of these behaviours can be tweaked through the `error_retries' and `update_period'
   loader settings (see <a href="#api-reference">function reference</a>.)
   </li>
-<li>When downloading from a MaxMind edition or an HTTPS URL, the remote certificate will be authenticated
+<li>When downloading from a MaxMind edition or an HTTP URL, the remote certificate will be authenticated
   against <a target="_parent" href="https://hexdocs.pm/tls_certificate_check/">a list of known Certification Authorities</a>
   and connection negotiation will fail in case of an expired certificate, mismatched hostname,
   self-signed certificate or unknown certification authority.

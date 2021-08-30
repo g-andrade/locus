@@ -51,7 +51,7 @@ dialyzer: $(REBAR3)
 
 test: $(REBAR3) cli
 	@$(REBAR3) do eunit, ct, cover
-	./locus analyze --log-level debug test/priv/GeoLite2-Country.tar.gz
+	./locus check --log-level debug test/priv/GeoLite2-Country.tar.gz
 
 cover: test
 

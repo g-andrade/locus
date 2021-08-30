@@ -1,4 +1,4 @@
-%% Copyright (c) 2017-2021 Guilherme Andrade
+%% Copyright (c) 2019-2021 Guilherme Andrade
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy  of this software and associated documentation files (the "Software"),
@@ -39,15 +39,18 @@
 main(Args) ->
     ensure_apps_are_started([locus, getopt]),
     case Args of
+        ["check" | CmdArgs] ->
+            handle_check_command(CmdArgs);
         ["analyze" | CmdArgs] ->
-            handle_analysis_command(CmdArgs);
+            locus_logger:log_warning("The `analyze` command is now called `check`", []),
+            handle_check_command(CmdArgs);
         _ ->
             fall_from_grace(
               "~n"
               "Usage: locus [<command>] [<command_args>]~n"
               "~n"
               "Available commands:~n"
-              "  analyze")
+              "  check")
     end.
 
 %% ------------------------------------------------------------------
@@ -62,7 +65,7 @@ ensure_apps_are_started(Apps) ->
       Apps).
 
 prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
-    DatabaseId = cli_analysis,
+    DatabaseId = cli_check,
     BaseOpts = [{event_subscriber, self()}],
     ExtraOpts =
         case locus_util:parse_absolute_http_url(DatabaseURL) of
@@ -105,10 +108,10 @@ stderr_println(Fmt, Args) ->
     io:format(standard_error, Fmt ++ "~n", Args).
 
 %% ------------------------------------------------------------------
-%% Internal Function Definitions - Analysis
+%% Internal Function Definitions - Check
 %% ------------------------------------------------------------------
 
-handle_analysis_command(CmdArgs) ->
+handle_check_command(CmdArgs) ->
     OptSpecList =
         [{load_timeout, undefined, "load-timeout",
           {integer, 30}, "Database load timeout (in seconds)"},
@@ -117,31 +120,55 @@ handle_analysis_command(CmdArgs) ->
           {string, "error"}, "debug | info | warning | error"},
 
          {url, undefined, undefined,
-          utf8_binary, "Database URL (local or remote)"}],
+          utf8_binary, "Database URL (local or remote)"},
+
+         {warnings_as_errors, undefined, "warnings-as-errors",
+          {boolean, false}, "Treat check warnings as errors"}],
 
     case getopt:parse_and_check(OptSpecList, CmdArgs) of
         {ok, {ParsedArgs, []}} ->
             {load_timeout, LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
             {log_level, StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
             {url, DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
+            {warnings_as_errors, WarningsAsErrors} = lists:keyfind(warnings_as_errors,
+                                                                   1, ParsedArgs),
             LoadTimeout = timer:seconds(LoadTimeoutSecs),
             LogLevel = list_to_atom(StrLogLevel),
             ok = locus_logger:set_loglevel(LogLevel),
-            prepare_database(DatabaseURL, LoadTimeout, fun perform_analysis/1);
+            prepare_database(DatabaseURL, LoadTimeout,
+                             fun (DatabaseId) ->
+                                     perform_check(DatabaseId, WarningsAsErrors)
+                             end);
         _ ->
-            getopt:usage(OptSpecList, "locus analyze"),
+            getopt:usage(OptSpecList, "locus check"),
             fall_from_grace()
     end.
 
-perform_analysis(DatabaseId) ->
-    stderr_println("Analyzing database for flaws..."),
-    case locus:analyze(DatabaseId) of
+perform_check(DatabaseId, WarningsAsErrors) ->
+    stderr_println("Checking database for flaws..."),
+    case locus:check(DatabaseId) of
         ok ->
             stderr_println("Database is wholesome.");
-        {error, {flawed, Flaws}} ->
+        {validation_warnings, Warnings}
+          when not WarningsAsErrors ->
+            stderr_println("Database has a few quirks but is otherwise wholesome:~n"
+                           ++ lists:flatten(["* ~p~n" || _ <- Warnings]),
+                           WarningsAsErrors);
+        {validation_warnings, Warnings}
+          when WarningsAsErrors ->
+            stderr_println("Database has a few quirks:~n"
+                           ++ lists:flatten(["* ~p~n" || _ <- Warnings]),
+                           WarningsAsErrors);
+        {validation_errors, Errors, [] = _Warnings} ->
             fall_from_grace("Database is corrupt or incompatible:~n"
-                            ++ lists:flatten(["* ~p~n" || _ <- Flaws]),
-                            Flaws)
+                            ++ lists:flatten(["* ~p~n" || _ <- Errors]),
+                            Errors);
+        {validation_errors, Errors, Warnings} ->
+            fall_from_grace("Database is corrupt or incompatible:~n"
+                            ++ lists:flatten(["* ~p~n" || _ <- Errors])
+                            ++ "~n...and also:~n"
+                            ++ lists:flatten(["* ~p~n" || _ <- Warnings]),
+                            Errors ++ Warnings)
     end.
 
 -endif.

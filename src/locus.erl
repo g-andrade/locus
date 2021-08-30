@@ -39,25 +39,11 @@
 -export([lookup/2]).                      -ignore_xref(lookup/2).
 -export([get_info/1]).                    -ignore_xref(get_info/1).
 -export([get_info/2]).                    -ignore_xref(get_info/2).
--export([analyze/1]).                     -ignore_xref(analyze/1).
+-export([check/1]).                       -ignore_xref(check/1).
 
 -ifdef(TEST).
 -export([parse_database_edition/1]).
 -endif.
-
-%% ------------------------------------------------------------------
-%% Deprecated API Function Exports
-%% ------------------------------------------------------------------
-
--export([wait_for_loader/1]).             -ignore_xref(wait_for_loader/1).
--export([wait_for_loader/2]).             -ignore_xref(wait_for_loader/2).
--export([wait_for_loaders/2]).            -ignore_xref(wait_for_loaders/2).
--export([get_version/1]).                 -ignore_xref(get_version/1).
-
--deprecated([{wait_for_loader, 1, eventually}]).
--deprecated([{wait_for_loader, 2, eventually}]).
--deprecated([{wait_for_loaders, 2, eventually}]).
--deprecated([{get_version, 1, eventually}]).
 
 %% ------------------------------------------------------------------
 %% CLI-only Function Exports
@@ -98,10 +84,10 @@
 -type database_error() :: database_unknown | database_not_loaded.
 -export_type([database_error/0]).
 
--type database_entry() :: locus_mmdb:lookup_success().
+-type database_entry() :: locus_mmdb_data:value().
 -export_type([database_entry/0]).
 
--type ip_address_prefix() :: locus_mmdb:ip_address_prefix().
+-type ip_address_prefix() :: locus_mmdb_tree:ip_address_prefix().
 -export_type([ip_address_prefix/0]).
 
 -type database_info() ::
@@ -111,7 +97,7 @@
      }.
 -export_type([database_info/0]).
 
--type database_metadata() :: locus_mmdb:metadata().
+-type database_metadata() :: locus_mmdb_metadata:t().
 -export_type([database_metadata/0]).
 
 -type database_source() :: locus_loader:source().
@@ -230,7 +216,7 @@ start_loader(DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts)
             when DatabaseId :: atom(),
                  Error :: not_found.
 stop_loader(DatabaseId) ->
-    locus_database:stop(DatabaseId).
+    locus_database:stop(DatabaseId, _Reason = normal).
 
 %% @doc Like `:loader_child_spec/2' but with default options
 %%
@@ -466,10 +452,8 @@ await_loader(DatabaseId, Timeout) ->
 await_loaders(DatabaseIds, Timeout) ->
     ReplyRef = make_ref(),
     UniqueDatabaseIds = lists:usort(DatabaseIds),
-    WaiterOpts = [],
-    Waiters = launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds),
-    EmulateLegacyBehaviour = false,
-    perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
+    Waiters = launch_waiters(ReplyRef, Timeout, UniqueDatabaseIds),
+    perform_wait(ReplyRef, Waiters, #{}, #{}).
 
 %% @doc Looks-up info on IPv4 and IPv6 addresses.
 %%
@@ -482,7 +466,7 @@ await_loaders(DatabaseIds, Timeout) ->
 %% Returns:
 %% <ul>
 %% <li>`{ok, Entry}' in case of success</li>
-%% <li>`{error, not_found}' if no data was found for this `Address'.</li>
+%% <li>`not_found' if no data was found for this `Address'.</li>
 %% <li>`{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
 %%    tuple or a valid textual representation of an IP address.</li>
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
@@ -490,15 +474,20 @@ await_loaders(DatabaseIds, Timeout) ->
 %% <li>`{error, ipv4_database}' if `Address' represents an IPv6 address and the database
 %%      only supports IPv4 addresses.</li>
 %% </ul>
--spec lookup(DatabaseId, Address) -> {ok, Entry} | {error, Error}
+-spec lookup(DatabaseId, Address) -> {ok, Entry} | not_found | {error, Error}
             when DatabaseId :: atom(),
-                 Address :: inet:ip_address() | nonempty_string() | binary(),
+                 Address :: inet:ip_address() | string() | binary(),
                  Entry :: database_entry(),
-                 Error :: (not_found | invalid_address |
-                           database_unknown | database_not_loaded |
+                 Error :: (database_unknown | database_not_loaded |
+                           {invalid_address, Address} |
                            ipv4_database).
 lookup(DatabaseId, Address) ->
-    locus_mmdb:lookup(DatabaseId, Address).
+    case locus_database:find(DatabaseId) of
+        {ok, Database, _Source, _Version} ->
+            locus_mmdb:lookup_address(Address, Database);
+        Error ->
+            Error
+    end.
 
 %% @doc Returns the properties of a currently loaded database.
 %%
@@ -518,11 +507,12 @@ lookup(DatabaseId, Address) ->
                  Info :: database_info(),
                  Error :: database_unknown | database_not_loaded.
 get_info(DatabaseId) ->
-    case locus_mmdb:get_parts(DatabaseId) of
-        {ok, Parts} ->
-            {ok, info_from_db_parts(Parts)};
-        {error, Error} ->
-            {error, Error}
+    case locus_database:find(DatabaseId) of
+        {ok, Database, Source, Version} ->
+            Info = database_info(Database, Source, Version),
+            {ok, Info};
+        Error ->
+            Error
     end.
 
 %% @doc Returns a specific property of a currently loaded database.
@@ -561,127 +551,31 @@ get_info(DatabaseId, Property) ->
 %%
 %% Returns:
 %% <ul>
-%% <li>`ok' if the database is wholesome</li>
-%% <li>`{error, {flawed, [Flaw, ...]]}}' in case of corruption or incompatibility
-%%    (see the definition of {@link locus_mmdb:analysis_flaw/0})
+%% <li>`ok' if the database is wholesome.</li>
+%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
+%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% <li>`{validation_warnings, [CheckWarning, ...]}' in case something smells within the database
+%%    (see the definition of {@link locus_mmdb_check:warning/0})
 %% </li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
+%% <li>`{validation_errors, [CheckError], [...]}' in case of corruption or incompatibility
+%%    (see the definition of {@link locus_mmdb_check:error/0})
+%% </li>
 %% </ul>
--spec analyze(DatabaseId) -> ok | {error, Error}
+-spec check(DatabaseId) -> ok
+                           | {error, Error}
+                           | {validation_warnings, [ValidationWarning, ...]}
+                           | {validation_errors, [ValidationError, ...], [ValidationWarning]}
             when DatabaseId :: atom(),
-                 Error :: ({flawed, [locus_mmdb:analysis_flaw(), ...]} |
-                           database_unknown |
-                           database_not_loaded).
-analyze(DatabaseId) ->
-    locus_mmdb:analyze(DatabaseId).
-
-%% ------------------------------------------------------------------
-%% Deprecated API Function Definitions
-%% ------------------------------------------------------------------
-
-%% @doc Blocks caller execution until either readiness is achieved or a database load attempt fails.
-%% @deprecated Use {@link await_loader/1} instead.
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
-%% </ul>
--spec wait_for_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadedVersion :: database_version(),
-                 Error :: database_unknown | {loading, LoadingError},
-                 LoadingError :: term().
-wait_for_loader(DatabaseId) ->
-    wait_for_loader(DatabaseId, infinity).
-
-%% @doc Like `wait_for_loader/1' but it can time-out.
-%% @deprecated Use {@link await_loader/2} instead.
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {loading, term()}}' if loading the database failed for some reason.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
-%% </ul>
--spec wait_for_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
-            when DatabaseId :: atom(),
-                 Timeout :: timeout(),
-                 LoadedVersion :: database_version(),
-                 Reason :: database_unknown | {loading, term()} | timeout.
-wait_for_loader(DatabaseId, Timeout) ->
-    case wait_for_loaders([DatabaseId], Timeout) of
-        {ok, #{DatabaseId := LoadedVersion}} ->
-            {ok, LoadedVersion};
-        {error, {DatabaseId, Reason}} ->
-            {error, Reason};
-        {error, timeout} ->
-            {error, timeout}
+                 Error :: database_unknown | database_not_loaded,
+                 ValidationWarning :: locus_mmdb_check:warning(),
+                 ValidationError :: locus_mmdb_check:error().
+check(DatabaseId) ->
+    case locus_database:find(DatabaseId) of
+        {ok, Database, _Source, _Version} ->
+            check_(Database);
+        {error, _} = Error ->
+            Error
     end.
-
-%% @doc Like `wait_for_loader/2' but it can concurrently await status from more than one database.
-%% @deprecated Use {@link await_loaders/2} instead.
-%%
-%% <ul>
-%% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
-%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
-%% <li>`{error, {DatabaseId, database_unknown}}'
-%%      if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {DatabaseId, {loading, term()}}}'
-%%      if loading `DatabaseId' failed for some reason.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
-%% </ul>
--spec wait_for_loaders(DatabaseIds, Timeout) -> {ok, LoadedVersionPerDatabase} | {error, Reason}
-            when DatabaseIds :: [DatabaseId],
-                 Timeout :: timeout(),
-                 LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
-                 LoadedVersion :: database_version(),
-                 Reason ::{DatabaseId, LoaderFailure} | timeout,
-                 LoaderFailure :: database_unknown | {loading, term()}.
-wait_for_loaders(DatabaseIds, Timeout) ->
-    ReplyRef = make_ref(),
-    UniqueDatabaseIds = lists:usort(DatabaseIds),
-    EmulateLegacyBehaviour = true,
-    WaiterOpts = [{emulate_legacy_behaviour, EmulateLegacyBehaviour}],
-    Waiters = launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds),
-    perform_wait(ReplyRef, Waiters, #{}, #{}, EmulateLegacyBehaviour).
-
-%% @doc Returns the currently loaded database version.
-%% @deprecated Please use {@link get_info/2} instead.
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' in case of success</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
-%% </ul>
--spec get_version(DatabaseId) -> {ok, LoadedVersion} | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadedVersion :: database_version(),
-                 Error :: database_unknown | database_not_loaded.
-get_version(DatabaseId) ->
-    get_info(DatabaseId, version).
 
 %% ------------------------------------------------------------------
 %% CLI-only Function Definitions
@@ -737,11 +631,6 @@ parse_http_url(DatabaseURL) ->
     of
         false ->
             false;
-        {ok, {Scheme, "", "geolite.maxmind.com", Port,
-              "/download/geoip/database/GeoLite2-" ++ Suffix, _, _}}
-          when Scheme =:= http, Port =:= 80;
-               Scheme =:= https, Port =:= 443 ->
-            parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList);
         {ok, _Result} ->
             {http, ByteList};
         {error, _Reason} ->
@@ -749,29 +638,6 @@ parse_http_url(DatabaseURL) ->
     catch
         error:badarg -> false
     end.
-
-parse_discontinued_geolite2_http_url(DatabaseURL, Suffix, ByteList) ->
-    case Suffix of
-        "Country.tar.gz" ->
-            log_warning_on_use_of_discontinued_geolite2_http_url(DatabaseURL, 'GeoLite2-Country'),
-            {maxmind, 'GeoLite2-Country'};
-        "City.tar.gz" ->
-            log_warning_on_use_of_discontinued_geolite2_http_url(DatabaseURL, 'GeoLite2-City'),
-            {maxmind, 'GeoLite2-City'};
-        "ASN.tar.gz" ->
-            log_warning_on_use_of_discontinued_geolite2_http_url(DatabaseURL, 'GeoLite2-ASN'),
-            {maxmind, 'GeoLite2-ASN'};
-        _ ->
-            {http, ByteList}
-    end.
-
-log_warning_on_use_of_discontinued_geolite2_http_url(LegacyURL, DatabaseEdition) ->
-    locus_logger:log_warning(
-      "Public access to GeoLite2 was discontinued on 2019-12-30"
-      "; converting legacy URL for your convenience.~n"
-      "Update your `:start_loader' and `:loader_child_spec' calls to silence this message.~n"
-      "(Use the tuple {maxmind, '~ts'} instead of the legacy URL \"~ts\")",
-      [DatabaseEdition, LegacyURL]).
 
 parse_filesystem_url(DatabaseURL) ->
     try unicode:characters_to_list(DatabaseURL) of
@@ -785,45 +651,36 @@ parse_filesystem_url(DatabaseURL) ->
         error:badarg -> false
     end.
 
-info_from_db_parts(Parts) ->
-    maps:with([metadata, source, version], Parts).
+-spec database_info(locus_mmdb:database(), locus_loader:source(), calendar:datetime())
+        -> database_info().
+database_info(Database, Source, Version) ->
+    #{metadata := Metadata} = Database,
+    #{metadata => Metadata, source => Source, version => Version}.
 
 opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
 
-launch_waiters(ReplyRef, Timeout, WaiterOpts, UniqueDatabaseIds) ->
-    [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout, WaiterOpts)}
+launch_waiters(ReplyRef, Timeout, UniqueDatabaseIds) ->
+    [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout)}
      || DatabaseId <- UniqueDatabaseIds].
 
-perform_wait(_ReplyRef, [], Successes, Failures, EmulateLegacyBehaviour) ->
+perform_wait(_ReplyRef, [], Successes, Failures) ->
     case map_size(Failures) =:= 0 of
         true ->
             {ok, Successes};
         false ->
-            false = EmulateLegacyBehaviour, % an assertion of self-consistency
             {error, {Failures, Successes}}
     end;
-perform_wait(ReplyRef, WaitersLeft, Successes, Failures, EmulateLegacyBehaviour) ->
+perform_wait(ReplyRef, WaitersLeft, Successes, Failures) ->
     case receive_waiter_reply(ReplyRef) of
         {DatabaseId, {ok, Version}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
             UpdatedSuccesses = Successes#{ DatabaseId => Version },
-            perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses,
-                         Failures, EmulateLegacyBehaviour);
-        {DatabaseId, {error, Reason}}
-          when EmulateLegacyBehaviour ->
-            {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
-            stop_waiters(RemainingWaitersLeft),
-            flush_waiter_replies(ReplyRef),
-            case Reason =:= timeout of
-                true  -> {error, timeout};
-                false -> {error, {DatabaseId, Reason}}
-            end;
+            perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses, Failures);
         {DatabaseId, {error, Reason}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
             UpdatedFailures = Failures#{ DatabaseId => Reason },
-            perform_wait(ReplyRef, RemainingWaitersLeft, Successes,
-                         UpdatedFailures, EmulateLegacyBehaviour)
+            perform_wait(ReplyRef, RemainingWaitersLeft, Successes, UpdatedFailures)
     end.
 
 receive_waiter_reply(ReplyRef) ->
@@ -832,44 +689,12 @@ receive_waiter_reply(ReplyRef) ->
             {DatabaseId, Reply}
     end.
 
-flush_waiter_replies(ReplyRef) ->
-    receive
-        {ReplyRef, _, _} ->
-            flush_waiter_replies(ReplyRef)
-    after
-        0 -> ok
+check_(Database) ->
+    case locus_mmdb_check:run(Database) of
+        ok ->
+            ok;
+        {warnings, Warnings} ->
+            {validation_warnings, Warnings};
+        {errors, Errors, Warnings} ->
+            {validation_errors, Errors, Warnings}
     end.
-
-stop_waiters(Waiters) ->
-    Deadline = erlang:monotonic_time(millisecond) + 5000,
-    PidPerMonitor
-        = lists:foldl(
-            fun ({_DatabaseId, WaiterPid}, Acc) ->
-                    WaiterMon = monitor(process, WaiterPid),
-                    unlink(WaiterPid),
-                    exit(WaiterPid, normal),
-                    Acc#{WaiterMon => WaiterPid}
-            end,
-            #{}, Waiters),
-
-    await_waiters_termination(PidPerMonitor, Deadline).
-
-await_waiters_termination(PidPerMonitor, Deadline)
-  when map_size(PidPerMonitor) > 0 ->
-    Timeout = max(0, Deadline - erlang:monotonic_time(millisecond)),
-    receive
-        {'DOWN', WaiterMon, _, _, _}
-          when is_map_key(WaiterMon, PidPerMonitor) ->
-            {_, Remaining} = maps:take(WaiterMon, PidPerMonitor),
-            await_waiters_termination(Remaining, Deadline)
-    after
-        Timeout ->
-            lists:foreach(
-              fun ({WaiterMon, WaiterPid}) ->
-                      demonitor(WaiterMon, [flush]),
-                      exit(WaiterPid, kill)
-              end,
-              maps:to_list(PidPerMonitor))
-    end;
-await_waiters_termination(#{}, _Deadline) ->
-    ok.

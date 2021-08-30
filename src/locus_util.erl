@@ -48,8 +48,13 @@
     purge_term_of_very_large_binaries/1,
     resolve_http_location/2,
     censor_url_query/2,
-    parse_absolute_http_url/1
+    parse_absolute_http_url/1,
+    is_termination_reason_harmless/1
    ]).
+
+-ifndef(TEST).
+-hank([{unnecessary_function_arguments, [{is_shutdown_subreason_harmless, 1, 1}]}]).
+-endif.
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -286,6 +291,19 @@ parse_absolute_http_url(URI) ->
             {error, {Reason, Context}}
     end.
 
+-spec is_termination_reason_harmless(term()) -> boolean().
+is_termination_reason_harmless(Reason) ->
+    case Reason of
+        normal ->
+            true;
+        shutdown ->
+            true;
+        {shutdown, SubReason} ->
+            is_shutdown_subreason_harmless(SubReason);
+        _ ->
+            false
+    end.
+
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
@@ -350,6 +368,17 @@ maybe_censor_url_query_pair(Pair, PrefixesForWhichToCensorSuffix) ->
         false ->
             Pair
     end.
+
+-ifdef(TEST).
+is_shutdown_subreason_harmless(simulated_crash) ->
+    % A way of simulating crash reactions without spamming the console
+    false;
+is_shutdown_subreason_harmless(_) ->
+    true.
+-else.
+is_shutdown_subreason_harmless(_SubReason) ->
+    true.
+-endif.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Unit Tests

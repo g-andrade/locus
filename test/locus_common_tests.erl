@@ -43,8 +43,7 @@
          invalid_args_test/1,
          subscriber_death_test/1,
          loader_child_spec_test/1,
-         await_loader_failures_test/0,
-         wait_for_loader_failures_test/0]).
+         await_loader_failures_test/0]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -75,20 +74,9 @@
 
 -spec test_successful_loader_await(atom()) -> ok.
 test_successful_loader_await(Loader) ->
-    case rand:uniform(2) of
-        1 ->
-            {ok, LoadedVersion} = locus:await_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
-            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
-            LoadedVersion;
-        2 ->
-            {ok, LoadedVersion} = locus:wait_for_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:wait_for_loaders([Loader], 500),
-            {ok, LoadedVersion} = locus:await_loader(Loader),
-            {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
-            LoadedVersion
-    end.
+    {ok, LoadedVersion} = locus:await_loader(Loader),
+    {ok, #{Loader := LoadedVersion}} = locus:await_loaders([Loader], 500),
+    LoadedVersion.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -101,9 +89,9 @@ ipv4_country_lookup_test(Config) ->
     ok = locus:start_loader(Loader, LoadFrom),
     test_successful_loader_await(Loader),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV4_STR_ADDR),
-    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
-    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
-    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
 
 -spec ipv4_invalid_addr_test(config()) -> ok.
@@ -112,7 +100,7 @@ ipv4_invalid_addr_test(Config) ->
     Loader = ipv4_invalid_addr_test,
     ok = locus:start_loader(Loader, LoadFrom),
     test_successful_loader_await(Loader),
-    ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
+    ?assertEqual({error, {invalid_address, "256.0.1.2"}}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
 
 -spec ipv6_country_lookup_test(config()) -> ok.
@@ -122,9 +110,9 @@ ipv6_country_lookup_test(Config) ->
     ok = locus:start_loader(Loader, LoadFrom),
     test_successful_loader_await(Loader),
     {StrAddr, BinAddr, Addr} = address_forms(?IPV6_STR_ADDR),
-    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
-    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
-    ?assertMatch({ok, #{ prefix := _, <<"country">> := _ }}, locus:lookup(Loader, Addr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, StrAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, BinAddr)),
+    ?assertMatch({ok, #{ <<"country">> := _ }}, locus:lookup(Loader, Addr)),
     ok = locus:stop_loader(Loader).
 
 -spec ipv6_invalid_addr_test(config()) -> ok.
@@ -133,14 +121,13 @@ ipv6_invalid_addr_test(Config) ->
     Loader = ipv6_invalid_addr_test,
     ok = locus:start_loader(Loader, LoadFrom),
     test_successful_loader_await(Loader),
-    ?assertEqual({error, invalid_address}, locus:lookup(Loader, "256.0.1.2")),
+    ?assertEqual({error, {invalid_address, "256.0.1.2"}}, locus:lookup(Loader, "256.0.1.2")),
     ok = locus:stop_loader(Loader).
 
 -spec database_unknown_test() -> ok.
 database_unknown_test() ->
     Loader = database_unknown_test,
     ?assertEqual({error, database_unknown}, locus:lookup(Loader, "127.0.0.1")),
-    ?assertEqual({error, database_unknown}, locus:get_version(Loader)),
     ?assertEqual({error, database_unknown}, locus:get_info(Loader)),
     ?assertEqual({error, database_unknown}, locus:get_info(Loader, metadata)),
     ?assertEqual({error, database_unknown}, locus:get_info(Loader, source)),
@@ -198,9 +185,9 @@ loader_child_spec_test(Config) ->
     ?assertMatch({error, already_started}, locus:start_loader(Loader, LoadFrom)),
 
     % addresses can be looked up like in regular loaders
-    ?assertEqual({error, not_found}, locus:lookup(Loader, "127.0.0.1")),
-    ?assertMatch({ok, #{}},          locus:lookup(Loader, ?IPV4_STR_ADDR)),
-    ?assertMatch({ok, #{}},          locus:lookup(Loader, ?IPV6_STR_ADDR)),
+    ?assertEqual(not_found, locus:lookup(Loader, "127.0.0.1")),
+    ?assertMatch({ok, #{}}, locus:lookup(Loader, ?IPV4_STR_ADDR)),
+    ?assertMatch({ok, #{}}, locus:lookup(Loader, ?IPV6_STR_ADDR)),
 
     % if stopped like a regular loader,
     % its supervisor will decide whether to restart it
@@ -228,24 +215,6 @@ await_loader_failures_test() ->
     ?assertMatch({error, {#{Loader := database_unknown}, PartialSuccesses}}
                    when map_size(PartialSuccesses) =:= 0,
                  locus:await_loaders([Loader], 500)),
-    ok.
-
--spec wait_for_loader_failures_test() -> ok.
-wait_for_loader_failures_test() ->
-    Loader = wait_for_loader_failures_test,
-
-    ?assertEqual({error, database_unknown},
-                 locus:wait_for_loader(Loader)),
-
-    ?assertEqual({error, timeout},
-                 locus:wait_for_loader(Loader, 0)),
-    ?assertEqual({error, database_unknown},
-                 locus:wait_for_loader(Loader, 500)),
-
-    ?assertMatch({error, timeout},
-                 locus:wait_for_loaders([Loader], 0)),
-    ?assertMatch({error, {Loader, database_unknown}},
-                 locus:wait_for_loaders([Loader], 500)),
     ok.
 
 %% ------------------------------------------------------------------

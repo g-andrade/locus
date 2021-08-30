@@ -4,20 +4,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2021-08-30
 
 ### Added
 
 - support for retrieving databases using consumer-defined `locus_custom_fetcher's
+- support for decoding IEEE-754 infinities in MMDB data
+- `locus:check/1` to API (which replaces `locus:analyze/1` and can be up to *3200% faster* 🏎️)
+- details to MMDB unpacking errors
 - linting checks with `rebar3_lint`
 - dead code checks with `rebar3_hank`
 
 ### Changed
 
+- ⚠️ **return type of `locus:lookup/2`** (see MIGRATION.md)
+- database loader to use `persistent_term` instead of ETS
+- MMDB decoder to perform stricter metadata validations
+- MMDB decoder to not crash upon maps containing duplicate keys
+- databases downloaded through HTTP(S) without a `last-modified` response header to no longer
+be cached
 - imported version of `tls_certificate_check` to '~> 1.7'
 - single CT suite covering both filesystem and HTTP sources into one for each
-- databases downloaded through HTTP(S) without a `last-modified` response header are no longer
-cached
+- test coverage for the better
+
+### Removed
+
+- ⚠️ **`locus:wait_for_loader/1` from API** (deprecated in 1.10.0 - see MIGRATION.md)
+- ⚠️ **`locus:wait_for_loader/2` from API** (deprecated in 1.10.0 - see MIGRATION.md)
+- ⚠️ **`locus:wait_for_loaders/2` from API** (deprecated in 1.10.0 - see MIGRATION.md)
+- ⚠️ **`locus:get_version/1` from API** (deprecated in 1.4.0 - see MIGRATION.md)
+- ⚠️ **`locus:analyze/1` from API** (`locus:check/1` now fullfils this role - see MIGRATION.md)
+- **deprecated loader options** `pre_readiness_update_period` and `post_readiness_update_period`
+(see MIGRATION.md)
+- warnings on the use of discontinued GeoLite2 HTTP URLs
 
 ## [1.16.1] - 2021-07-12
 
