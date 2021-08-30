@@ -168,7 +168,9 @@ the `locus` CLI utility:
     ```
 
 The script will exit with code 1 in case of failure, and 0 otherwise.
+
 Warnings can produce failure through the `--warnings-as-errors` flag.
+
 Run `./locus check --help` for a description of supported options and
 arguments.
 

@@ -167,8 +167,8 @@ Alternatively, they can also be checked from the command line by use of the `loc
 </pre>
 </li>
 </ol>
-The script will exit with code 1 in case of failure, and 0 otherwise.
-Warnings can produce failure through the `--warnings-as-errors' flag.
+<p>The script will exit with code 1 in case of failure, and 0 otherwise.</p>
+<p>Warnings can produce failure through the `--warnings-as-errors' flag.</p>
 Run `./locus check --help' for a description of supported options and arguments.
 
 <h5 id="remote-sources-downloading-and-updating">Remote sources: Downloading and Updating</h5>
