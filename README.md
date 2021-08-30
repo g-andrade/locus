@@ -165,17 +165,17 @@ the `locus` CLI utility:
     ```
 
 The script will exit with code 1 in case of failure, and 0 otherwise.
-Warnings can produce failure through the ``--warnings-as-errors` flag.
-Run `./locus check --help`` for a description of supported options and
+Warnings can produce failure through the `--warnings-as-errors` flag.
+Run `./locus check --help` for a description of supported options and
 arguments.
 
 ##### Remote sources: Downloading and Updating
 
   - The downloaded database files, when compressed, are inflated in
     memory
-  - The `last-modified` response header, if present, is used to
-    condition subsequent download attempts (using `if-modified-since`
-    request headers) in order to save bandwidth
+  - For MaxMind and HTTP downloads, the `last-modified` response header,
+    if present, is used to condition subsequent download attempts (using
+    `if-modified-since` request headers) in order to save bandwidth
   - The downloaded databases are cached on the filesystem in order to
     more quickly achieve readiness on future launches of the database
     loader
@@ -186,7 +186,7 @@ arguments.
     hours. Both of these behaviours can be tweaked through the
     `error_retries` and `update_period` loader settings (see [function
     reference](#api-reference).)
-  - When downloading from a MaxMind edition or an HTTPS URL, the remote
+  - When downloading from a MaxMind edition or an HTTP URL, the remote
     certificate will be authenticated against [a list of known
     Certification
     Authorities](https://hexdocs.pm/tls_certificate_check/) and

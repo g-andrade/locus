@@ -166,15 +166,16 @@ Alternatively, they can also be checked from the command line by use of the `loc
 </li>
 </ol>
 The script will exit with code 1 in case of failure, and 0 otherwise.
-Warnings can produce failure through the `--warnings-as-errors` flag.
+Warnings can produce failure through the `--warnings-as-errors' flag.
 Run `./locus check --help' for a description of supported options and arguments.
 
 <h5 id="remote-sources-downloading-and-updating">Remote sources: Downloading and Updating</h5>
 
 <ul>
 <li>The downloaded database files, when compressed, are inflated in memory</li>
-<li>The `last-modified' response header, if present, is used to condition subsequent download
-  attempts (using `if-modified-since' request headers) in order to save bandwidth
+<li>For MaxMind and HTTP downloads, the `last-modified' response header, if present,
+  is used to condition subsequent download attempts (using `if-modified-since' request headers)
+  in order to save bandwidth
   </li>
 <li>The downloaded databases are cached on the filesystem in order to more quickly achieve readiness
   on future launches of the database loader
@@ -185,7 +186,7 @@ Run `./locus check --help' for a description of supported options and arguments.
   Both of these behaviours can be tweaked through the `error_retries' and `update_period'
   loader settings (see <a href="#api-reference">function reference</a>.)
   </li>
-<li>When downloading from a MaxMind edition or an HTTPS URL, the remote certificate will be authenticated
+<li>When downloading from a MaxMind edition or an HTTP URL, the remote certificate will be authenticated
   against <a target="_parent" href="https://hexdocs.pm/tls_certificate_check/">a list of known Certification Authorities</a>
   and connection negotiation will fail in case of an expired certificate, mismatched hostname,
   self-signed certificate or unknown certification authority.
