@@ -32,12 +32,7 @@
 
 -type value()
     :: map_()
-    |  nonmap_value().
-
--export_type([value/0]).
-
--type nonmap_value()
-    :: utf8_string()
+    |  utf8_string()
     |  double()
     |  bytes()
     |  uint16()
@@ -49,7 +44,7 @@
     |  boolean()
     |  float_().
 
--export_type([nonmap_value/0]).
+-export_type([value/0]).
 
 -type utf8_string() :: unicode:unicode_binary().
 -export_type([utf8_string/0]).

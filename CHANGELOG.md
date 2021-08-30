@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - no longer warranted run time dependency (`public_key`)
 
+### Fixed
+
+- no longer warranted type definition
+
 ## [2.0.0] - 2021-08-30
 
 ### Added
