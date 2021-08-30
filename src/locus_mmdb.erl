@@ -42,6 +42,17 @@
         [unpack_tree_data_and_data_section/2]).
 
 %% ------------------------------------------------------------------
+%% Debug API Function Exports
+%% ------------------------------------------------------------------
+
+-export([parse_all_data_section_values/1,
+         parse_data_section_value/2]).
+
+-ignore_xref(
+        [parse_all_data_section_values/1,
+         parse_data_section_value/2]).
+
+%% ------------------------------------------------------------------
 %% API Type Definitions
 %% ------------------------------------------------------------------
 
@@ -160,6 +171,30 @@ lookup_address(Address, Database) ->
         {error, einval} ->
             {error, {invalid_address, Address}}
     end.
+
+%% ------------------------------------------------------------------
+%% Debug API Function Definitions
+%% ------------------------------------------------------------------
+
+-spec parse_all_data_section_values(file:name_all())
+        -> [locus_mmdb_data_raw:value()].
+%% @private
+parse_all_data_section_values(Filename) ->
+    {ok, EncodedDatabase} = file:read_file(Filename),
+    {ok, Database} = unpack_database_(EncodedDatabase),
+    #{data_section := DataSection} = Database,
+    locus_mmdb_data_codec:parse_all(DataSection, _Raw = true).
+
+-spec parse_data_section_value(file:name_all(), locus_mmdb_data_codec:index())
+        -> locus_mmdb_data_raw:value().
+%% @private
+parse_data_section_value(Filename, Index) ->
+    {ok, EncodedDatabase} = file:read_file(Filename),
+    {ok, Database} = unpack_database_(EncodedDatabase),
+    #{data_section := DataSection} = Database,
+    {Entry, _RemainingData} = locus_mmdb_data_codec:parse_on_index(Index, DataSection,
+                                                                   _Raw = true),
+    Entry.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

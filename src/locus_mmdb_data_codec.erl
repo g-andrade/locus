@@ -41,6 +41,12 @@
 -export([validate_indices_in_tree/7]).
 
 %% ------------------------------------------------------------------
+%% Debug API Function Exports
+%% ------------------------------------------------------------------
+
+-export([parse_all/2]).
+
+%% ------------------------------------------------------------------
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
@@ -132,6 +138,18 @@ validate_indices_in_tree(BitArray, VisitedBitArray, MapKeysBitArray,
                           journal = Journal},
 
     validate_positions_in_tree_recur(Aux, _CurrentOffset = BatchOffset).
+
+%% ------------------------------------------------------------------
+%% Debug API Function Definitions
+%% ------------------------------------------------------------------
+
+-spec parse_all(binary(), boolean()) -> [locus_mmdb_data:value()
+                                         | locus_mmdb_data_raw:value()].
+%% @private
+parse_all(FullData, Raw) ->
+    WrappingFun = parser_wrapping_fun(Raw),
+    Opts = #parse_opts{wrapping_fun = WrappingFun},
+    parse_all_recur(_Chunk = FullData, FullData, Opts, _Acc = []).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Parsing
@@ -820,3 +838,21 @@ validate_direct_array_value(Aux, Position, {error, Reason}, Path) ->
                                                           Position, Reason,
                                                           lists:reverse(Path)),
     throw(controlled_validation_error).
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Debugging
+%% ------------------------------------------------------------------
+
+parse_all_recur(<<>>, _FullData, _Opts, Acc) ->
+    lists:reverse(Acc);
+parse_all_recur(Chunk, FullData, Opts, Acc) ->
+    try parse_chunk(Chunk, FullData, Opts, _Path = []) of
+        {Value, RemainingData} ->
+            UpdatedAcc = [Value | Acc],
+            parse_all_recur(RemainingData, FullData, Opts, UpdatedAcc)
+    catch
+        Class:Reason:Stacktrace ->
+            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
+            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
+            erlang:raise(Class, SaferReason, SaferStacktrace)
+    end.
