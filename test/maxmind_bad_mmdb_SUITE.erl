@@ -34,14 +34,29 @@
 %% ------------------------------------------------------------------
 
 all() ->
-    [{group, individual_tests}].
+    [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
 groups() ->
-    [{individual_tests, [],
-      [Function || {Function, 1} <- ?MODULE:module_info(exports),
-                   lists:suffix("_test", atom_to_list(Function))]
-     }].
+    BaseDatabasePath = filename:join(?PROJECT_ROOT, ?DATABASES_ROOT_DIR),
+    DatabasePathsPattern = filename:join([BaseDatabasePath, "**", "*.mmdb"]),
+    DatabasePaths = filelib:wildcard(DatabasePathsPattern),
+    lists:filtermap(
+      fun (DatabasePath) ->
+              true = lists:prefix(BaseDatabasePath, DatabasePath),
+              DatabasePathTailLength = length(DatabasePath) - length(BaseDatabasePath),
+              DatabasePathTail = lists:sublist(DatabasePath, length(BaseDatabasePath) + 1,
+                                               DatabasePathTailLength),
+              Group = list_to_atom(DatabasePathTail),
+              {true, {Group, [parallel], test_cases()}}
+      end,
+      DatabasePaths).
 
+test_cases() ->
+    Exports = ?MODULE:module_info(exports),
+    [Function || {Function, 1} <- Exports,
+                 lists:suffix("_test", atom_to_list(Function))].
+
+%%%%%%%%%%%%%%%
 init_per_suite(Config) ->
     {ok, _} = application:ensure_all_started(locus),
     Config.
@@ -49,55 +64,28 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok = application:stop(locus).
 
+init_per_group(Group, Config) ->
+    BaseDatabasePath = filename:join(?PROJECT_ROOT, ?DATABASES_ROOT_DIR),
+    DatabasePathTail = atom_to_list(Group),
+    DatabasePath = BaseDatabasePath ++ DatabasePathTail,
+    [{group, Group},
+     {database_path, DatabasePath}
+     | Config].
+
+end_per_group(_Group, _Config) ->
+    ok.
+
 %% ------------------------------------------------------------------
 %% Test Cases
 %% ------------------------------------------------------------------
 
-offset_integer_overflow_test(_Config) ->
-    expect_database_decode_failure("libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb").
-
-cyclic_data_structure_test(_Config) ->
-    expect_database_decode_failure("maxminddb-golang/cyclic-data-structure.mmdb").
-
-invalid_bytes_length_test(_Config) ->
-    expect_database_decode_failure("maxminddb-golang/invalid-bytes-length.mmdb").
-
-invalid_data_record_offset_test(_Config) ->
-    expect_database_decode_failure("maxminddb-golang/invalid-data-record-offset.mmdb").
-
-invalid_map_key_length_test(_Config) ->
-    expect_database_decode_failure("maxminddb-golang/invalid-map-key-length.mmdb").
-
-invalid_string_length_test(_Config) ->
-    expect_database_decode_failure("maxminddb-golang/invalid-string-length.mmdb").
-
-metadata_is_an_uint128_test(_Config) ->
-    expect_database_decode_failure("maxminddb-golang/metadata-is-an-uint128.mmdb").
-
-unexpected_bytes_test(_Config) ->
-    expect_database_decode_failure("maxminddb-golang/unexpected-bytes.mmdb").
-
-bad_unicode_in_map_key_test(_Config) ->
-    expect_database_decode_failure("maxminddb-python/bad-unicode-in-map-key.mmdb").
-
-%% ------------------------------------------------------------------
-%% Internal
-%% ------------------------------------------------------------------
-
-expect_database_decode_failure(TailPath) ->
-    {ok, BinDatabase} = read_database(TailPath),
-    case locus_mmdb:unpack_database(BinDatabase) of
-        {ok, _Database} ->
-            ct:pal("Database version successfully unpacked", []),
-            error(unexpected_success);
-        {error, Reason} ->
-            ct:pal("Unable to unpack database: ~p", [Reason]),
+fail_to_unpack_or_check_test(Config) ->
+    {_, DatabasePath} = lists:keyfind(database_path, 1, Config),
+    {ok, EncodedDatabase} = file:read_file(DatabasePath),
+    case locus_mmdb:unpack_database(EncodedDatabase) of
+        {ok, Database} ->
+            ?assertMatch({errors, [_|_], _},
+                         locus_mmdb_check:run(Database));
+        {error, _} ->
             ok
     end.
-
-read_database(TailPath) ->
-    FullPath = database_path(TailPath),
-    file:read_file(FullPath).
-
-database_path(TailPath) ->
-    filename:join([?PROJECT_ROOT, ?DATABASES_ROOT_DIR, TailPath]).
