@@ -16,7 +16,7 @@ network, cached on the filesystem and updated automatically.
 
 ## Usage
 
-### 1\. Configure your license key
+#### 1\. Configure your license key
 
 **Skip this step if you're not loading databases directly from
 MaxMind.**
@@ -31,7 +31,7 @@ Then clone the repository, run `make shell` and declare your key:
 application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 ```
 
-### 2\. Start the database loader
+#### 2\. Start the database loader
 
 ``` erlang
 ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
@@ -42,13 +42,13 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 %   implementing the locus_custom_fetcher behaviour.
 ```
 
-### 3\. Wait for the database to load (optional)
+#### 3\. Wait for the database to load (optional)
 
 ``` erlang
 {ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
 ```
 
-### 4\. Look up IP addresses
+#### 4\. Look up IP addresses
 
 ``` erlang
 
