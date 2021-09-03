@@ -21,6 +21,8 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc Loads and unpacks databases while managing any associated assets 
+%% (e.g. reading from and writing to cache)
 -module(locus_loader).
 -behaviour(gen_server).
 

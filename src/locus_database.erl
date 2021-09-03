@@ -21,6 +21,8 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc Launches `locus_database_loader' and later shares the unpacked database,
+%% as well as any updates to it, through `persistent_term'.
 -module(locus_database).
 -behaviour(gen_server).
 
@@ -234,12 +236,10 @@ find(Id) ->
     end.
 
 -ifdef(TEST).
-%% @private
 whereis(Id) ->
     ServerName = server_name(Id),
     erlang:whereis(ServerName).
 
-%% @private
 list_subscribers(Id) ->
     ServerName = server_name(Id),
     State = sys:get_state(ServerName),

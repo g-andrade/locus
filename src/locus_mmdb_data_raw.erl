@@ -24,6 +24,10 @@
 %% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
 %% MaxMind DB File Format Specification</a>
 
+%% @doc API for working with MMDB - raw data representation (it preserves
+%% the original type for when it's necessary to distinguish between e.g.
+%% `{uint32, 0}' and `{uint16, 0}', which `locus_mmdb_data' does not allow for.)
+%%
 -module(locus_mmdb_data_raw).
 
 %% ------------------------------------------------------------------

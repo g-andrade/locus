@@ -14,9 +14,9 @@ network, cached on the filesystem and updated automatically.
 > ⚠️ For instructions on how to upgrade to 2.x, check
 > [`MIGRATION.md`](https://github.com/g-andrade/locus/blob/master/MIGRATION.md)
 
-#### Usage
+## Usage
 
-##### 1\. Configure your license key
+### 1\. Configure your license key
 
 **Skip this step if you're not loading databases directly from
 MaxMind.**
@@ -31,7 +31,7 @@ Then clone the repository, run `make shell` and declare your key:
 application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 ```
 
-##### 2\. Start the database loader
+### 2\. Start the database loader
 
 ``` erlang
 ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
@@ -42,13 +42,13 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 %   implementing the locus_custom_fetcher behaviour.
 ```
 
-##### 3\. Wait for the database to load (optional)
+### 3\. Wait for the database to load (optional)
 
 ``` erlang
 {ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
 ```
 
-##### 4\. Look up IP addresses
+### 4\. Look up IP addresses
 
 ``` erlang
 
@@ -97,7 +97,7 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
                   <<"zh-CN">> => <<"美国"/utf8>>}}}}
 ```
 
-#### Documentation
+## Documentation
 
 1.  [Supported File Formats](#supported-file-formats)
 2.  [Database Types and Loading](#database-types-and-loading)
@@ -116,7 +116,7 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 13. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
 14. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
 
-##### Supported File Formats
+### Supported File Formats
 
   - gzip-compressed tarballs (`.tar.gz`, `.tgz`)
   - plain tarballs (`.tar`)
@@ -132,7 +132,7 @@ the [`data cache
 container`](https://maxmind.github.io/MaxMind-DB/#data-cache-container---12)
 data type.
 
-##### Database Types and Loading
+### Database Types and Loading
 
   - The free GeoLite2 [Country, City and ASN
     databases](https://dev.maxmind.com/geoip/geoip2/geolite2/) were all
@@ -145,7 +145,7 @@ data type.
     and the original binary search tree is used to lookup addresses. The
     data for each entry is decoded on the fly upon successful lookups.
 
-##### Database Validation
+### Database Validation
 
 Databases, local or remote, can have their compatibility validated
 through the `locus:check/1` function after they've been loaded (see
@@ -174,7 +174,7 @@ Warnings can produce failure through the `--warnings-as-errors` flag.
 Run `./locus check --help` for a description of supported options and
 arguments.
 
-##### Remote sources: Downloading and Updating
+### Remote sources: Downloading and Updating
 
   - The downloaded database files, when compressed, are inflated in
     memory
@@ -200,7 +200,7 @@ arguments.
     certification authority. These checks can be disabled by specifying
     the `insecure` loader option.
 
-##### Remote sources: Caching
+### Remote sources: Caching
 
   - Caching is a best effort; the system falls back to relying
     exclusively on the network if needed
@@ -225,7 +225,7 @@ arguments.
   - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
 
-##### Local sources: Loading and Updating
+### Local sources: Loading and Updating
 
   - The loaded database files, when compressed, are inflated in memory
   - The database modification timestamp is used to condition subsequent
@@ -238,7 +238,7 @@ arguments.
     and `update_period` loader settings (see [function
     reference](#api-reference).)
 
-##### Logging
+### Logging
 
   - Five logging levels are supported: `debug`, `info`, `warning`,
     `error` and `none`
@@ -252,7 +252,7 @@ arguments.
     application's `env` config
   - To tweak the log level in runtime, use `locus_logger:set_loglevel/1`
 
-##### Event Subscriptions
+### Event Subscriptions
 
   - Any number of event subscribers can be attached to a database loader
     by specifying the `{event_subscriber, Subscriber}` option when
@@ -264,16 +264,16 @@ arguments.
     in the loader pipeline are reported (download started, download
     succeeded, download failed, caching succeeded, loading failed, etc.)
 
-##### API Reference
+### API Reference
 
 The API reference can be found on [HexDocs](https://hexdocs.pm/locus/).
 
-##### Tested setup
+### Tested setup
 
   - Erlang/OTP 22 or newer
   - rebar3
 
-##### License
+### License
 
 MIT License
 
@@ -301,13 +301,13 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 `locus` is an independent project and has not been authorized,
 sponsored, or otherwise approved by MaxMind.
 
-##### Alternative Providers
+### Alternative Providers
 
   - [DB-IP.com](https://db-ip.com/db/): lite databases seem to work but
     setting up auto-update for them is not practical, as there's no
     "latest" URL.
 
-##### Alternative Libraries (Erlang)
+### Alternative Libraries (Erlang)
 
   - [egeoip](https://github.com/mochi/egeoip): IP Geolocation module,
     currently supporting the MaxMind GeoLite City Database
@@ -320,7 +320,7 @@ sponsored, or otherwise approved by MaxMind.
   - [ip2location-erlang](https://github.com/ip2location/ip2location-erlang):
     Uses IP2Location geolocation database
 
-##### Alternative Libraries (Elixir)
+### Alternative Libraries (Elixir)
 
   - [asn](https://hex.pm/packages/asn): IP-to-AS-to-ASname lookup
   - [freegeoip](https://hex.pm/packages/freegeoip): Simple wrapper for
@@ -335,8 +335,4 @@ sponsored, or otherwise approved by MaxMind.
     location to a Plug connection based upon the client IP address by
     using MaxMind's GeoIP2 database
   - [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
-    from a location efficiently using PostGIS and Ecto
-
------
-
-*Generated by EDoc*
+    rom a location efficiently using PostGIS and Ecto

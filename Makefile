@@ -62,18 +62,10 @@ shell:
 console: shell
 
 doc: $(REBAR3)
-	@$(REBAR3) edoc
-
-README.md: doc
-	# non-portable dirty hack follows (pandoc 2.1.1 used)
-	# gfm: "github-flavoured markdown"
-	@pandoc --from html --to gfm doc/overview-summary.html -o README.md
-	@tail -n +11 <"README.md"   >"README.md_"
-	@head -n -12 <"README.md_"  >"README.md"
-	@tail -n  2  <"README.md_" >>"README.md"
-	@rm "README.md_"
+	./support/scripts/generate_docs.sh
 
 publish: $(REBAR3)
+publish: doc
 	@$(REBAR3) hex publish
 
 cli: $(REBAR3)

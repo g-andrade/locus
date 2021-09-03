@@ -24,6 +24,7 @@
 %% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
 %% MaxMind DB File Format Specification</a>
 
+%% @doc API for working with MMDB - data codec
 -module(locus_mmdb_data_codec).
 
 -hank([{unnecessary_function_arguments, [{just_the_value, 2, 1}]}]).

@@ -21,6 +21,7 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc The main API
 -module(locus).
 
 %% ------------------------------------------------------------------
@@ -133,7 +134,6 @@
 %% </ul>
 %% @see await_loader/1
 %% @see await_loader/2
-%% @see start_loader/1
 %% @see start_loader/3
 -spec start_loader(DatabaseId, LoadFrom) -> ok | {error, Error}
             when DatabaseId :: atom(),
@@ -169,7 +169,6 @@ start_loader(DatabaseId, LoadFrom) ->
 %% </ul>
 %% @see await_loader/1
 %% @see await_loader/2
-%% @see start_loader/1
 %% @see start_loader/2
 -spec start_loader(DatabaseId, LoadFrom, Opts) -> ok | {error, Error}
             when DatabaseId :: atom(),
@@ -555,10 +554,10 @@ get_info(DatabaseId, Property) ->
 %% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
 %% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
 %% <li>`{validation_warnings, [CheckWarning, ...]}' in case something smells within the database
-%%    (see the definition of {@link locus_mmdb_check:warning/0})
+%%    (check the definitions in {@link locus_mmdb_check})
 %% </li>
 %% <li>`{validation_errors, [CheckError], [...]}' in case of corruption or incompatibility
-%%    (see the definition of {@link locus_mmdb_check:error/0})
+%%    (check the definitions in {@link locus_mmdb_check})
 %% </li>
 %% </ul>
 -spec check(DatabaseId) -> ok
@@ -593,7 +592,6 @@ main(Args) ->
 %% ------------------------------------------------------------------
 
 -spec parse_database_edition(database_edition()) -> {maxmind, atom()}.
-%% @private
 parse_database_edition({maxmind, Atom})
   when is_atom(Atom) ->
     {maxmind, Atom};

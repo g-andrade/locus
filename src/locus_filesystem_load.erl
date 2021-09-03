@@ -21,6 +21,7 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc Loads a file from the filesystem without blocking the caller
 -module(locus_filesystem_load).
 -behaviour(gen_server).
 

@@ -24,6 +24,7 @@
 %% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
 %% MaxMind DB File Format Specification</a>
 
+%% @doc API for working with MMDB
 -module(locus_mmdb).
 
 -ifdef(TEST).

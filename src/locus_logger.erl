@@ -21,6 +21,8 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc Logging of `locus_database' events; can be adjusted in app config
+%% as well as at run time.
 -module(locus_logger).
 -behaviour(locus_event_subscriber).
 

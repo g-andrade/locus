@@ -24,6 +24,7 @@
 %% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
 %% MaxMind DB File Format Specification</a>
 
+%% @doc API for working with MMDB - metadata
 -module(locus_mmdb_metadata).
 
 %% ------------------------------------------------------------------
@@ -60,7 +61,7 @@
 -export_type([binary_format_version/0]).
 
 -type parse_or_validation_error()
-    :: {marker_not_found, <<_:(14 * 8)>>}
+    :: {marker_not_found, bitstring()}
     |  {atom(), term(), list()} % Stacktrace
     |  {not_a_map, term()}
     |  {incompatible_binary_format_version, {locus_mmdb_data_raw:uint16(),

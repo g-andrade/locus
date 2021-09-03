@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- documentation from edoc to ExDoc
+
 ## [2.1.0] - 2021-08-30
 
 ### Added
@@ -27,7 +33,7 @@ which had been checked previously
 
 ### Added
 
-- support for retrieving databases using consumer-defined `locus_custom_fetcher's
+- support for retrieving databases using consumer-defined `locus_custom_fetcher`s
 - support for decoding IEEE-754 infinities in MMDB data
 - `locus:check/1` to API (which replaces `locus:analyze/1` and can be up to *3200% faster* 🏎️)
 - details to MMDB unpacking errors

@@ -21,6 +21,7 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc Callbacks for providing your own database fetcher
 -module(locus_custom_fetcher).
 -behaviour(gen_server).
 

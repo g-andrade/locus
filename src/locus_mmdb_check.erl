@@ -21,6 +21,7 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc API for working with MMDB - wholesomeness check
 -module(locus_mmdb_check).
 
 -include_lib("stdlib/include/assert.hrl").

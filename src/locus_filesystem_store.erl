@@ -21,6 +21,7 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
+%% @doc Stores a file in the filesystem without blocking the caller
 -module(locus_filesystem_store).
 -behaviour(gen_server).
 
