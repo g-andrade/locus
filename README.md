@@ -18,8 +18,8 @@ network, cached on the filesystem and updated automatically.
 
 #### 1\. Configure your license key
 
-**Skip this step if you're not loading databases directly from
-MaxMind.**
+*Skip this step if you're not loading databases directly from
+MaxMind.*
 
 Get a free [license key](https://www.maxmind.com/en/geolite2/signup)
 from MaxMind if you haven't one already. Once logged in, you'll find the
