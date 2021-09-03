@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 
 - documentation from edoc to ExDoc
+- imported version of `tls_certificate_check` to '~> 1.9'
 
 ## [2.1.0] - 2021-08-30
 
