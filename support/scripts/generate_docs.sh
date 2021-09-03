@@ -9,6 +9,7 @@ OTP_VERSION=$(erl -eval 'io:format("~ts", [erlang:system_info(otp_release)]), ha
 
 if [[ "$OTP_VERSION" < "24" ]]; then
     >&2 echo "Doc generation requires OTP 24+ (found: ${OTP_VERSION})"
+    exit 1
 fi
 
 OUR_DIRECTORY=$(dirname $0)
