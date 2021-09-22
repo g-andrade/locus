@@ -338,7 +338,7 @@ parse_chunk_head(Data) ->
             Count = BaseCount + 65821,
             {map, Count, RemainingData};
 
-        <<0:3, Size:5, ?extended_int32, Value:Size/integer-unit:8, RemainingData/bytes>>
+        <<0:3, Size:5, ?extended_int32, Value:Size/signed-integer-unit:8, RemainingData/bytes>>
           when Size =:= 4 ->
             {int32, Value, RemainingData};
         <<0:3, Size:5, ?extended_int32, Value:Size/integer-unit:8, RemainingData/bytes>>
