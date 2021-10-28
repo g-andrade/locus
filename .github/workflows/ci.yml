@@ -16,9 +16,9 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        otp_vsn: [22.0, 22.1, 22.2, 22.3,
-                  23.0, 23.1, 23.2, 23.3,
-                  24.0, 24.1]
+        otp_vsn: ['22.0', '22.1', '22.2', '22.3',
+                  '23.0', '23.1', '23.2', '23.3',
+                  '24.0', '24.1']
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v2
