@@ -38,7 +38,7 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % You can also use:
 % * an HTTP(S) URL,
 % * or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
-% * or a {custom, Module, Args} tuple, with Module
+% * or a {custom_fetcher, Module, Args} tuple, with Module
 %   implementing the locus_custom_fetcher behaviour.
 ```
 
