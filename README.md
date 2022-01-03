@@ -277,7 +277,7 @@ The API reference can be found on [HexDocs](https://hexdocs.pm/locus/).
 
 MIT License
 
-Copyright (c) 2017-2021 Guilherme Andrade
+Copyright (c) 2017-2022 Guilherme Andrade
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the
