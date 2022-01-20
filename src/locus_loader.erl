@@ -468,7 +468,7 @@ cached_database_path(#state{
                        }
                     )
   when DatabaseCacheFile =/= undefined ->
-  DatabaseCacheFile;
+    DatabaseCacheFile;
 
 cached_database_path(State) ->
     case State#state.origin of
