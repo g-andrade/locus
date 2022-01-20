@@ -338,7 +338,9 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
               (no_cache) ->
                   true;
               ({database_cache_file, File}) ->
-                  filelib:is_file(File);
+                  % Ensure directory exists
+                  Dirname = filename:dirname(File),
+                  filelib:is_dir(Dirname);
               (_) ->
                   false
           end,
