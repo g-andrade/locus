@@ -340,7 +340,11 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
               ({database_cache_file, File}) ->
                   % Ensure directory exists
                   Dirname = filename:dirname(File),
-                  filelib:is_dir(Dirname)
+                  (
+                   has_extenstion(File, ["gz", "mmdb"])
+                   and
+                   filelib:is_dir(Dirname)
+                  )
                   orelse error({badopt, Opt});
               (_) ->
                   false
@@ -873,10 +877,14 @@ extract_mmdb_from_tarball_blob(Tarball) ->
 
 -spec has_mmdb_extension(nonempty_string()) -> boolean().
 has_mmdb_extension(Filename) ->
-    case filename_extension_parts(Filename) of
-        ["mmdb"|_] -> true;
-        _ -> false
-    end.
+    has_extenstion(Filename, ["mmdb"]).
+
+% Make sure the ExpectedExtensions list is passed in reverse order.
+% So if file is "archive.tar.gz", the ExpectedExtensions list is ["gz", "tar"].
+-spec has_extenstion(nonempty_string(), [nonempty_string()]) -> boolean().
+has_extenstion(Filename, ExpectedExtensions) ->
+    ExtensionParts = filename_extension_parts(Filename),
+    lists:prefix(ExpectedExtensions, ExtensionParts).
 
 filename_extension_parts(Filename) ->
     filename_extension_parts_recur(Filename, []).
