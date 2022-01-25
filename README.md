@@ -225,7 +225,8 @@ arguments.
   - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
   - The cache database location can be customised by providing
-    `{database_cache_file, FilePath}` option for `locus_loader`.
+    `{database_cache_file, FilePath}` option for `locus_loader`
+    (`FilePath` must have a ".mmdb.gz" extension)
 
 ### Local sources: Loading and Updating
 
