@@ -204,7 +204,7 @@ arguments.
 
   - Caching is a best effort; the system falls back to relying
     exclusively on the network if needed
-  - A caching directory named `locus_erlang` is created under the
+  - By default a caching directory named `locus_erlang` is created under the
     ['user\_cache'
     basedir](http://erlang.org/doc/man/filename.html#basedir-3)
   - A cached database is named after either:
@@ -224,6 +224,9 @@ arguments.
         callbacks (for databases loaded with `locus_custom_fetcher``)
   - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
+  - The cache database location can be customised by providing
+    `{database_cache_file, FilePath}` option for `locus_loader`
+    (`FilePath` must have a ".mmdb.gz" extension)
 
 ### Local sources: Loading and Updating
 

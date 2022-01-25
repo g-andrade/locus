@@ -88,7 +88,8 @@
 -type loader_opt() ::
     {update_period, milliseconds_interval()} |
     {error_retries, error_retry_behaviour()} |
-    no_cache.
+    no_cache |
+    {database_cache_file, file:filename()}.
 -export_type([loader_opt/0]).
 
 -type milliseconds_interval() :: pos_integer().
@@ -149,7 +150,8 @@
           update_period :: pos_integer(),
           error_retry_behaviour :: error_retry_behaviour(),
           error_retry_behaviour_applies_after_readiness :: boolean(),
-          use_cache :: boolean()
+          use_cache :: boolean(),
+          database_cache_file :: file:filename() | undefined
          }).
 -type settings() :: #settings{}.
 
@@ -335,6 +337,15 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
                   orelse error({badopt, Opt});
               (no_cache) ->
                   true;
+              ({database_cache_file, File} = Opt) ->
+                  % Ensure directory exists
+                  Dirname = filename:dirname(File),
+                  (
+                   has_extenstion(File, ["gz", "mmdb"])
+                   and
+                   filelib:is_dir(Dirname)
+                  )
+                  orelse error({badopt, Opt});
               (_) ->
                   false
           end,
@@ -383,7 +394,8 @@ default_remote_origin_settings() ->
        update_period = timer:hours(6),
        error_retry_behaviour = default_remote_origin_error_retry_behaviour(),
        error_retry_behaviour_applies_after_readiness = true,
-       use_cache = true
+       use_cache = true,
+       database_cache_file = undefined
       }.
 
 default_remote_origin_error_retry_behaviour() ->
@@ -398,7 +410,8 @@ default_local_origin_settings() ->
        update_period = timer:seconds(30),
        error_retry_behaviour = default_local_origin_error_retry_behaviour(),
        error_retry_behaviour_applies_after_readiness = true,
-       use_cache = false
+       use_cache = false,
+       database_cache_file = undefined
       }.
 
 default_local_origin_error_retry_behaviour() ->
@@ -415,7 +428,9 @@ customized_settings(Settings, LoaderOpts) ->
           ({error_retries, Behaviour}, Acc) ->
               Acc#settings{ error_retry_behaviour = Behaviour };
           (no_cache, Acc) ->
-              Acc#settings{ use_cache = false}
+              Acc#settings{ use_cache = false};
+          ({database_cache_file, File}, Acc) ->
+              Acc#settings{ database_cache_file = File }
       end,
       Settings, LoaderOpts).
 
@@ -451,6 +466,15 @@ schedule_update(Interval, State)
     State#state{ update_timer = NewTimer }.
 
 -spec cached_database_path(state()) -> nonempty_string().
+cached_database_path(#state{
+                        settings = #settings{
+                                      database_cache_file = DatabaseCacheFile
+                                     }
+                       }
+                    )
+  when DatabaseCacheFile =/= undefined ->
+    DatabaseCacheFile;
+
 cached_database_path(State) ->
     case State#state.origin of
         {maxmind, EditionName} ->
@@ -853,10 +877,14 @@ extract_mmdb_from_tarball_blob(Tarball) ->
 
 -spec has_mmdb_extension(nonempty_string()) -> boolean().
 has_mmdb_extension(Filename) ->
-    case filename_extension_parts(Filename) of
-        ["mmdb"|_] -> true;
-        _ -> false
-    end.
+    has_extenstion(Filename, ["mmdb"]).
+
+% Make sure the ExpectedExtensions list is passed in reverse order.
+% So if file is "archive.tar.gz", the ExpectedExtensions list is ["gz", "tar"].
+-spec has_extenstion(nonempty_string(), [nonempty_string()]) -> boolean().
+has_extenstion(Filename, ExpectedExtensions) ->
+    ExtensionParts = filename_extension_parts(Filename),
+    lists:prefix(ExpectedExtensions, ExtensionParts).
 
 filename_extension_parts(Filename) ->
     filename_extension_parts_recur(Filename, []).
