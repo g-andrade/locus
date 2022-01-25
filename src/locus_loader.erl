@@ -337,7 +337,7 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
                   orelse error({badopt, Opt});
               (no_cache) ->
                   true;
-              ({database_cache_file, File}) ->
+              ({database_cache_file, File} = Opt) ->
                   % Ensure directory exists
                   Dirname = filename:dirname(File),
                   (
