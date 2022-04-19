@@ -19,7 +19,7 @@ CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
 .PHONY: all build clean check
 .PHONY: xref hank-dead-code-cleaner elvis-linter dialyzer
 .PHONY: test cover
-.PHONY: shell console doc publish cli
+.PHONY: shell console doc-dry publish cli
 
 .NOTPARALLEL: check cover test
 
@@ -61,11 +61,10 @@ shell:
 
 console: shell
 
-doc: $(REBAR3)
-	./support/scripts/generate_docs.sh
+doc-dry: $(REBAR3)
+	@$(REBAR3) hex publish docs --dry-run
 
 publish: $(REBAR3)
-publish: doc
 	@$(REBAR3) hex publish
 
 cli: $(REBAR3)
