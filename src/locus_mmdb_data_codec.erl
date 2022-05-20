@@ -84,7 +84,6 @@
                                -> locus_mmdb_data_raw:value()
                                   | locus_mmdb_data:value())
          }).
--type parse_opts() :: parse_opts().
 
 -record(validation_aux, {
           indices_in_tree :: locus_shared_bitarray:t(),
