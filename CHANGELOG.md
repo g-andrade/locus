@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- OTP 25 to CI
+
+### Fixed
+
+- `rebar3_lint` warnings on OTP 25
+- `rebar3_hank` warnings on OTP 25
+- Dialyzer warnings on OTP 25
+
 ## [2.3.1] - 2022-04-19
 
 ### Fixed
