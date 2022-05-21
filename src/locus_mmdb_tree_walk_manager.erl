@@ -79,9 +79,15 @@
           walk_started :: boolean(),
           counters :: counters(),
           concurrency :: pos_integer(),
-          free_workers :: [{pid(), reference()}]
+          free_workers :: [{pid(), reply_tag()}]
          }).
 -type state() :: #state{}.
+
+-if(?OTP_RELEASE < 25).
+-type reply_tag() :: reference().
+-else.
+-type reply_tag() :: gen_server:reply_tag().
+-endif.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions

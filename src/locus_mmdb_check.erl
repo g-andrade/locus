@@ -235,7 +235,8 @@ spawn_task(Fun, TaskIndex, Concurrency) ->
                   Class:Reason:Stacktrace ->
                       SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
                       SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-                      erlang:raise(Class, SaferReason, SaferStacktrace)
+                      Erlang = list_to_atom("erlang"), % Keep Dialyzer quiet
+                      erlang:apply(Erlang, raise, [Class, SaferReason, SaferStacktrace])
               end
       end).
 
