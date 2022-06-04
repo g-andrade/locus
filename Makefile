@@ -41,7 +41,11 @@ xref: $(REBAR3)
 	@$(REBAR3) xref
 
 hank-dead-code-cleaner: $(REBAR3)
-	@$(REBAR3) hank
+	@if $(REBAR3) plugins list | grep '\<rebar3_hank\>' >/dev/null; then \
+		$(REBAR3) hank; \
+	else \
+		echo >&2 "skipping rebar3_hank check"; \
+	fi
 
 elvis-linter: $(REBAR3)
 	@$(REBAR3) lint
