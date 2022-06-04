@@ -11,7 +11,7 @@ begin
     TakeOutHankIfMaybeExprNotEnabledOnEnv
         = fun (Config) ->
             Env = os:getenv(),
-            Warn = fun () -> logger:warning("Taking out `rebar3_hank`"
+            Warn = fun () -> logger:warning("Not importing `rebar3_hank`"
                                             " as maybe_expr may not be available") end,
 
             case [V || "ERL_FLAGS=" ++ V <- Env] of
