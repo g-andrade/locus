@@ -1,17 +1,45 @@
 % vim: set ft=erlang:
 begin
+    TakeOutHank
+        = fun (Config) ->
+            {project_plugins, ProjPlugins} = lists:keyfind(project_plugins, 1, Config),
+            {value, {rebar3_hank, HankVersion}, RemainingProjPlugins}
+                = lists:keytake(rebar3_hank, 1, ProjPlugins),
+            _UpdatedConfig = [{project_plugins, RemainingProjPlugins} | Config]
+          end,
+
+    TakeOutHankIfMaybeExprNotEnabledOnEnv
+        = fun (Config) ->
+            Env = os:getenv(),
+            Warn = fun () -> logger:warning("Taking out `rebar3_hank`"
+                                            " as maybe_expr may not be available") end,
+
+            case [V || "ERL_FLAGS=" ++ V <- Env] of
+                [Flags | _] ->
+                    % katana-code (a dependent of rebar3_hank) requires maybe_expr
+                    case string:find(Flags, "-enable-feature maybe_expr") of
+                        nomatch ->
+                            Warn(),
+                            TakeOutHank(Config);
+                        _ ->
+                            Config
+                    end;
+                [] ->
+                    Warn(),
+                    Config
+            end
+        end,
+
+
     OtpRelease = erlang:system_info(otp_release),
     try list_to_integer(OtpRelease) of
         22 ->
             % Take rebar3_hank away as it's no longer compatible with OTP 22
-            {project_plugins, ProjPlugins} = lists:keyfind(project_plugins, 1, CONFIG),
-            {value, {rebar3_hank, HankVersion}, RemainingProjPlugins}
-                = lists:keytake(rebar3_hank, 1, ProjPlugins),
-            _UpdatedConfig = [{project_plugins, RemainingProjPlugins} | CONFIG];
-
+            TakeOutHank(CONFIG) ;
+        25 ->
+            TakeOutHankIfMaybeExprNotEnabledOnEnv(CONFIG);
         _ ->
             CONFIG
-
     catch
         error:badarg ->
             logger:warning("Don't now how to compare to OTP release: ~tp", [OtpRelease]),

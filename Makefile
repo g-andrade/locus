@@ -16,6 +16,8 @@ endif
 
 CLI_ARTIFACT_PATH = _build/escriptize/bin/locus
 
+export ERL_FLAGS = -enable-feature maybe_expr # needed for katana-code under OTP 25
+
 .PHONY: all build clean check
 .PHONY: xref hank-dead-code-cleaner elvis-linter dialyzer
 .PHONY: test cover
