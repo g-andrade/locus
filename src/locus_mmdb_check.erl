@@ -76,7 +76,7 @@
     :: {bad_chunk_in_data_section,
         #{position := non_neg_integer(),
           why := term(),
-          under := #{path := [non_neg_integer()]}}
+          under := #{path := [{non_neg_integer(), term()}]}}
        }.
 -export_type([bad_chunk_in_data_section/0]).
 
@@ -84,7 +84,7 @@
     :: {map_key_of_wrong_type_in_data_section,
         #{position := non_neg_integer(),
           key := term(),
-          under := #{path := [non_neg_integer()]}}
+          under := #{path := [{non_neg_integer(), term()}]}}
        }.
 -export_type([map_key_of_wrong_type_in_data_section/0]).
 
@@ -93,7 +93,7 @@
         #{position := non_neg_integer(),
           original_data := binary(),
           error := term(),
-          under := #{path := [non_neg_integer()]}}
+          under := #{path := [{non_neg_integer(), term()}]}}
        }.
 -export_type([invalid_utf8_string_in_data_section/0]).
 
@@ -113,7 +113,7 @@
     :: {unprintable_utf8_string_in_data_section,
         #{position := non_neg_integer(),
           value := unicode:unicode_binary(),
-          under := #{path := [non_neg_integer()]}}
+          under := #{path := [{non_neg_integer(), term()}]}}
         }.
 -export_type([unprintable_utf8_string_in_data_section/0]).
 

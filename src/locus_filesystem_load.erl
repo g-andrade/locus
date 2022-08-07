@@ -90,7 +90,7 @@
 -record(state, {
           owner_pid :: pid(),
           source :: source(),
-          previously_modified_on :: calendar:datetime() | undefined
+          previously_modified_on :: calendar:datetime() | unknown
          }).
 -type state() :: #state{}.
 
@@ -98,7 +98,7 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start_link(source(), calendar:datetime() | undefined) -> {ok, pid()}.
+-spec start_link(source(), calendar:datetime() | unknown) -> {ok, pid()}.
 %% @private
 start_link(Source, PrevModificationDT) ->
     gen_server:start_link(?MODULE, [self(), Source, PrevModificationDT], []).
@@ -111,7 +111,7 @@ start_link(Source, PrevModificationDT) ->
         when InitArg :: OwnerPid | Source | PrevModificationDT,
              OwnerPid :: pid(),
              Source :: source(),
-             PrevModificationDT :: calendar:datetime() | undefined.
+             PrevModificationDT :: calendar:datetime() | unknown.
 %% @private
 init([OwnerPid, Source, PrevModificationDT]) ->
     _ = process_flag(trap_exit, true),

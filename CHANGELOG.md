@@ -12,9 +12,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- a few wrong specs
 - `rebar3_lint` warnings on OTP 25
 - `rebar3_hank` warnings on OTP 25
 - Dialyzer warnings on OTP 25
+- a few eqWAlizer warnings
 
 ## [2.3.1] - 2022-04-19
 

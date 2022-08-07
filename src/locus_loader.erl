@@ -440,7 +440,7 @@ finish_initialization(State)
     UpdatedState = maybe_mock_fetch_metadata_for_last_successful_load(State),
     CachedDatabasePath = cached_database_path(UpdatedState),
     Source = {cache, CachedDatabasePath},
-    {ok, FetcherPid} = locus_filesystem_load:start_link(Source, undefined),
+    {ok, FetcherPid} = locus_filesystem_load:start_link(Source, unknown),
     UpdatedState#state{ fetcher_pid = FetcherPid, fetcher_source = Source };
 finish_initialization(State) ->
     schedule_update(0, State).
@@ -496,7 +496,7 @@ cached_database_path_for_maxmind_edition_name(Edition, MaybeDate) ->
     DirectoryPath = cache_directory_path(),
     BinEdition = atom_to_binary(Edition, utf8),
     BaseFilename = locus_util:filesystem_safe_name(BinEdition),
-    FilenameIoData =
+    FilenameChardata =
         case MaybeDate of
             undefined ->
                 io_lib:format("~ts.mmdb.gz", [BaseFilename]);
@@ -504,7 +504,7 @@ cached_database_path_for_maxmind_edition_name(Edition, MaybeDate) ->
                 io_lib:format("~ts.~4..0B-~2..0B-~2..0B.mmdb.gz",
                               [BaseFilename, Year, Month, Day])
         end,
-    Filename = unicode:characters_to_list(FilenameIoData),
+    Filename = [_|_] = unicode:characters_to_list(FilenameChardata),
     filename:join(DirectoryPath, Filename).
 
 -spec cached_database_path_for_url(string()) -> nonempty_string().
@@ -523,8 +523,8 @@ cached_database_path_for_custom_fetcher(Module, FetchedFrom) ->
     ModuleName = atom_to_binary(Module, utf8),
     SafeModuleName = locus_util:filesystem_safe_name(ModuleName),
     Hash = erlang:phash2(FetchedFrom, 1 bsl 32),
-    FilenameIoData = io_lib:format("custom.~ts.~.36..b.mmdb.gz", [SafeModuleName, Hash]),
-    Filename = unicode:characters_to_list(FilenameIoData),
+    FilenameChardata = io_lib:format("custom.~ts.~.36..b.mmdb.gz", [SafeModuleName, Hash]),
+    Filename = [_|_] = unicode:characters_to_list(FilenameChardata),
     filename:join(DirectoryPath, Filename).
 
 -spec cache_directory_path() -> nonempty_string().

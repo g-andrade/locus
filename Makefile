@@ -35,6 +35,10 @@ elvis-linter:
 dialyzer:
 	@rebar3 dialyzer
 
+eqwalizer:
+	@rebar3 as eqwalizer,test compile
+	elp eqwalize-all
+
 test: cli
 	@rebar3 do eunit, ct, cover
 	./locus check --log-level debug test/priv/GeoLite2-Country.tar.gz

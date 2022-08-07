@@ -309,7 +309,7 @@ maybe_truncate_url(URL) ->
             URL
     end.
 
--spec resumed_source(locus_loader:source()) -> cache | remote | filesystem.
+-spec resumed_source(locus_loader:source()) -> cache | remote | filesystem | local.
 resumed_source({SourceType, _SourceLocation}) ->
     SourceType.
 

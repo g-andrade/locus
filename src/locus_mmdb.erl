@@ -149,7 +149,7 @@ unpack_tree_data_and_data_section(Metadata, TreeAndDataSection) ->
         <<_:TreeSize/bytes, MissingData/bits>> ->
             {error, {missing_data_after_tree,
                      {{required, {128, bits}},
-                      {bot_got, {bit_size(MissingData), bits}},
+                      {but_got, {bit_size(MissingData), bits}},
                       {at_offset, TreeSize},
                       {with_metadata, Metadata}}}};
         <<MissingTree/bytes>> ->
@@ -164,7 +164,9 @@ unpack_tree_data_and_data_section(Metadata, TreeAndDataSection) ->
     when Address :: inet:ip_address() | string() | unicode:unicode_binary(),
          Database :: database(),
          Entry :: locus_mmdb_data:value(),
-         ErrorReason :: term().
+         ErrorReason :: (database_unknown | database_not_loaded |
+                         {invalid_address, Address} |
+                         ipv4_database).
 lookup_address(Address, Database) ->
     case locus_util:parse_ip_address(Address) of
         {ok, ParsedAddress} ->

@@ -146,7 +146,8 @@ init([Counters, Concurrency]) ->
 
 -spec handle_call(term(), {pid(), reference()}, state())
         -> {noreply, state()} |
-           {reply, {ok, 0}, state()} |
+           {reply, {ok, 0, 1}, state()} |
+           {stop, normal, stop, state()} |
            {stop, {unexpected_call, #{request := _, from := {pid(), reference()}}}, state()}.
 handle_call(take_index, From, State) ->
     case State#state.walk_started of

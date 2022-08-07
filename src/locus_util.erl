@@ -170,7 +170,7 @@ is_date(Date) ->
         _:_ -> false
     end.
 
--spec purge_term_of_very_large_binaries(term()) -> term().
+-spec purge_term_of_very_large_binaries(T) -> T.
 purge_term_of_very_large_binaries([H|T]) ->
     MappedH = purge_term_of_very_large_binaries(H),
     MappedT = purge_term_of_very_large_binaries(T),

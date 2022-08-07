@@ -216,9 +216,11 @@ handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
 
 -spec handle_info(term(), state())
-        -> {noreply, state()} |
-           {stop, normal, state()} |
-           {stop, unexpected_info, state()}.
+        -> {noreply, state()}
+         | {stop, normal, state()}
+         | {stop, {database_download_stopped, pid(), term()}, state()}
+         | {stop, {checksum_download_stopped, pid(), term()}, state()}
+         | {stop, unexpected_info, state()}.
 %% @private
 handle_info({DatabaseDownloadPid, Msg}, State)
   when DatabaseDownloadPid =:= State#state.database_download_pid ->
@@ -452,7 +454,10 @@ notify_owner_process(OwnerPid, Msg) ->
     _ = erlang:send(OwnerPid, {self(), Msg}, [noconnect]),
     ok.
 
--spec handle_linked_process_death(pid(), term(), state()) -> {stop, normal, state()}.
+-spec handle_linked_process_death(pid(), term(), state())
+        -> {stop, normal, state()}
+         | {stop, {database_download_stopped, pid(), term()}, state()}
+         | {stop, {checksum_download_stopped, pid(), term()}, state()}.
 handle_linked_process_death(Pid, _, State)
   when Pid =:= State#state.owner_pid ->
     {stop, normal, State};

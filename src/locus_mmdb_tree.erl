@@ -309,8 +309,8 @@ extract_node_records(Offset, Data, RecordSize) ->
     Left = (LeftHigh bsl LeftWholeSz) bor LeftLow,
     {Left, Right}.
 
--spec bitstring_ip_address_prefix(<<_:32>>,  0..32)  -> ip4_address_prefix();
-                                 (<<_:128>>, 0..128) -> ip6_address_prefix().
+-spec bitstring_ip_address_prefix(<<_:32>> | <<_:128>>,  0..32 | 0..128)
+    -> ip4_address_prefix() | ip6_address_prefix().
 %% @private
 bitstring_ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:= 32 ->
     PrefixSize = 32 - SuffixSize,
@@ -440,7 +440,7 @@ journal_prefix_recur(Path, Aux, Prefix)
                       {A, B, C, D}
               end,
 
-    [_|_] = StringAddress = inet:ntoa(Address),
+    StringAddress = [_|_] = inet:ntoa(Address),
     StringAddress ++ "/" ++ integer_to_list(PrefixSize).
 
 journal_path(Path, Aux) ->

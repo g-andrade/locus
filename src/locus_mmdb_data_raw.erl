@@ -80,7 +80,7 @@
 -type array() :: {array, [value()]}.
 -export_type([array/0]).
 
--type boolean_() :: {bool, locus_mmdb_data:boolean_()}.
+-type boolean_() :: {boolean, locus_mmdb_data:boolean_()}.
 -export_type([boolean_/0]).
 
 -type float_() :: {float, locus_mmdb_data:float_()}.
@@ -96,8 +96,8 @@
     |  map
     |  int32
     |  uint64
-    |  int128
+    |  uint128
     |  array
-    |  bool
+    |  boolean
     |  float.
 -export_type([value_tag/0]).

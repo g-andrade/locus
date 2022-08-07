@@ -111,14 +111,14 @@ map_key_of_wrong_type_in_data_section(Journal, Position, Key, Path) ->
     register_error(Journal, Error).
 
 -spec invalid_utf8_string_in_data_section(t(), non_neg_integer(), binary(),
-                                          term(), [non_neg_integer()])
+                                          term(), [{non_neg_integer(), term()}])
         -> true.
 invalid_utf8_string_in_data_section(Journal, Position, OriginalData, ValidationError, Path) ->
     Error = invalid_utf8_string_in_data_section(Position, OriginalData, ValidationError, Path),
     register_error(Journal, Error).
 
 -spec unprintable_utf8_string_in_data_section(t(), non_neg_integer(), unicode:unicode_binary(),
-                                              [non_neg_integer()])
+                                              [{non_neg_integer(), term()}])
         -> true.
 unprintable_utf8_string_in_data_section(Journal, Position, Value, Path) ->
     Warning = unprintable_utf8_string_in_data_section(Position, Value, Path),
