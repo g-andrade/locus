@@ -52,7 +52,7 @@ shell:
 console: shell
 
 doc-dry:
-	@rebar3 hex docs --dry-run
+	@rebar3 hex build
 
 publish:
 	@rebar3 hex publish
