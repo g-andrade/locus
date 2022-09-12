@@ -8,24 +8,33 @@ begin
             _UpdatedConfig = [{project_plugins, RemainingProjPlugins} | Config]
           end,
 
-    TakeOutHankIfMaybeExprNotEnabledOnEnv
+    DisableMaybeExprOnDep
+        = fun (App, Config) ->
+            ErlOpt = {feature, maybe_expr, disable},
+            ErlOpts = {erl_opts, [ErlOpt]},
+            Override = {override, App, ErlOpts},
+            Overrides = [{overrides, [Override]}],
+            [Overrides | Config]
+          end,
+
+    DisableMaybeExprIfNotEnabledOnEnv
         = fun (Config) ->
             Env = os:getenv(),
-            Warn = fun () -> logger:warning("Not importing `rebar3_hank`"
-                                            " as maybe_expr may not be available") end,
+            Log = fun () -> rebar_api:debug("Disabling `maybe_expr` for `katana_code`"
+                                            " as it may not be available", []) end,
 
             case [V || "ERL_FLAGS=" ++ V <- Env] of
                 [Flags | _] ->
                     % katana-code (a dependent of rebar3_hank) requires maybe_expr
                     case string:find(Flags, "-enable-feature maybe_expr") of
                         nomatch ->
-                            Warn(),
-                            TakeOutHank(Config);
+                            Log(),
+                            DisableMaybeExprOnDep(katana_code, Config);
                         _ ->
                             Config
                     end;
                 [] ->
-                    Warn(),
+                    Log(),
                     Config
             end
         end,
@@ -37,7 +46,7 @@ begin
             % Take rebar3_hank away as it's no longer compatible with OTP 22
             TakeOutHank(CONFIG) ;
         25 ->
-            TakeOutHankIfMaybeExprNotEnabledOnEnv(CONFIG);
+            DisableMaybeExprIfNotEnabledOnEnv(CONFIG);
         _ ->
             CONFIG
     catch
