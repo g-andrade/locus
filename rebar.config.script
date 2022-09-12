@@ -2,40 +2,30 @@
 begin
     TakeOutHank
         = fun (Config) ->
-            {project_plugins, ProjPlugins} = lists:keyfind(project_plugins, 1, Config),
+            {project_plugins, ProjPlugins}
+                = lists:keyfind(project_plugins, 1, Config),
             {value, {rebar3_hank, HankVersion}, RemainingProjPlugins}
                 = lists:keytake(rebar3_hank, 1, ProjPlugins),
-            _UpdatedConfig = [{project_plugins, RemainingProjPlugins} | Config]
+            _UpdatedConfig
+                = lists:keystore(project_plugins, 1, Config,
+                                 {project_plugins, RemainingProjPlugins})
           end,
 
-    DisableMaybeExprOnDep
-        = fun (App, Config) ->
-            ErlOpt = {feature, maybe_expr, disable},
-            ErlOpts = {erl_opts, [ErlOpt]},
-            Override = {override, App, ErlOpts},
-            Overrides = [{overrides, [Override]}],
-            [Overrides | Config]
-          end,
-
-    DisableMaybeExprIfNotEnabledOnEnv
+    TakeOutHankIfMaybeExprNotEnabledOnEnv
         = fun (Config) ->
             Env = os:getenv(),
-            Log = fun () -> rebar_api:debug("Disabling `maybe_expr` for `katana_code`"
-                                            " as it may not be available", []) end,
 
             case [V || "ERL_FLAGS=" ++ V <- Env] of
                 [Flags | _] ->
                     % katana-code (a dependent of rebar3_hank) requires maybe_expr
                     case string:find(Flags, "-enable-feature maybe_expr") of
                         nomatch ->
-                            Log(),
-                            DisableMaybeExprOnDep(katana_code, Config);
+                            TakeOutHank(Config);
                         _ ->
                             Config
                     end;
                 [] ->
-                    Log(),
-                    Config
+                    TakeOutHank(Config)
             end
         end,
 
@@ -46,7 +36,7 @@ begin
             % Take rebar3_hank away as it's no longer compatible with OTP 22
             TakeOutHank(CONFIG) ;
         25 ->
-            DisableMaybeExprIfNotEnabledOnEnv(CONFIG);
+            TakeOutHankIfMaybeExprNotEnabledOnEnv(CONFIG);
         _ ->
             CONFIG
     catch

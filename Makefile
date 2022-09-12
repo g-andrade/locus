@@ -23,10 +23,10 @@ xref:
 	@rebar3 xref
 
 hank-dead-code-cleaner:
-	@if rebar3 plugins list | grep '\<rebar3_hank\>' >/dev/null; then \
+	@if rebar3 plugins list | grep '^rebar3_hank\>' >/dev/null; then \
 		rebar3 hank; \
 	else \
-		echo >&2 "skipping rebar3_hank check"; \
+		echo >&2 "WARN: skipping rebar3_hank check"; \
 	fi
 
 elvis-linter:
