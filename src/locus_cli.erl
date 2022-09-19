@@ -67,8 +67,9 @@ ensure_apps_are_started(Apps) ->
 prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
     DatabaseId = cli_check,
     BaseOpts = [{event_subscriber, self()}],
+    DatabaseURLStr = unicode:characters_to_list(DatabaseURL),
     ExtraOpts =
-        case locus_util:parse_absolute_http_url(DatabaseURL) of
+        case locus_util:parse_absolute_http_url(DatabaseURLStr) of
             {ok, _} -> [no_cache];
             {error, _} -> []
         end,
