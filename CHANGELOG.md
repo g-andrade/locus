@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - broken CLI check when loading database from a HTTP(S) URL
 
-## [2.3.4]
+## [2.3.4] - 2022-09-12
 
 ### Fixed
 
