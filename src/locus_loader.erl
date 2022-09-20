@@ -914,6 +914,8 @@ fetched_database_format_and_blob({remote, From}, #{headers := Headers, body := B
             {tgz, Body};
         {{_, "application/x-tgz"}, _} ->
             {tgz, Body};
+        {{_, "application/x-tar"}, <<?GZIP_MAGIC_BYTES, _/bytes>>} ->
+            {tgz, Body};
         {{_, "application/x-tar"}, _} ->
             {tarball, Body};
         {_, <<?GZIP_MAGIC_BYTES, _/bytes>>} ->
