@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        otp_vsn: ['22.3', '23.3', '24.3', '25.1']
+        otp_vsn: ['22.3', '23.3', '24.3', '25.2']
         os: ['ubuntu-20.04', 'windows-2019']
         rebar3_vsn: ['3.18', '3.19']
         exclude:
@@ -27,7 +27,7 @@ jobs:
           - rebar3_vsn: '3.18'
             otp_vsn: '24.3'
           - rebar3_vsn: '3.18'
-            otp_vsn: '25.1'
+            otp_vsn: '25.2'
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
