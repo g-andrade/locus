@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         otp_vsn: ['22.3', '23.3', '24.3', '25.1']
-        os: [ubuntu-latest, windows-latest]
+        os: ['ubuntu-20.04', 'windows-2019']
         rebar3_vsn: ['3.18', '3.19']
         exclude:
           - rebar3_vsn: '3.19'
