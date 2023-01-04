@@ -31,7 +31,7 @@ jobs:
             otp_vsn: '25.2'
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@v1.15.1
         with:
           otp-version: ${{matrix.otp_vsn}}
           rebar3-version: ${{matrix.rebar3_vsn}}
