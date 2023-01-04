@@ -31,9 +31,11 @@ jobs:
             otp_vsn: '25.2'
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@v1.15.1
         with:
           otp-version: ${{matrix.otp_vsn}}
           rebar3-version: ${{matrix.rebar3_vsn}}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: make test check
