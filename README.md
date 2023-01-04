@@ -1,7 +1,7 @@
 # locus
 
 [![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
-[![](https://github.com/g-andrade/locus/workflows/build/badge.svg)](https://github.com/g-andrade/locus/actions?query=workflow%3Abuild)
+[![](https://github.com/g-andrade/locus/actions/workflows/ci.yml/badge.svg)](https://github.com/g-andrade/locus/actions/workflows/ci.yml)
 [![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-22%20to%2025-blue)](https://www.erlang.org)
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
