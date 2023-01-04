@@ -35,8 +35,6 @@ jobs:
         with:
           otp-version: ${{matrix.otp_vsn}}
           rebar3-version: ${{matrix.rebar3_vsn}}
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: restore _build
         uses: actions/cache@v2
         with:
