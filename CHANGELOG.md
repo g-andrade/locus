@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- OTP 25.2 to CI
+- OTP 25.3 to CI
 
 ## [2.3.6] - 2022-09-20
 
