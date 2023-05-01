@@ -70,7 +70,8 @@ groups() ->
     end.
 
 should_run_remote_http_tests() ->
-    license_key_from_environment_is_defined().
+    currently_checkedout_commit_is_likely_tagged()
+    andalso license_key_from_environment_is_defined().
 
 currently_checkedout_commit_is_likely_tagged() ->
     {ok, _} = application:ensure_all_started(locus),
