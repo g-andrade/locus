@@ -55,7 +55,7 @@ jobs:
           key: ${{env.build_cache_prefix_with_hash}}-${{env.prev_github_run_number}}
           restore-keys:
             ${{env.build_cache_prefix_with_hash}}-
-            ${{env.build_cache_prefix}}
+            ${{env.build_cache_prefix}}-
 
       - run: make test check
         env:
