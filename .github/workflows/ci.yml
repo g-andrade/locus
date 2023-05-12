@@ -41,21 +41,21 @@ jobs:
 
       - name: set dynamic env (1)
         run: |
-          echo "PREV_GITHUB_RUN_NUMBER=$((${{github.run_number}} - 1))" >> "$GITHUB_ENV"
-          echo "BUILD_CACHE_PREFIX=_build-cache-for-os-${{runner.os}}-otp-${{matrix.otp_vsn}}-rebar3-${{matrix.rebar3_vsn}}" >> "$GITHUB_ENV"
+          echo "prev_github_run_number=$((${{github.run_number}} - 1))" >> "$GITHUB_ENV"
+          echo "build_cache_prefix=_build-cache-for-os-${{runner.os}}-otp-${{matrix.otp_vsn}}-rebar3-${{matrix.rebar3_vsn}}" >> "$GITHUB_ENV"
 
       - name: set dynamic env (2)
         run: |
-          echo "BUILD_CACHE_PREFIX_WITH_HASH=${{env.BUILD_CACHE_PREFIX}}-hash-${{hashFiles('rebar.lock')}}" >> "$GITHUB_ENV"
+          echo "build_cache_prefix_with_hash=${{env.build_cache_prefix}}-hash-${{hashFiles('rebar.lock')}}" >> "$GITHUB_ENV"
 
       - name: restore cached build artifacts
         uses: actions/cache/restore@v3
         with:
           path: _build
-          key: ${{env.BUILD_CACHE_PREFIX_WITH_HASH}}-${{env.PREV_GITHUB_RUN_NUMBER}}
+          key: ${{env.build_cache_prefix_with_hash}}-${{env.prev_github_run_number}}
           restore-keys:
-            ${{env.BUILD_CACHE_PREFIX_WITH_HASH}}-
-            ${{env.BUILD_CACHE_PREFIX}}-
+            ${{env.build_cache_prefix_with_hash}}-
+            ${{env.build_cache_prefix}}-
 
       - run: make test check
         env:
@@ -65,4 +65,4 @@ jobs:
         uses: actions/cache/save@v3
         with:
           path: _build
-          key: ${{env.BUILD_CACHE_PREFIX_WITH_HASH}}-${{github.run_number}}
+          key: ${{env.build_cache_prefix_with_hash}}-${{github.run_number}}
