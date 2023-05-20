@@ -20,7 +20,8 @@ jobs:
         otp_vsn: ['22.3', '23.3', '24.3', '25.3']
         os: ['ubuntu-20.04', 'windows-2019']
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - id: otp-version-to-rebar3-version
         name: "Read #{OTP version => rebar3 version} map"
@@ -29,6 +30,7 @@ jobs:
           path: ./.github/workflows/otp_version_to_rebar3_version.json
 
       - id: setup-beam
+        name: Setup BEAM
         uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp_vsn}}
@@ -61,7 +63,7 @@ jobs:
         run: |
           echo "build_cache_prefix_with_hash=${{env.build_cache_prefix}}-hash-${{hashFiles('rebar.lock')}}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: restore cached build artifacts
+      - name: Restore cached build artifacts
         uses: actions/cache/restore@v3
         with:
           path: _build
@@ -70,11 +72,15 @@ jobs:
             ${{env.build_cache_prefix_with_hash}}-
             ${{env.build_cache_prefix}}-
 
-      - run: make test check
+      - name: Run Tests
+        run: make test
         env:
           MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
 
-      - name: save build artifacts
+      - name: Run Checks
+        run: make check
+
+      - name: Save build artifacts to cache
         uses: actions/cache/save@v3
         with:
           path: _build
