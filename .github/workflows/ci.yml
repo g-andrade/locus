@@ -17,25 +17,32 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        otp_vsn: ['22.3', '23.3', '24.3', '25.3']
+        otp_vsn: ['22.3', '23.3', '24.3', '25.3', '26.0']
         os: ['ubuntu-20.04', 'windows-2019']
-        rebar3_vsn: ['3.18', '3.20']
         exclude:
-          - rebar3_vsn: '3.20'
-            otp_vsn: '22.3'
-          - rebar3_vsn: '3.18'
-            otp_vsn: '23.3'
-          - rebar3_vsn: '3.18'
-            otp_vsn: '24.3'
-          - rebar3_vsn: '3.18'
-            otp_vsn: '25.3'
+          # See:
+          # * Issue report: https://github.com/erlef/setup-beam/issues/189
+          # * Possible root cause: https://github.com/erlang/otp/issues/7261
+          - otp_vsn: '26.0'
+            os: 'windows-2019'
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - uses: erlef/setup-beam@v1
+      - id: otp-version-to-rebar3-version
+        name: "Read #{OTP version => rebar3 version} map"
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ./.github/workflows/otp_version_to_rebar3_version.json
+
+      - id: setup-beam
+        name: Setup BEAM
+        uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp_vsn}}
-          rebar3-version: ${{matrix.rebar3_vsn}}
+          # rebar3-version: https://stackoverflow.com/a/64405821
+          rebar3-version: |
+            ${{ fromJson(steps.otp-version-to-rebar3-version.outputs.content)[matrix.otp_vsn] }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -43,7 +50,7 @@ jobs:
         if: ${{runner.os != 'Windows'}}
         run: |
           echo "prev_github_run_number=$((${{github.run_number}} - 1))" >> "$GITHUB_ENV"
-          echo "build_cache_prefix=_build-cache-for-os-${{runner.os}}-otp-${{matrix.otp_vsn}}-rebar3-${{matrix.rebar3_vsn}}" >> "$GITHUB_ENV"
+          echo "build_cache_prefix=_build-cache-for-os-${{runner.os}}-otp-${{matrix.otp_vsn}}-rebar3-${{steps.setup-beam.outputs.rebar3-version}}" >> "$GITHUB_ENV"
 
       - name: "Non-Windows: set dynamic env (2)"
         if: ${{runner.os != 'Windows'}}
@@ -55,14 +62,14 @@ jobs:
         run: |
           # https://github.com/actions/runner-images/issues/5251#issuecomment-1071030822
           echo "prev_github_run_number=$(${{github.run_number}} - 1)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "build_cache_prefix=_build-cache-for-os-${{runner.os}}-otp-${{matrix.otp_vsn}}-rebar3-${{matrix.rebar3_vsn}}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "build_cache_prefix=_build-cache-for-os-${{runner.os}}-otp-${{matrix.otp_vsn}}-rebar3-${{steps.setup-beam.outputs.rebar3-version}}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: "Windows: set dynamic env (2)"
         if: ${{runner.os == 'Windows'}}
         run: |
           echo "build_cache_prefix_with_hash=${{env.build_cache_prefix}}-hash-${{hashFiles('rebar.lock')}}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: restore cached build artifacts
+      - name: Restore cached build artifacts
         uses: actions/cache/restore@v3
         with:
           path: _build
@@ -71,11 +78,16 @@ jobs:
             ${{env.build_cache_prefix_with_hash}}-
             ${{env.build_cache_prefix}}-
 
-      - run: make test check
+      - name: Run Tests
+        run: make test
         env:
           MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
 
-      - name: save build artifacts
+      - name: Run Checks
+        run: make check
+
+      - name: Save build artifacts to cache
+        if: always()
         uses: actions/cache/save@v3
         with:
           path: _build

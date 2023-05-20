@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - OTP 25.3 to CI
+- OTP 26.0 to CI (Linux only)
+
+### Changed
+
+- CI to use latest rebar3 version that's compatible with each covered OTP release
 
 ## [2.3.6] - 2022-09-20
 
