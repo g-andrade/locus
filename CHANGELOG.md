@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - OTP 25.3 to CI
-- OTP 26.0 to CI
+- OTP 26.0 to CI (Linux only)
 
 ### Changed
 
