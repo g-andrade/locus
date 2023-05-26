@@ -19,12 +19,6 @@ jobs:
       matrix:
         otp_vsn: ['22.3', '23.3', '24.3', '25.3', '26.0']
         os: ['ubuntu-20.04', 'windows-2019']
-        exclude:
-          # See:
-          # * Issue report: https://github.com/erlef/setup-beam/issues/189
-          # * Possible root cause: https://github.com/erlang/otp/issues/7261
-          - otp_vsn: '26.0'
-            os: 'windows-2019'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
