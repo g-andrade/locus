@@ -68,7 +68,7 @@ jobs:
         with:
           path: _build
           key: ${{env.build_cache_prefix_with_hash}}-${{env.prev_github_run_number}}
-          restore-keys:
+          restore-keys: |-
             ${{env.build_cache_prefix_with_hash}}-
             ${{env.build_cache_prefix}}-
 
