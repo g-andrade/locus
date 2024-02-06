@@ -47,6 +47,8 @@
 
 % https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
 -define(IPV4_IPV6_PREFIX, <<0:80, 16#FFFF:16>>).
+% see maxmind python & java
+-define(IPV4_DEFAULT_OFFSET, 96).
 
 %% ------------------------------------------------------------------
 %% API Record and Type Definitions
@@ -128,8 +130,14 @@ new(TreeData, NodeCount, RecordSize, IpVersion, DataSectionSize) ->
                          node_size = NodeSize,
                          ipv4_root_index = Ipv4RootIndex},
             {ok, Tree};
-        {error, _} = Error ->
-            Error
+        {error, _} ->
+                Tree = #tree{data = TreeData,
+                         node_count = NodeCount,
+                         record_size = RecordSize,
+                         ip_version = IpVersion,
+                         node_size = NodeSize,
+                         ipv4_root_index = ?IPV4_DEFAULT_OFFSET},
+            {ok, Tree}
     end.
 
 %% @doc Looks up for a `DataIndex' for `Address' within `Tree'
@@ -197,7 +205,7 @@ find_ipv4_root_index_recur(<<_/bits>>, _Data, NodeCount, _RecordSize,
                            _NodeSize, _DataSectionSize, NodeIndex)
   when NodeIndex =:= NodeCount ->
     % This database does not map any IPv4 addresses
-    {ok, none};
+    {ok, {tree_index, ?IPV4_DEFAULT_OFFSET}};
 find_ipv4_root_index_recur(<<BitsLeft/bits>>, _Data, NodeCount, _RecordSize,
                            _NodeSize, DataSectionSize, NodeIndex) ->
     HowManyBitsLeft = bit_size(BitsLeft),
