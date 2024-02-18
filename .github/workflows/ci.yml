@@ -21,7 +21,7 @@ jobs:
         os: ['ubuntu-20.04', 'windows-2019']
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: otp-version-to-rebar3-version
         name: "Read #{OTP version => rebar3 version} map"
@@ -64,7 +64,7 @@ jobs:
           echo "build_cache_prefix_with_hash=${{env.build_cache_prefix}}-hash-${{hashFiles('rebar.lock')}}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Restore cached build artifacts
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: _build
           key: ${{env.build_cache_prefix_with_hash}}-${{env.prev_github_run_number}}
@@ -82,7 +82,7 @@ jobs:
 
       - name: Save build artifacts to cache
         if: always()
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: _build
           key: ${{env.build_cache_prefix_with_hash}}-${{github.run_number}}
