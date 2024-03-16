@@ -1,8 +1,12 @@
 # locus
 
-[![](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
-[![](https://github.com/g-andrade/locus/actions/workflows/ci.yml/badge.svg)](https://github.com/g-andrade/locus/actions/workflows/ci.yml)
-[![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-22%20to%2026-blue)](https://www.erlang.org)
+[![Hex downloads](https://img.shields.io/hexpm/dt/locus.svg)](https://hex.pm/packages/locus)
+[![License](https://img.shields.io/hexpm/l/locus.svg)](https://github.com/g-andrade/locus/blob/master/LICENSE)
+[![Erlang Versions](https://img.shields.io/badge/Erlang%2FOTP-22%20to%2026-blue)](https://www.erlang.org)
+[![CI status](https://github.com/g-andrade/locus/actions/workflows/ci.yml/badge.svg)](https://github.com/g-andrade/locus/actions/workflows/ci.yml)
+[![Latest version](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
+[![API reference](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/locus/)
+[![Last commit](https://img.shields.io/github/last-commit/g-andrade/locus.svg)](https://github.com/g-andrade/locus/commits/master)
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
 the country, city or ASN of IP addresses using [MaxMind
