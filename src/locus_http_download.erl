@@ -168,7 +168,8 @@
           response_headers :: headers() | undefined,
           response_body :: iodata() | undefined
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -291,7 +292,7 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 -spec maybe_censor_url(url(), [opt()]) -> url().
 maybe_censor_url(URL, Opts) ->
     case proplists:get_value(censor_query, Opts, []) of
-        [_|_] = CensoredKeys ->
+        [_ | _] = CensoredKeys ->
             CensoredStringKeys = [atom_to_list(Key) || Key <- CensoredKeys],
             locus_util:censor_url_query(URL, CensoredStringKeys);
         [] ->
@@ -443,7 +444,7 @@ stream_start_redirect_for_location(Permanence, NewLocation, State) ->
     end.
 
 handle_successful_download_conclusion(Headers, Body, State) ->
-    ActualContentLength = integer_to_list( byte_size(Body) ),
+    ActualContentLength = integer_to_list(byte_size(Body)),
 
     case lists:keyfind("content-length", 1, Headers) of
         {_, DeclaredContentLength} when DeclaredContentLength =/= ActualContentLength ->
@@ -505,7 +506,7 @@ cancel_timeout(OptName, State) ->
     end.
 
 cancel_or_flush_timer(Timer, TimeoutMsg) ->
-    is_integer( erlang:cancel_timer(Timer) )
+    is_integer(erlang:cancel_timer(Timer))
     orelse receive
                TimeoutMsg -> true
            after

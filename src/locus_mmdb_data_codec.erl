@@ -794,10 +794,8 @@ validate_array(Aux, Count, RemainingData, Path) ->
 
 validate_array_recur(Aux, Count, RemainingData, Path)
   when Count > 0 ->
-    case validate_array_value(Aux, RemainingData, Path) of
-        {ok, DataAfterValue} ->
-            validate_array_recur(Aux, Count - 1, DataAfterValue, Path)
-    end;
+    {ok, DataAfterValue} = validate_array_value(Aux, RemainingData, Path),
+    validate_array_recur(Aux, Count - 1, DataAfterValue, Path);
 validate_array_recur(_Aux, Count, RemainingData, _Path)
   when Count =:= 0 ->
     {ok, RemainingData}.

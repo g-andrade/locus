@@ -127,7 +127,9 @@
           subscribers :: [atom() | pid()],
           subscriber_mons :: #{monitor() => pid()}
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
+
 -type monitor() :: reference().
 
 -record(shared_state, {

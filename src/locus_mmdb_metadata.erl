@@ -103,7 +103,7 @@
          Reason :: parse_or_validation_error().
 parse_and_validate(EncodedDatabase) ->
     case binary:matches(EncodedDatabase, <<?METADATA_MARKER>>) of
-        [_|_] = PossibleMetadataMarkers ->
+        [_ | _] = PossibleMetadataMarkers ->
             {MetadataStart, _} = lists:last(PossibleMetadataMarkers),
             <<TreeAndDataSection:MetadataStart/bytes,
               ?METADATA_MARKER,

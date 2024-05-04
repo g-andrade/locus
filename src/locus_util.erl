@@ -24,8 +24,6 @@
 %% @private
 -module(locus_util).
 
--include_lib("kernel/include/file.hrl").
-
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
@@ -95,7 +93,7 @@ parse_ip_address(_Invalid) ->
 
 -spec lists_anymap(fun ((term()) -> boolean() | {true, term()}), list())
         -> {true, term()} | false.
-lists_anymap(Fun, [H|T]) ->
+lists_anymap(Fun, [H | T]) ->
     case Fun(H) of
         {true, Mapped} -> {true, Mapped};
         true -> {true, H};
@@ -171,7 +169,7 @@ is_date(Date) ->
     end.
 
 -spec purge_term_of_very_large_binaries(T) -> T.
-purge_term_of_very_large_binaries([H|T]) ->
+purge_term_of_very_large_binaries([H | T]) ->
     MappedH = purge_term_of_very_large_binaries(H),
     MappedT = purge_term_of_very_large_binaries(T),
     [MappedH | MappedT];
@@ -310,17 +308,17 @@ is_termination_reason_harmless(Reason) ->
 %% ------------------------------------------------------------------
 
 -spec lists_take_recur(term(), list(), list()) -> {ok, list()} | error.
-lists_take_recur(Elem, [H|T], Acc) when Elem =:= H ->
+lists_take_recur(Elem, [H | T], Acc) when Elem =:= H ->
     {ok, lists:reverse(Acc, T)};
-lists_take_recur(Elem, [H|T], Acc) ->
-    lists_take_recur(Elem, T, [H|Acc]);
+lists_take_recur(Elem, [H | T], Acc) ->
+    lists_take_recur(Elem, T, [H | Acc]);
 lists_take_recur(_, [], _) ->
     error.
 
 -spec flush_link_exit(pid(), timeout()) -> boolean().
 flush_link_exit(Pid, Timeout) ->
     receive
-        {'EXIT', Pid, _} -> true
+        {'EXIT', P, _} when P =:= Pid -> true
     after
         Timeout -> false
     end.
@@ -334,7 +332,7 @@ url_query_encode_codepoint(Codepoint)
        Codepoint =:= $.;
        Codepoint =:= $_ ->
     <<Codepoint>>;
-url_query_encode_codepoint($\ ) ->
+url_query_encode_codepoint(32) -> % codepoint for `$\ ` which Elvis doesnt like
     <<$+>>;
 url_query_encode_codepoint(Codepoint) ->
     UTF8Bytes = <<Codepoint/utf8>>,

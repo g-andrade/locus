@@ -65,15 +65,16 @@
 %% Record and Type Definitions
 %% ------------------------------------------------------------------
 
--type args() :: #{locality := local | remote,
-                  pid := pid()}.
+-type args() :: #{locality := local | remote, pid := pid()}.
+-export_type([args/0]).
 
 -record(state, {
           path :: nonempty_string(),
           database :: database() | undefined
          }).
 
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 -record(database, {
           format :: locus_loader:blob_format(),

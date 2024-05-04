@@ -102,7 +102,8 @@
           database_download_success :: undefined | locus_http_download:success(),
           checksum_download_pid :: undefined | pid()
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions

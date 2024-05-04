@@ -84,7 +84,7 @@ fail_to_unpack_or_check_test(Config) ->
     {ok, EncodedDatabase} = file:read_file(DatabasePath),
     case locus_mmdb:unpack_database(EncodedDatabase) of
         {ok, Database} ->
-            ?assertMatch({errors, [_|_], _},
+            ?assertMatch({errors, [_ | _], _},
                          locus_mmdb_check:run(Database));
         {error, _} ->
             ok

@@ -81,7 +81,8 @@
           concurrency :: pos_integer(),
           free_workers :: [{pid(), reply_tag()}]
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 -if(?OTP_RELEASE < 25).
 -type reply_tag() :: reference().

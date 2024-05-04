@@ -70,7 +70,8 @@
           content :: iodata(),
           modified_on :: calendar:datetime()
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions

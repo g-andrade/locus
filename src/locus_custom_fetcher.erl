@@ -25,6 +25,8 @@
 -module(locus_custom_fetcher).
 -behaviour(gen_server).
 
+-include_lib("stdlib/include/assert.hrl").
+
 %% ------------------------------------------------------------------
 %% Callback Declarations
 %% ------------------------------------------------------------------
@@ -112,7 +114,7 @@
 -type event_load_attempt_dismissed() :: {load_attempt_dismissed, source()}.
 -export_type([event_load_attempt_dismissed/0]).
 
--type source() :: {local|remote, {custom, term()}}.
+-type source() :: {local | remote, {custom, term()}}.
 -export_type([source/0]).
 
 %% ------------------------------------------------------------------
@@ -133,7 +135,8 @@
           args :: term(),
           previous_fetch_metadata :: successful_fetch_metadata() | undefined
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 %% ------------------------------------------------------------------
 %% "Private" API Function Definitions
@@ -153,13 +156,13 @@ source(Module, Args) ->
 -spec description(module(), term()) -> description().
 %% @private
 description(Module, Args) ->
-    case Module:description(Args) of
-        #{database_is_stored_remotely := IsRemote,
-          database_is_fetched_from := _
-         } = Description
-          when is_boolean(IsRemote) ->
-            Description
-    end.
+    #{
+      database_is_stored_remotely := IsRemote,
+      database_is_fetched_from := _
+     } = Description = Module:description(Args),
+
+    ?assertMatch(_ when is_boolean(IsRemote), IsRemote),
+    Description.
 
 -spec start_link(source(), module(), term(), successful_fetch_metadata() | undefined)
         -> {ok, pid()}.

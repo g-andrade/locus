@@ -75,10 +75,8 @@ prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
         end,
 
     stderr_println("Loading database from \"~ts\"...", [DatabaseURL]),
-    case locus:start_loader(DatabaseId, DatabaseURL, BaseOpts ++ ExtraOpts) of
-        ok ->
-            wait_for_database_load(DatabaseId, LoadTimeout, SuccessHandler)
-    end.
+    ok = locus:start_loader(DatabaseId, DatabaseURL, BaseOpts ++ ExtraOpts),
+    wait_for_database_load(DatabaseId, LoadTimeout, SuccessHandler).
 
 wait_for_database_load(DatabaseId, LoadTimeout, SuccessHandler) ->
     receive

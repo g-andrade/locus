@@ -94,7 +94,7 @@ unpack_and_check_database_test(Config) ->
             ?assertMatch(ok, unpack_and_check_database(Config));
         true ->
             ?assertMatch(
-               {errors, [_|_], _},
+               {errors, [_ | _], _},
                unpack_and_check_database(Config))
     end.
 

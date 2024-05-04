@@ -57,7 +57,7 @@ start_child(Args) ->
     try supervisor:start_child(?SERVER, Args) of
         Result -> Result
     catch
-        exit:{Reason, {gen_server, call, [?SERVER|_]}}
+        exit:{Reason, {gen_server, call, [?SERVER | _]}}
           when Reason =:= noproc;
                Reason =:= normal;
                Reason =:= shutdown;

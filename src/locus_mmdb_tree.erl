@@ -97,7 +97,7 @@
           walk_manager :: locus_mmdb_tree_walk_manager:handle(),
           journal :: locus_mmdb_check_journal:t(),
           data :: binary(),
-          max_depth :: 128|32
+          max_depth :: 128 | 32
          }).
 
 %% ------------------------------------------------------------------
@@ -111,7 +111,7 @@
     when TreeData :: binary(),
          NodeCount :: non_neg_integer(),
          RecordSize :: non_neg_integer(),
-         IpVersion :: 4|6,
+         IpVersion :: 4 | 6,
          DataSectionSize :: non_neg_integer(),
          Tree :: t(),
          Reason :: term().
@@ -248,7 +248,7 @@ ip_address_to_bitstring({A, B, C, D, E, F, G, H}, Tree) ->
     end.
 
 lookup_bit_address(BitAddress, RootIndex, Tree) ->
-    case lookup_bit_address_recur(BitAddress, _NodeIndex = RootIndex, Tree) of
+    case lookup_bit_address_recur(BitAddress, RootIndex, Tree) of
         {ok, DataIndex} ->
             {ok, DataIndex};
         not_found ->
@@ -334,7 +334,7 @@ bitstring_ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:
 %% ------------------------------------------------------------------
 
 tree_depth_from_path(Path) ->
-    floor( math:log2(Path) ) + 1.
+    floor(math:log2(Path)) + 1.
 
 validate_(NodeIndex, Fun, WalkManager, Journal, Tree, Path, Depth) ->
     Aux = #validation_aux{node_count = Tree#tree.node_count,
@@ -444,7 +444,7 @@ journal_prefix_recur(Path, Aux, Prefix)
                       {A, B, C, D}
               end,
 
-    StringAddress = [_|_] = inet:ntoa(Address),
+    StringAddress = [_ | _] = inet:ntoa(Address),
     StringAddress ++ "/" ++ integer_to_list(PrefixSize).
 
 journal_path(Path, Aux) ->

@@ -75,7 +75,7 @@
 -type event_load_attempt_dismissed() :: {load_attempt_dismissed, source()}.
 -export_type([event_load_attempt_dismissed/0]).
 
--type source() :: {cache|filesystem, path()}.
+-type source() :: {cache | filesystem, path()}.
 -export_type([source/0]).
 
 -type success() ::
@@ -92,7 +92,8 @@
           source :: source(),
           previously_modified_on :: calendar:datetime() | unknown
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions

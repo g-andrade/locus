@@ -144,7 +144,8 @@
           cacher_path :: locus_filesystem_store:path() | undefined,
           cacher_source :: source() | undefined
          }).
--type state() :: #state{}.
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 -record(settings, {
           update_period :: pos_integer(),
@@ -504,7 +505,7 @@ cached_database_path_for_maxmind_edition_name(Edition, MaybeDate) ->
                 io_lib:format("~ts.~4..0B-~2..0B-~2..0B.mmdb.gz",
                               [BaseFilename, Year, Month, Day])
         end,
-    Filename = [_|_] = unicode:characters_to_list(FilenameChardata),
+    Filename = [_ | _] = unicode:characters_to_list(FilenameChardata),
     filename:join(DirectoryPath, Filename).
 
 -spec cached_database_path_for_url(string()) -> nonempty_string().
@@ -524,7 +525,7 @@ cached_database_path_for_custom_fetcher(Module, FetchedFrom) ->
     SafeModuleName = locus_util:filesystem_safe_name(ModuleName),
     Hash = erlang:phash2(FetchedFrom, 1 bsl 32),
     FilenameChardata = io_lib:format("custom.~ts.~.36..b.mmdb.gz", [SafeModuleName, Hash]),
-    Filename = [_|_] = unicode:characters_to_list(FilenameChardata),
+    Filename = [_ | _] = unicode:characters_to_list(FilenameChardata),
     filename:join(DirectoryPath, Filename).
 
 -spec cache_directory_path() -> nonempty_string().
@@ -967,9 +968,8 @@ fetched_database_modification_datetime({filesystem, _}, #{modified_on := Modific
 
 %-spec make_cached_database_blob(nonempty_string(), binary()) -> binary().
 make_cached_database_blob(CachedTarballPath, EncodedDatabase) ->
-    case filename_extension_parts(CachedTarballPath) of
-        ["gz", "mmdb" | _] -> zlib:gzip(EncodedDatabase)
-    end.
+    ?assertMatch(["gz", "mmdb" | _], filename_extension_parts(CachedTarballPath)),
+    zlib:gzip(EncodedDatabase).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions - Monitoring and Events

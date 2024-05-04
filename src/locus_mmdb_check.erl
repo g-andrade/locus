@@ -24,8 +24,6 @@
 %% @doc API for working with MMDB - wholesomeness check
 -module(locus_mmdb_check).
 
--include_lib("stdlib/include/assert.hrl").
-
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -187,15 +185,16 @@ validate_data_indices(BitArray, DataSection, Journal) ->
     VisitedBitArray = locus_shared_bitarray:new(byte_size(DataSection)),
     MapKeysBitArray = locus_shared_bitarray:new(byte_size(DataSection)),
 
-    case run_concurrent_tasks(
-           fun (TaskIndex, Concurrency) ->
-                   BatchSize = Concurrency,
-                   BatchOffset = TaskIndex,
-                   validate_data_indices_batch(BitArray, VisitedBitArray, MapKeysBitArray,
-                                               BatchSize, BatchOffset, DataSection,
-                                               Journal)
-           end)
-    of
+    Result = run_concurrent_tasks(
+               fun (TaskIndex, Concurrency) ->
+                       BatchSize = Concurrency,
+                       BatchOffset = TaskIndex,
+                       validate_data_indices_batch(BitArray, VisitedBitArray, MapKeysBitArray,
+                                                   BatchSize, BatchOffset, DataSection,
+                                                   Journal)
+               end),
+
+    case Result of
         {ok, _} ->
             ok;
         {error, _} = Error ->
@@ -223,7 +222,7 @@ spawn_concurrent_tasks(Concurrency, TaskFun) ->
                    || TaskIndex <- lists:seq(0, Concurrency - 1)],
 
     {PidsList, MonitorsList} = lists:unzip(PidMonitors),
-    maps:from_list( lists:zip(MonitorsList, PidsList) ).
+    maps:from_list(lists:zip(MonitorsList, PidsList)).
 
 spawn_task(Fun, TaskIndex, Concurrency) ->
     spawn_monitor(
