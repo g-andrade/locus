@@ -1,14 +1,25 @@
 % vim: set ft=erlang:
 begin
-    TakeOutHank
-        = fun (Config) ->
+    TakeOutProjPlugin
+        = fun (Name, Config) ->
             {project_plugins, ProjPlugins}
                 = lists:keyfind(project_plugins, 1, Config),
-            {value, {rebar3_hank, HankVersion}, RemainingProjPlugins}
-                = lists:keytake(rebar3_hank, 1, ProjPlugins),
+            {value, {_, Version}, RemainingProjPlugins}
+                = lists:keytake(Name, 1, ProjPlugins),
+            logger:info("Dropping proj plugin '~ts' ~ts", [Name, Version]),
             _UpdatedConfig
                 = lists:keystore(project_plugins, 1, Config,
                                  {project_plugins, RemainingProjPlugins})
+          end,
+
+    TakeOutElvis
+        = fun (Config) ->
+            TakeOutProjPlugin(rebar3_lint, Config)
+          end,
+
+    TakeOutHank
+        = fun (Config) ->
+            TakeOutProjPlugin(rebar3_hank, Config)
           end,
 
     TakeOutHankIfMaybeExprNotEnabledOnEnv
@@ -32,9 +43,9 @@ begin
 
     OtpRelease = erlang:system_info(otp_release),
     try list_to_integer(OtpRelease) of
-        22 ->
-            % Take rebar3_hank away as it's no longer compatible with OTP 22
-            TakeOutHank(CONFIG) ;
+        TooOld when TooOld =< 22 ->
+            % Take dev helpers away as they're no longer compatible with OTP 22
+            TakeOutHank(TakeOutElvis(CONFIG));
         25 ->
             TakeOutHankIfMaybeExprNotEnabledOnEnv(CONFIG);
         _ ->
