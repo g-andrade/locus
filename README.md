@@ -163,7 +163,7 @@ the `locus` CLI utility:
     deployed to the current directory.
 
 2.  Check the database:
-    
+
     ``` shell
     ./locus check GeoLite2-City.mmdb
     # Loading database from "GeoLite2-City.mmdb"...
@@ -311,9 +311,11 @@ sponsored, or otherwise approved by MaxMind.
 
 ### Alternative Providers
 
+  - [IPinfo](https://ipinfo.io/) MMDB databases are compatible with `locus`
+    **[since version 2.3.8](https://github.com/g-andrade/locus/issues/44)**
   - [DB-IP.com](https://db-ip.com/db/): lite databases seem to work but
     setting up auto-update for them is not practical, as there's no
-    "latest" URL.
+    "latest" official URL.
 
 ### Alternative Libraries (Erlang)
 
