@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- wrong root in MMDB tree parser, failing IPv4 lookups in IPv6 databases that
+  don't include IPv4-mapped IPv6 addresses [wrong since 1.0.0]
+
 ## [2.3.7] - 2024-03-16
 
 ### Added

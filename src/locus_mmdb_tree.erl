@@ -45,8 +45,12 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
-% https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
--define(IPV4_IPV6_PREFIX, <<0:80, 16#FFFF:16>>).
+% "When storing IPv4 addresses in an IPv6 tree, they are stored as-is, so they
+%  occupy the first 32-bits of the address space (from 0 to 2**32 - 1)."
+%
+% * https://maxmind.github.io/MaxMind-DB/#ipv4-addresses-in-an-ipv6-tree
+%
+-define(IPV4_IPV6_PREFIX, <<0:96>>).
 
 %% ------------------------------------------------------------------
 %% API Record and Type Definitions
