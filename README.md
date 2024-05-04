@@ -225,8 +225,8 @@ arguments.
       - the `last-modified` response header (when present, for MaxMind
         and HTTP(S) sources)
       - the `modified_on` metadata property for successful
-        `locus_custom_fetcher:fetch/1` and ``:conditionally_fetch/2`
-        callbacks (for databases loaded with `locus_custom_fetcher``)
+        `locus_custom_fetcher` `:fetch/1` and `:conditionally_fetch/2`
+        callbacks (for databases loaded with `locus_custom_fetcher`)
   - Caching can be disabled by specifying the `no_cache` option when
     running `:start_loader`
   - The cache database location can be customised by providing
