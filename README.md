@@ -36,6 +36,24 @@ Then clone the repository, run `make shell` and declare your key:
 application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
 ```
 
+If you're using Elixir, add locus as a dependency to your mix project:
+
+```elixir
+defp deps do
+    [
+      ...
+      {:locus, "~> 2.3"}
+    ]
+  end
+```
+
+Then, configure your license key in `config.exs`:
+
+```elixir
+config :locus,
+  license_key: <MAXMIND_API_KEY>
+```
+
 #### 2\. Start the database loader
 
 ``` erlang
@@ -45,6 +63,17 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 % * or a local path, e.g. "/usr/share/GeoIP/GeoLite2-City.mmdb"
 % * or a {custom_fetcher, Module, Args} tuple, with Module
 %   implementing the locus_custom_fetcher behaviour.
+```
+
+Or, in Elixir, start the database loaders that you'll be using in `application.ex`:
+
+```elixir
+  def start(_type, _args) do
+    # :locus.start_loader(:asn, {:maxmind, "GeoLite2-ASN"})
+    # :locus.start_loader(:country, {:maxmind, "GeoLite2-Country"})
+    :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
+
+    ...
 ```
 
 #### 3\. Wait for the database to load (optional)
@@ -100,6 +129,17 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
                   <<"pt-BR">> => <<"Estados Unidos">>,
                   <<"ru">> => <<"США"/utf8>>,
                   <<"zh-CN">> => <<"美国"/utf8>>}}}}
+```
+
+Or, in Elixir, call the erlang library from your Elixir application:
+
+```elixir
+iex> :locus.lookup(:city, "93.184.216.34")
+{:ok,
+ %{
+   "city" => %{"geoname_id" => 4945936, "names" => %{"en" => "Norwell"}},
+   ...
+ }}
 ```
 
 ## Documentation
