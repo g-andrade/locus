@@ -28,7 +28,7 @@ MaxMind.*
 
 Get a free [license key](https://www.maxmind.com/en/geolite2/signup)
 from MaxMind if you haven't one already. Once logged in, you'll find the
-page to generate it on the left menu, under "My License Key".
+page to generate it on the left menu, under "Manage License Keys".
 
 Then clone the repository, run `make shell` and declare your key:
 
