@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- Elixir-specific info to README (thanks https://github.com/petrus-jvrensburg)
 - OTP 27.0 to CI
 
 ## [2.3.8] - 2024-05-04
