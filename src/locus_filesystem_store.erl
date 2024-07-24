@@ -61,7 +61,7 @@
     {finished, {error, term()}}.
 -export_type([msg/0]).
 
--type path() :: nonempty_string().
+-type path() :: file:filename_all().
 -export_type([path/0]).
 
 -record(state, {
@@ -156,7 +156,7 @@ handle_write(State) ->
 do_write(State) ->
     #state{path = Path, content = Content, modified_on = ModificationDT} = State,
     TmpSuffix = ".tmp." ++ integer_to_list(rand:uniform(1 bsl 32), 36),
-    TmpPath = Path ++ TmpSuffix,
+    TmpPath = unicode:characters_to_list([Path, TmpSuffix]),
     FileInfoMod = #file_info{ mtime = ModificationDT },
 
     ok = filelib:ensure_dir(Path),

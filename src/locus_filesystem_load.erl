@@ -84,7 +84,7 @@
      }.
 -export_type([success/0]).
 
--type path() :: nonempty_string().
+-type path() :: file:filename_all().
 -export_type([path/0]).
 
 -record(state, {

@@ -89,7 +89,7 @@
     {update_period, milliseconds_interval()} |
     {error_retries, error_retry_behaviour()} |
     no_cache |
-    {database_cache_file, file:filename()}.
+    {database_cache_file, file:filename_all()}.
 -export_type([loader_opt/0]).
 
 -type milliseconds_interval() :: pos_integer().
@@ -152,7 +152,7 @@
           error_retry_behaviour :: error_retry_behaviour(),
           error_retry_behaviour_applies_after_readiness :: boolean(),
           use_cache :: boolean(),
-          database_cache_file :: file:filename() | undefined
+          database_cache_file :: file:filename_all() | undefined
          }).
 -type settings() :: #settings{}.
 
@@ -342,7 +342,7 @@ validate_loader_opts(MixedOpts, FetcherOpts) ->
                   % Ensure directory exists
                   Dirname = filename:dirname(File),
                   (
-                   has_extenstion(File, ["gz", "mmdb"])
+                   has_extension(File, ["gz", "mmdb"])
                    and
                    filelib:is_dir(Dirname)
                   )
@@ -466,7 +466,7 @@ schedule_update(Interval, State)
     NewTimer = erlang:send_after(Interval, self(), begin_update),
     State#state{ update_timer = NewTimer }.
 
--spec cached_database_path(state()) -> nonempty_string().
+-spec cached_database_path(state()) -> file:filename_all().
 cached_database_path(#state{
                         settings = #settings{
                                       database_cache_file = DatabaseCacheFile
@@ -475,7 +475,6 @@ cached_database_path(#state{
                     )
   when DatabaseCacheFile =/= undefined ->
     DatabaseCacheFile;
-
 cached_database_path(State) ->
     case State#state.origin of
         {maxmind, EditionName} ->
@@ -878,15 +877,18 @@ extract_mmdb_from_tarball_blob(Tarball) ->
 
 -spec has_mmdb_extension(nonempty_string()) -> boolean().
 has_mmdb_extension(Filename) ->
-    has_extenstion(Filename, ["mmdb"]).
+    has_extension(Filename, ["mmdb"]).
 
 % Make sure the ExpectedExtensions list is passed in reverse order.
 % So if file is "archive.tar.gz", the ExpectedExtensions list is ["gz", "tar"].
--spec has_extenstion(nonempty_string(), [nonempty_string()]) -> boolean().
-has_extenstion(Filename, ExpectedExtensions) ->
+-spec has_extension(file:filename_all(), [nonempty_string()]) -> boolean().
+has_extension(Filename, ExpectedExtensions) ->
     ExtensionParts = filename_extension_parts(Filename),
     lists:prefix(ExpectedExtensions, ExtensionParts).
 
+filename_extension_parts(<<BinFilename/bytes>>) ->
+    Filename = unicode:characters_to_list(BinFilename),
+    filename_extension_parts_recur(Filename, []);
 filename_extension_parts(Filename) ->
     filename_extension_parts_recur(Filename, []).
 
@@ -966,7 +968,7 @@ fetched_database_modification_datetime({cache, _}, #{modified_on := Modification
 fetched_database_modification_datetime({filesystem, _}, #{modified_on := ModificationDate}) ->
     ModificationDate.
 
-%-spec make_cached_database_blob(nonempty_string(), binary()) -> binary().
+%-spec make_cached_database_blob(file:filename_all(), binary()) -> binary().
 make_cached_database_blob(CachedTarballPath, EncodedDatabase) ->
     ?assertMatch(["gz", "mmdb" | _], filename_extension_parts(CachedTarballPath)),
     zlib:gzip(EncodedDatabase).
