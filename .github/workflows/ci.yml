@@ -21,8 +21,8 @@ jobs:
         os: ['ubuntu-20.04', 'windows-2019']
         exclude:
           # Results in "make: *** [Makefile:38: ct] Error 2816"
-          # as of 2024/05/22, try again at a later date.
-          - otp_vsn: '27.0'
+          # as of 2024/10/12, try again at a later date.
+          - otp_vsn: '27.1'
             os: 'windows-2019'
     steps:
       - name: Checkout
