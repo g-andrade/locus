@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - OTP 27.1 to CI
 
+### Fixed
+
+- unwarranted build messages about dropping hank and elvis on incompatible OTP
+  versions
+
 ## [2.3.10] - 2024-07-24
 
 ### Fixed

@@ -6,7 +6,7 @@ begin
                 = lists:keyfind(project_plugins, 1, Config),
             {value, {_, Version}, RemainingProjPlugins}
                 = lists:keytake(Name, 1, ProjPlugins),
-            logger:info("Dropping proj plugin '~ts' ~ts", [Name, Version]),
+            % logger:notice("Dropping proj plugin '~ts' ~ts", [Name, Version]),
             _UpdatedConfig
                 = lists:keystore(project_plugins, 1, Config,
                                  {project_plugins, RemainingProjPlugins})
