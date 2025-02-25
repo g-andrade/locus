@@ -2,7 +2,7 @@
 
 [![Hex downloads](https://img.shields.io/hexpm/dt/locus.svg)](https://hex.pm/packages/locus)
 [![License](https://img.shields.io/hexpm/l/locus.svg)](https://github.com/g-andrade/locus/blob/master/LICENSE)
-[![Erlang Versions](https://img.shields.io/badge/Erlang%2FOTP-22%20to%2027-blue)](https://www.erlang.org)
+[![Erlang Versions](https://img.shields.io/badge/Erlang%2FOTP-24%20to%2027-blue)](https://www.erlang.org)
 [![CI status](https://github.com/g-andrade/locus/actions/workflows/ci.yml/badge.svg)](https://github.com/g-andrade/locus/actions/workflows/ci.yml)
 [![Latest version](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 [![API reference](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/locus/)

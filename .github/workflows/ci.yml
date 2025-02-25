@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        otp_vsn: ['22.3', '23.3', '24.3', '25.3', '26.2', '27.2']
+        otp_vsn: ['24.3', '25.3', '26.2', '27.2']
         os: ['ubuntu-22.04', 'windows-2019']
         exclude:
          # Results in "make: *** [Makefile:38: ct] Error 2816"
