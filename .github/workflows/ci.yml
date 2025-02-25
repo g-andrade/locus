@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         otp_vsn: ['22.3', '23.3', '24.3', '25.3', '26.2', '27.2']
-        os: ['ubuntu-20.04', 'windows-2019']
+        os: ['ubuntu-22.04', 'windows-2019']
         exclude:
          # Results in "make: *** [Makefile:38: ct] Error 2816"
          # as of 2025/02/25, try again at a later date.

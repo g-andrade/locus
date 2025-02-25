@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - OTP 27.2 to CI
 
+### Changed
+
+- CI from Ubuntu 20.04 to 22.04
+
 ## [2.3.11] - 2024-12-15
 
 ### Added
