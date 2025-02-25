@@ -318,7 +318,7 @@ The API reference can be found on [HexDocs](https://hexdocs.pm/locus/).
 
 ### Tested setup
 
-  - Erlang/OTP 22 or newer
+  - Erlang/OTP 24 or newer
   - rebar3
 
 ### License
