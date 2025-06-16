@@ -18,12 +18,7 @@ jobs:
     strategy:
       matrix:
         otp_vsn: ['24.3', '25.3', '26.2', '27.3', '28.0']
-        os: ['ubuntu-22.04', 'windows-2019']
-        exclude:
-         # Results in "make: *** [Makefile:38: ct] Error 2816"
-         # as of 2025/02/25, try again at a later date.
-         - otp_vsn: '27.2'
-           os: 'windows-2019'
+        os: ['ubuntu-22.04', 'windows-2022']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
