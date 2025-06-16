@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - CI from Ubuntu 20.04 to 22.04
 - oldest supported OTP version from 22 to 24
 
+### Fixed
+
+- interval between retries when no database has yet been loaded
+[wrong since 1.10.0]
+
 ## [2.3.11] - 2024-12-15
 
 ### Added

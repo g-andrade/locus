@@ -736,7 +736,7 @@ update_error_backoff_count(Increment, State) ->
 time_to_next_update(LastFetchSource, State) ->
     #state{settings = Settings, error_backoff_count = ErrorBackoffCount} = State,
     {LastFetchSourceType, _} = LastFetchSource,
-    HasAchievedReadiness = (State#state.last_loaded_version =/= unknown),
+    HasAchievedReadiness = (State#state.last_loaded_version =/= undefined),
 
     if LastFetchSourceType =:= cache ->
            0;
