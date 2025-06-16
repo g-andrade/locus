@@ -19,6 +19,10 @@ jobs:
       matrix:
         otp_vsn: ['24.3', '25.3', '26.2', '27.3', '28.0']
         os: ['ubuntu-22.04', 'windows-2022']
+        exclude:
+          # Gets stuck in '===> Fetching rebar3_ex_doc v0.2.22'
+          - otp_vsn: '28.0'
+            os: 'windows-2022'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
