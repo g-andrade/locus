@@ -74,7 +74,7 @@ In Elixir, you'll need to specify the cache directory explicitly when starting t
   def start(_type, _args) do
     # only start the database loader process in environments where a license key is defined
     if Application.get_env(:locus, :license_key) do
-      locus_cache_directory = "/tmp/locus/"
+      locus_cache_directory = Path.join(System.tmp_dir()!, "locus")
 
       case File.mkdir(locus_cache_directory) do
         :ok ->
