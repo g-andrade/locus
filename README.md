@@ -65,14 +65,37 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 %   implementing the locus_custom_fetcher behaviour.
 ```
 
-Or, in Elixir, start the database loaders that you'll be using in `application.ex`:
+In Elixir, you'll need to specify the cache directory explicitly when starting the database loaders. You can do that in `application.ex`:
 
 ```elixir
-  def start(_type, _args) do
-    # :locus.start_loader(:asn, {:maxmind, "GeoLite2-ASN"})
-    # :locus.start_loader(:country, {:maxmind, "GeoLite2-Country"})
-    :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
+  require Logger
+  ...
 
+  def start(_type, _args) do
+    # only start the database loader process in environments where a license key is defined
+    if Application.get_env(:locus, :license_key) do
+      locus_cache_directory = Path.join(System.tmp_dir()!, "locus")
+
+      case File.mkdir(locus_cache_directory) do
+        :ok ->
+          Logger.info("New directory created for IP geolocation cache: #{locus_cache_directory}")
+
+        {:error, :eexist} ->
+          Logger.info("Loading IP geolocation cache from: #{locus_cache_directory}")
+      end
+
+      # :locus.start_loader(:asn, {:maxmind, "GeoLite2-ASN"},
+      #   database_cache_file: Path.join([locus_cache_directory, "maxmind_asn.mmdb.gz"])
+      # )
+
+      # :locus.start_loader(:country, {:maxmind, "GeoLite2-Country"},
+      #   database_cache_file: Path.join([locus_cache_directory, "maxmind_country.mmdb.gz"])
+      # )
+
+      :locus.start_loader(:city, {:maxmind, "GeoLite2-City"},
+        database_cache_file: Path.join([locus_cache_directory, "maxmind_city.mmdb.gz"])
+      )
+    end
     ...
 ```
 
