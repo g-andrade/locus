@@ -90,6 +90,8 @@ def start(_type, _args) do
 
 #### 5\. Look up IP addresses
 
+**Erlang:**
+
 ``` erlang
 
 % > locus:lookup(country, "93.184.216.34").
@@ -137,9 +139,9 @@ def start(_type, _args) do
                   <<"zh-CN">> => <<"美国"/utf8>>}}}}
 ```
 
-Or, in Elixir, call the erlang library from your Elixir application:
+**Elixir:**
 
-```elixir
+``` elixir
 iex> :locus.lookup(:city, "93.184.216.34")
 {:ok,
  %{
