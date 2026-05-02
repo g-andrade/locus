@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - OTP 28.5 to CI
+- code formatter (erlfmt)
+
+### Changed
+
+- outdated checks, and the fixes that they required
+- whole library was re-formatted by erlfmt
+
+### Fixed
+
+- failing tests and checks on OTP 29.0-rc3
 
 ## [2.3.13] - 2026-04-06
 
