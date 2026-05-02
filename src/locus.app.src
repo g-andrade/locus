@@ -1,29 +1,31 @@
-{application, locus,
- [{description,
-   "MMDB reader for geolocation and ASN lookup of IP addresses,"
-   " supporting MaxMind GeoLite2/GeoIP2 and other providers"},
-  {vsn, "git"},
-  {registered, []},
-  {mod, {locus_app, []}},
-  {applications,
-   [kernel,
-    stdlib,
-    % OTP dependencies
-    crypto,
-    inets,
-    ssl,
-    % External dependencies
-    tls_certificate_check
-   ]},
-  {modules, []},
+{application, locus, [
+    {description,
+        "MMDB reader for geolocation and ASN lookup of IP addresses,"
+        " supporting MaxMind GeoLite2/GeoIP2 and other providers"},
+    {vsn, "git"},
+    {registered, []},
+    {mod, {locus_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        % OTP dependencies
+        crypto,
+        inets,
+        ssl,
+        % External dependencies
+        tls_certificate_check
+    ]},
+    {modules, []},
 
-  {env,
-   [{license_key, "YOUR_LICENSE_KEY"},
-    {log_level, error} % debug | info | warning | error
-   ]},
+    {env, [
+        {license_key, "YOUR_LICENSE_KEY"},
+        % debug | info | warning | error
+        {log_level, error}
+    ]},
 
-  {licenses, ["MIT"]},
-  {links, [{"GitHub", "https://github.com/g-andrade/locus"},
-           {"GitLab", "https://gitlab.com/g-andrade/locus"}
-          ]}
- ]}.
+    {licenses, ["MIT"]},
+    {links, [
+        {"GitHub", "https://github.com/g-andrade/locus"},
+        {"GitLab", "https://gitlab.com/g-andrade/locus"}
+    ]}
+]}.

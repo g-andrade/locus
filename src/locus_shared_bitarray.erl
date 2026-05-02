@@ -30,10 +30,12 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([new/1,
-         set/2,
-         is_set/2,
-         get_positions_set_at_cell/2]).
+-export([
+    new/1,
+    set/2,
+    is_set/2,
+    get_positions_set_at_cell/2
+]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -108,12 +110,18 @@ set_recur(Array, Cell, OneBasedIndex, UpdateMask) ->
             end
     end.
 
-positions_set_at_cell(BasePosition, Cell)
-  when Cell =/= 0 ->
+positions_set_at_cell(BasePosition, Cell) when
+    Cell =/= 0
+->
     case Cell band 1 of
         1 ->
-            [BasePosition | positions_set_at_cell(BasePosition + 1,
-                                                  Cell bsr 1)];
+            [
+                BasePosition
+                | positions_set_at_cell(
+                    BasePosition + 1,
+                    Cell bsr 1
+                )
+            ];
         _ ->
             positions_set_at_cell(BasePosition + 1, Cell bsr 1)
     end;

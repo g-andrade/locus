@@ -33,22 +33,24 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [parse_ip_address/1,
-    lists_anymap/2,
-    lists_take/2,
-    bin_to_hex_str/1,
-    expect_linked_process_termination/1,
-    url_query_encode/1,
-    filesystem_safe_name/1,
-    is_utf8_binary/1,
-    is_unicode_string/1,
-    is_date/1,
-    purge_term_of_very_large_binaries/1,
-    resolve_http_location/2,
-    censor_url_query/2,
-    parse_absolute_http_url/1,
-    is_termination_reason_harmless/1
-   ]).
+    [
+        parse_ip_address/1,
+        lists_anymap/2,
+        lists_take/2,
+        bin_to_hex_str/1,
+        expect_linked_process_termination/1,
+        url_query_encode/1,
+        filesystem_safe_name/1,
+        is_utf8_binary/1,
+        is_unicode_string/1,
+        is_date/1,
+        purge_term_of_very_large_binaries/1,
+        resolve_http_location/2,
+        censor_url_query/2,
+        parse_absolute_http_url/1,
+        is_termination_reason_harmless/1
+    ]
+).
 
 -ifndef(TEST).
 -hank([{unnecessary_function_arguments, [{is_shutdown_subreason_harmless, 1, 1}]}]).
@@ -70,14 +72,22 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
--spec parse_ip_address(binary() | string() | inet:ip_address())
-        -> {ok, inet:ip_address()} | {error, einval}.
-parse_ip_address({A, B, C, D} = Address)
-  when ?is_uint8(A), ?is_uint8(B), ?is_uint8(C), ?is_uint8(D) ->
+-spec parse_ip_address(binary() | string() | inet:ip_address()) ->
+    {ok, inet:ip_address()} | {error, einval}.
+parse_ip_address({A, B, C, D} = Address) when
+    ?is_uint8(A), ?is_uint8(B), ?is_uint8(C), ?is_uint8(D)
+->
     {ok, Address};
-parse_ip_address({A, B, C, D, E, F, G, H} = Address)
-  when ?is_uint16(A), ?is_uint16(B), ?is_uint16(C), ?is_uint16(D),
-       ?is_uint16(E), ?is_uint16(F), ?is_uint16(G), ?is_uint16(H) ->
+parse_ip_address({A, B, C, D, E, F, G, H} = Address) when
+    ?is_uint16(A),
+    ?is_uint16(B),
+    ?is_uint16(C),
+    ?is_uint16(D),
+    ?is_uint16(E),
+    ?is_uint16(F),
+    ?is_uint16(G),
+    ?is_uint16(H)
+->
     {ok, Address};
 parse_ip_address(Binary) when is_binary(Binary) ->
     String = binary_to_list(Binary),
@@ -94,8 +104,8 @@ parse_ip_address(String) when ?GUARD_IS_PROPER_LIST(String) ->
 parse_ip_address(_Invalid) ->
     {error, einval}.
 
--spec lists_anymap(fun ((term()) -> boolean() | {true, term()}), list())
-        -> {true, term()} | false.
+-spec lists_anymap(fun((term()) -> boolean() | {true, term()}), list()) ->
+    {true, term()} | false.
 lists_anymap(Fun, [H | T]) ->
     case Fun(H) of
         {true, Mapped} -> {true, Mapped};
@@ -124,7 +134,8 @@ bin_to_hex_str_recur(<<>>, Acc) ->
 -spec expect_linked_process_termination(pid()) -> boolean().
 expect_linked_process_termination(Pid) ->
     case flush_link_exit(Pid, 5000) of
-        true -> true;
+        true ->
+            true;
         false ->
             exit(Pid, kill),
             flush_link_exit(Pid, 1000)
@@ -133,7 +144,7 @@ expect_linked_process_termination(Pid) ->
 -spec url_query_encode(unicode:chardata()) -> binary().
 url_query_encode(Chardata) ->
     <<Binary/bytes>> = unicode:characters_to_binary(Chardata),
-    << <<(url_query_encode_codepoint(Codepoint))/bytes>> || <<Codepoint/utf8>> <= Binary >>.
+    <<<<(url_query_encode_codepoint(Codepoint))/bytes>> || <<Codepoint/utf8>> <= Binary>>.
 
 -spec filesystem_safe_name(binary()) -> binary().
 filesystem_safe_name(Name) ->
@@ -152,8 +163,9 @@ is_utf8_binary(_) ->
     false.
 
 -spec is_unicode_string(term()) -> boolean().
-is_unicode_string(Value)
-  when ?GUARD_IS_PROPER_LIST(Value) ->
+is_unicode_string(Value) when
+    ?GUARD_IS_PROPER_LIST(Value)
+->
     try unicode:characters_to_binary(Value) of
         <<_/bytes>> -> true;
         _ -> false
@@ -176,26 +188,30 @@ purge_term_of_very_large_binaries([H | T]) ->
     MappedH = purge_term_of_very_large_binaries(H),
     MappedT = purge_term_of_very_large_binaries(T),
     [MappedH | MappedT];
-purge_term_of_very_large_binaries(Tuple)
-  when is_tuple(Tuple) ->
+purge_term_of_very_large_binaries(Tuple) when
+    is_tuple(Tuple)
+->
     List = tuple_to_list(Tuple),
     MappedList = purge_term_of_very_large_binaries(List),
     list_to_tuple(MappedList);
-purge_term_of_very_large_binaries(Map)
-  when is_map(Map) ->
+purge_term_of_very_large_binaries(Map) when
+    is_map(Map)
+->
     List = maps:to_list(Map),
     MappedList = purge_term_of_very_large_binaries(List),
     maps:from_list(MappedList);
-purge_term_of_very_large_binaries(Binary)
-  when is_binary(Binary) ->
+purge_term_of_very_large_binaries(Binary) when
+    is_binary(Binary)
+->
     Size = byte_size(Binary),
     ReferencedSize = binary:referenced_byte_size(Binary),
-    if Size >= ?TERM_PURGE_LARGE_BINARY_THRESHOLD ->
-           {'__$VERY_LARGE_BINARY', #{size => Size}};
-       ReferencedSize >= ?TERM_PURGE_LARGE_BINARY_THRESHOLD ->
-           binary:copy(Binary);
-       true ->
-           Binary
+    if
+        Size >= ?TERM_PURGE_LARGE_BINARY_THRESHOLD ->
+            {'__$VERY_LARGE_BINARY', #{size => Size}};
+        ReferencedSize >= ?TERM_PURGE_LARGE_BINARY_THRESHOLD ->
+            binary:copy(Binary);
+        true ->
+            Binary
     end;
 purge_term_of_very_large_binaries(Other) ->
     Other.
@@ -234,18 +250,21 @@ resolve_http_location(BaseURL, Location) ->
 -spec censor_url_query(string(), [unicode:charlist()]) -> string().
 censor_url_query(URL, KeysToCensor) ->
     % we ignore URL fragments as they wouldn't have been sent to the server anyway.
-    {ok, {Scheme, UserInfo, Host, Port, Path,
-          Query, _Fragment}} = parse_absolute_http_url(URL),
+    {ok, {Scheme, UserInfo, Host, Port, Path, Query, _Fragment}} = parse_absolute_http_url(URL),
 
     case Query of
         "?" ++ QueryBody ->
             BinEncodedKeysToCensor = [url_query_encode(Key) || Key <- KeysToCensor],
-            PrefixesForWhichToCensorSuffix = [binary_to_list(BinEncodedKey) ++ "="
-                                              || BinEncodedKey <- BinEncodedKeysToCensor],
+            PrefixesForWhichToCensorSuffix = [
+                binary_to_list(BinEncodedKey) ++ "="
+             || BinEncodedKey <- BinEncodedKeysToCensor
+            ],
 
             QueryPairs = string:tokens(QueryBody, [$&]),
-            CensoredQueryPairs = [maybe_censor_url_query_pair(Pair, PrefixesForWhichToCensorSuffix)
-                                  || Pair <- QueryPairs],
+            CensoredQueryPairs = [
+                maybe_censor_url_query_pair(Pair, PrefixesForWhichToCensorSuffix)
+             || Pair <- QueryPairs
+            ],
             CensoredQueryBody = lists:join($&, CensoredQueryPairs),
             CensoredQuery = [$? | CensoredQueryBody],
             build_url(Scheme, UserInfo, Host, Port, Path, CensoredQuery);
@@ -253,18 +272,18 @@ censor_url_query(URL, KeysToCensor) ->
             URL
     end.
 
--spec parse_absolute_http_url(string())
-        -> {ok, {atom(), string(), string(), inet:port_number(),
-                 string(), string(), string()}}
-           | {error, not_absolute_http_url}
-           | {error, {atom(), term()}}.
-parse_absolute_http_url(URI)
-  when is_list(URI) ->
+-spec parse_absolute_http_url(string()) ->
+    {ok, {atom(), string(), string(), inet:port_number(), string(), string(), string()}}
+    | {error, not_absolute_http_url}
+    | {error, {atom(), term()}}.
+parse_absolute_http_url(URI) when
+    is_list(URI)
+->
     case uri_string:parse(URI) of
-        #{scheme := SchemeStr, host := Host} = ParsedURI
-          when (SchemeStr =:= "http" orelse SchemeStr =:= "https")
-               andalso ?GUARD_IS_PROPER_NON_EMPTY_LIST(Host) ->
-
+        #{scheme := SchemeStr, host := Host} = ParsedURI when
+            (SchemeStr =:= "http" orelse SchemeStr =:= "https") andalso
+                ?GUARD_IS_PROPER_NON_EMPTY_LIST(Host)
+        ->
             Scheme = list_to_existing_atom(SchemeStr),
             DefaultPort =
                 case Scheme of
@@ -274,19 +293,16 @@ parse_absolute_http_url(URI)
             Query =
                 case ParsedURI of
                     #{query := QueryStr} when ?GUARD_IS_PROPER_NON_EMPTY_LIST(QueryStr) ->
-                        [$? | QueryStr]; % simulate http_uri:parse/2 behaviour
+                        % simulate http_uri:parse/2 behaviour
+                        [$? | QueryStr];
                     #{} ->
                         ""
                 end,
 
-            {ok, {Scheme,
-                  maps:get(userinfo, ParsedURI, ""),
-                  Host,
-                  maps:get(port, ParsedURI, DefaultPort),
-                  maps:get(path, ParsedURI, "/"),
-                  Query,
-                  maps:get(fragment, ParsedURI, "")
-                 }};
+            {ok,
+                {Scheme, maps:get(userinfo, ParsedURI, ""), Host,
+                    maps:get(port, ParsedURI, DefaultPort), maps:get(path, ParsedURI, "/"), Query,
+                    maps:get(fragment, ParsedURI, "")}};
         #{} ->
             {error, not_absolute_http_url};
         {error, Reason, Context} ->
@@ -322,34 +338,36 @@ lists_take_recur(_, [], _) ->
 flush_link_exit(Pid, Timeout) ->
     receive
         {'EXIT', P, _} when P =:= Pid -> true
-    after
-        Timeout -> false
+    after Timeout -> false
     end.
 
-url_query_encode_codepoint(Codepoint)
-  when Codepoint >= $A, Codepoint =< $Z;
-       Codepoint >= $a, Codepoint =< $z;
-       Codepoint >= $0, Codepoint =< $9;
-       Codepoint =:= $*;
-       Codepoint =:= $-;
-       Codepoint =:= $.;
-       Codepoint =:= $_ ->
+url_query_encode_codepoint(Codepoint) when
+    Codepoint >= $A, Codepoint =< $Z;
+    Codepoint >= $a, Codepoint =< $z;
+    Codepoint >= $0, Codepoint =< $9;
+    Codepoint =:= $*;
+    Codepoint =:= $-;
+    Codepoint =:= $.;
+    Codepoint =:= $_
+->
     <<Codepoint>>;
-url_query_encode_codepoint(32) -> % codepoint for `$\ ` which Elvis doesnt like
+% codepoint for `$\ ` which Elvis doesnt like
+url_query_encode_codepoint(32) ->
     <<$+>>;
 url_query_encode_codepoint(Codepoint) ->
     UTF8Bytes = <<Codepoint/utf8>>,
-    << <<$%, (integer_to_binary(Byte, 16))/bytes>> || <<Byte>> <= UTF8Bytes >>.
+    <<<<$%, (integer_to_binary(Byte, 16))/bytes>> || <<Byte>> <= UTF8Bytes>>.
 
 -spec build_url(atom(), string(), iodata(), inet:port_number(), iodata(), iodata()) -> string().
-build_url(Scheme, UserInfo, Host, Port, Path, Query)
-  when UserInfo =:= "" andalso
-       ((Scheme =:= http andalso Port =:= 80) orelse
-        (Scheme =:= https andalso Port =:= 443))
-       ->
+build_url(Scheme, UserInfo, Host, Port, Path, Query) when
+    UserInfo =:= "" andalso
+        ((Scheme =:= http andalso Port =:= 80) orelse
+            (Scheme =:= https andalso Port =:= 443))
+->
     format_string("~s://~s~s~s", [Scheme, Host, Path, Query]);
-build_url(Scheme, UserInfo, Host, Port, Path, Query)
-  when UserInfo =:= "" ->
+build_url(Scheme, UserInfo, Host, Port, Path, Query) when
+    UserInfo =:= ""
+->
     format_string("~s://~s:~b~s", [Scheme, Host, Port, Path, Query]);
 build_url(Scheme, UserInfo, Host, Port, Path, Query) ->
     format_string("~s://~s@~s:~b~s", [Scheme, UserInfo, Host, Port, Path, Query]).
@@ -361,9 +379,11 @@ format_string(Fmt, Args) ->
     binary_to_list(Binary).
 
 maybe_censor_url_query_pair(Pair, PrefixesForWhichToCensorSuffix) ->
-    case lists_anymap(
-           fun (Prefix) -> lists:prefix(Prefix, Pair) end,
-           PrefixesForWhichToCensorSuffix)
+    case
+        lists_anymap(
+            fun(Prefix) -> lists:prefix(Prefix, Pair) end,
+            PrefixesForWhichToCensorSuffix
+        )
     of
         {true, Prefix} ->
             Prefix ++ "XXXXXXXXXXXXXXXX";
@@ -393,11 +413,17 @@ resolve_http_location_test() ->
     NetworkPathReference = "//google.com/thing",
     RelativeReference = "/etc",
 
-    ?assertEqual({ok, AbsoluteLocation},
-                 resolve_http_location(BaseURL, AbsoluteLocation)),
-    ?assertEqual({ok, "http:" ++ NetworkPathReference},
-                 resolve_http_location(BaseURL, NetworkPathReference)),
-    ?assertEqual({ok, BaseURL ++ RelativeReference},
-                 resolve_http_location(BaseURL, RelativeReference)).
+    ?assertEqual(
+        {ok, AbsoluteLocation},
+        resolve_http_location(BaseURL, AbsoluteLocation)
+    ),
+    ?assertEqual(
+        {ok, "http:" ++ NetworkPathReference},
+        resolve_http_location(BaseURL, NetworkPathReference)
+    ),
+    ?assertEqual(
+        {ok, BaseURL ++ RelativeReference},
+        resolve_http_location(BaseURL, RelativeReference)
+    ).
 
 -endif.

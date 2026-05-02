@@ -31,19 +31,19 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
--type value()
-    :: map_()
-    |  utf8_string()
-    |  double()
-    |  bytes()
-    |  uint16()
-    |  uint32()
-    |  int32()
-    |  uint64()
-    |  uint128()
-    |  array()
-    |  boolean()
-    |  float_().
+-type value() ::
+    map_()
+    | utf8_string()
+    | double()
+    | bytes()
+    | uint16()
+    | uint32()
+    | int32()
+    | uint64()
+    | uint128()
+    | array()
+    | boolean()
+    | float_().
 
 -export_type([value/0]).
 

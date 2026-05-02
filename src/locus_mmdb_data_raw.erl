@@ -34,19 +34,19 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
--type value()
-    :: utf8_string()
-    |  double()
-    |  bytes()
-    |  uint16()
-    |  uint32()
-    |  map_()
-    |  int32()
-    |  uint64()
-    |  uint128()
-    |  array()
-    |  boolean_()
-    |  float_().
+-type value() ::
+    utf8_string()
+    | double()
+    | bytes()
+    | uint16()
+    | uint32()
+    | map_()
+    | int32()
+    | uint64()
+    | uint128()
+    | array()
+    | boolean_()
+    | float_().
 
 -export_type([value/0]).
 
@@ -86,18 +86,18 @@
 -type float_() :: {float, locus_mmdb_data:float_()}.
 -export_type([float_/0]).
 
--type value_tag()
-    :: pointer
-    |  utf8_string
-    |  double
-    |  bytes
-    |  uint16
-    |  uint32
-    |  map
-    |  int32
-    |  uint64
-    |  uint128
-    |  array
-    |  boolean
-    |  float.
+-type value_tag() ::
+    pointer
+    | utf8_string
+    | double
+    | bytes
+    | uint16
+    | uint32
+    | map
+    | int32
+    | uint64
+    | uint128
+    | array
+    | boolean
+    | float.
 -export_type([value_tag/0]).

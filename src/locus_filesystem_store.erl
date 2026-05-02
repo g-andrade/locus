@@ -32,44 +32,46 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/3
-   ]).
+    [start_link/3]
+).
 
 -ignore_xref(
-   [start_link/3
-   ]).
+    [start_link/3]
+).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
 %% ------------------------------------------------------------------
 
 -type msg() ::
-    {finished, success} |
-    {finished, {error, term()}}.
+    {finished, success}
+    | {finished, {error, term()}}.
 -export_type([msg/0]).
 
 -type path() :: file:filename_all().
 -export_type([path/0]).
 
 -record(state, {
-          owner_pid :: pid(),
-          path :: path(),
-          content :: iodata(),
-          modified_on :: calendar:datetime()
-         }).
+    owner_pid :: pid(),
+    path :: path(),
+    content :: iodata(),
+    modified_on :: calendar:datetime()
+}).
 -opaque state() :: #state{}.
 -export_type([state/0]).
 
@@ -86,38 +88,38 @@ start_link(Path, Content, ModificationDT) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([InitArg, ...]) -> {ok, state()}
-        when InitArg :: OwnerPid | Path | Content | ModificationDT,
-             OwnerPid :: pid(),
-             Path :: path(),
-             Content :: iodata(),
-             ModificationDT :: calendar:datetime().
+-spec init([InitArg, ...]) -> {ok, state()} when
+    InitArg :: OwnerPid | Path | Content | ModificationDT,
+    OwnerPid :: pid(),
+    Path :: path(),
+    Content :: iodata(),
+    ModificationDT :: calendar:datetime().
 %% @private
 init([OwnerPid, Path, Content, ModificationDT]) ->
     _ = process_flag(trap_exit, true),
     self() ! write,
     {ok, #state{
-            owner_pid = OwnerPid,
-            path = Path,
-            content = Content,
-            modified_on = ModificationDT
-           }}.
+        owner_pid = OwnerPid,
+        path = Path,
+        content = Content,
+        modified_on = ModificationDT
+    }}.
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {stop, unexpected_call, state()}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
     {stop, unexpected_call, State}.
 
--spec handle_cast(term(), state())
-        -> {stop, unexpected_cast, state()}.
+-spec handle_cast(term(), state()) ->
+    {stop, unexpected_cast, state()}.
 %% @private
 handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
 
--spec handle_info(term(), state())
-        -> {stop, normal, state()} |
-           {stop, unexpected_info, state()}.
+-spec handle_info(term(), state()) ->
+    {stop, normal, state()}
+    | {stop, unexpected_info, state()}.
 %% @private
 handle_info(write, State) ->
     handle_write(State);
@@ -157,7 +159,7 @@ do_write(State) ->
     #state{path = Path, content = Content, modified_on = ModificationDT} = State,
     TmpSuffix = ".tmp." ++ integer_to_list(rand:uniform(1 bsl 32), 36),
     TmpPath = unicode:characters_to_list([Path, TmpSuffix]),
-    FileInfoMod = #file_info{ mtime = ModificationDT },
+    FileInfoMod = #file_info{mtime = ModificationDT},
 
     ok = filelib:ensure_dir(Path),
     {ok, IoDevice} = file:open(TmpPath, [write, exclusive, raw]),

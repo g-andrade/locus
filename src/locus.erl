@@ -28,19 +28,37 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_loader/2]).                -ignore_xref(start_loader/2).
--export([start_loader/3]).                -ignore_xref(start_loader/3).
--export([stop_loader/1]).                 -ignore_xref(stop_loader/1).
--export([loader_child_spec/2]).           -ignore_xref(loader_child_spec/2).
--export([loader_child_spec/3]).           -ignore_xref(loader_child_spec/3).
--export([loader_child_spec/4]).           -ignore_xref(loader_child_spec/4).
--export([await_loader/1]).                -ignore_xref(await_loader/1).
--export([await_loader/2]).                -ignore_xref(await_loader/2).
--export([await_loaders/2]).               -ignore_xref(await_loaders/2).
--export([lookup/2]).                      -ignore_xref(lookup/2).
--export([get_info/1]).                    -ignore_xref(get_info/1).
--export([get_info/2]).                    -ignore_xref(get_info/2).
--export([check/1]).                       -ignore_xref(check/1).
+-export([
+    start_loader/2,
+    start_loader/3,
+    stop_loader/1,
+    loader_child_spec/2,
+    loader_child_spec/3,
+    loader_child_spec/4,
+    await_loader/1,
+    await_loader/2,
+    await_loaders/2,
+    lookup/2,
+    get_info/1,
+    get_info/2,
+    check/1
+]).
+
+-ignore_xref([
+    start_loader/2,
+    start_loader/3,
+    stop_loader/1,
+    loader_child_spec/2,
+    loader_child_spec/3,
+    loader_child_spec/4,
+    await_loader/1,
+    await_loader/2,
+    await_loaders/2,
+    lookup/2,
+    get_info/1,
+    get_info/2,
+    check/1
+]).
 
 -ifdef(TEST).
 -export([parse_database_edition/1]).
@@ -51,7 +69,8 @@
 %% ------------------------------------------------------------------
 
 -ifdef(ESCRIPTIZING).
--export([main/1]).                        -ignore_xref(main/1).
+-export([main/1]).
+-ignore_xref(main/1).
 -endif.
 
 %% ------------------------------------------------------------------
@@ -69,8 +88,8 @@
 -export_type([database_edition/0]).
 
 -type maxmind_database_edition() ::
-    {maxmind, atom() | unicode:chardata()} |
-    legacy_maxmind_database_edition().
+    {maxmind, atom() | unicode:chardata()}
+    | legacy_maxmind_database_edition().
 -export_type([maxmind_database_edition/0]).
 
 -type legacy_maxmind_database_edition() :: atom().
@@ -92,10 +111,11 @@
 -export_type([ip_address_prefix/0]).
 
 -type database_info() ::
-    #{ metadata := database_metadata(),
-       source := database_source(),
-       version := database_version()
-     }.
+    #{
+        metadata := database_metadata(),
+        source := database_source(),
+        version := database_version()
+    }.
 -export_type([database_info/0]).
 
 -type database_metadata() :: locus_mmdb_metadata:t().
@@ -135,13 +155,13 @@
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/3
--spec start_loader(DatabaseId, LoadFrom) -> ok | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
-                 DatabaseEdition :: database_edition(),
-                 DatabaseURL :: database_url(),
-                 CustomFetcher :: custom_fetcher(),
-                 Error :: invalid_url | already_started | application_not_running.
+-spec start_loader(DatabaseId, LoadFrom) -> ok | {error, Error} when
+    DatabaseId :: atom(),
+    LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
+    DatabaseEdition :: database_edition(),
+    DatabaseURL :: database_url(),
+    CustomFetcher :: custom_fetcher(),
+    Error :: invalid_url | already_started | application_not_running.
 start_loader(DatabaseId, LoadFrom) ->
     start_loader(DatabaseId, LoadFrom, []).
 
@@ -170,27 +190,32 @@ start_loader(DatabaseId, LoadFrom) ->
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/2
--spec start_loader(DatabaseId, LoadFrom, Opts) -> ok | {error, Error}
-            when DatabaseId :: atom(),
-                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
-                 DatabaseEdition :: database_edition(),
-                 DatabaseURL :: database_url(),
-                 CustomFetcher :: custom_fetcher(),
-                 Opts :: [locus_database:opt()],
-                 Error :: (invalid_url | already_started |
-                           {invalid_opt, term()} | application_not_running).
+-spec start_loader(DatabaseId, LoadFrom, Opts) -> ok | {error, Error} when
+    DatabaseId :: atom(),
+    LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
+    DatabaseEdition :: database_edition(),
+    DatabaseURL :: database_url(),
+    CustomFetcher :: custom_fetcher(),
+    Opts :: [locus_database:opt()],
+    Error ::
+        (invalid_url
+        | already_started
+        | {invalid_opt, term()}
+        | application_not_running).
 start_loader(DatabaseId, {maxmind, _} = DatabaseEdition, Opts) ->
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:start(DatabaseId, Origin, OptsWithDefaults);
-start_loader(DatabaseId, DatabaseEdition, Opts)
-  when is_atom(DatabaseEdition) ->
+start_loader(DatabaseId, DatabaseEdition, Opts) when
+    is_atom(DatabaseEdition)
+->
     % Deprecated edition format
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:start(DatabaseId, Origin, OptsWithDefaults);
-start_loader(DatabaseId, DatabaseURL, Opts)
-  when ?might_be_chardata(DatabaseURL) ->
+start_loader(DatabaseId, DatabaseURL, Opts) when
+    ?might_be_chardata(DatabaseURL)
+->
     case parse_url(DatabaseURL) of
         false ->
             {error, invalid_url};
@@ -198,8 +223,9 @@ start_loader(DatabaseId, DatabaseURL, Opts)
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:start(DatabaseId, Origin, OptsWithDefaults)
     end;
-start_loader(DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts)
-  when is_atom(Module) ->
+start_loader(DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts) when
+    is_atom(Module)
+->
     Origin = CustomFetcher,
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:start(DatabaseId, Origin, OptsWithDefaults).
@@ -211,9 +237,9 @@ start_loader(DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts)
 %% </ul>
 %%
 %% Returns `ok' in case of success, `{error, not_found}' otherwise.
--spec stop_loader(DatabaseId) -> ok | {error, Error}
-            when DatabaseId :: atom(),
-                 Error :: not_found.
+-spec stop_loader(DatabaseId) -> ok | {error, Error} when
+    DatabaseId :: atom(),
+    Error :: not_found.
 stop_loader(DatabaseId) ->
     locus_database:stop(DatabaseId, _Reason = normal).
 
@@ -240,13 +266,13 @@ stop_loader(DatabaseId) ->
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/2
--spec loader_child_spec(DatabaseId, LoadFrom) -> ChildSpec | no_return()
-            when DatabaseId :: atom(),
-                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
-                 DatabaseEdition :: database_edition(),
-                 DatabaseURL :: database_url(),
-                 CustomFetcher :: custom_fetcher(),
-                 ChildSpec :: locus_database:static_child_spec().
+-spec loader_child_spec(DatabaseId, LoadFrom) -> ChildSpec | no_return() when
+    DatabaseId :: atom(),
+    LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
+    DatabaseEdition :: database_edition(),
+    DatabaseURL :: database_url(),
+    CustomFetcher :: custom_fetcher(),
+    ChildSpec :: locus_database:static_child_spec().
 loader_child_spec(DatabaseId, LoadFrom) ->
     loader_child_spec(DatabaseId, LoadFrom, []).
 
@@ -275,14 +301,14 @@ loader_child_spec(DatabaseId, LoadFrom) ->
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/3
--spec loader_child_spec(DatabaseId, LoadFrom, Opts) -> ChildSpec | no_return()
-            when DatabaseId :: atom(),
-                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
-                 DatabaseEdition :: database_edition(),
-                 DatabaseURL :: database_url(),
-                 CustomFetcher :: custom_fetcher(),
-                 Opts :: [locus_database:opt()],
-                 ChildSpec :: locus_database:static_child_spec().
+-spec loader_child_spec(DatabaseId, LoadFrom, Opts) -> ChildSpec | no_return() when
+    DatabaseId :: atom(),
+    LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
+    DatabaseEdition :: database_edition(),
+    DatabaseURL :: database_url(),
+    CustomFetcher :: custom_fetcher(),
+    Opts :: [locus_database:opt()],
+    ChildSpec :: locus_database:static_child_spec().
 loader_child_spec(DatabaseId, LoadFrom, Opts) ->
     loader_child_spec({locus_database, DatabaseId}, DatabaseId, LoadFrom, Opts).
 
@@ -311,28 +337,31 @@ loader_child_spec(DatabaseId, LoadFrom, Opts) ->
 %% @see await_loader/1
 %% @see await_loader/2
 %% @see start_loader/3
--spec loader_child_spec(ChildId, DatabaseId, LoadFrom, Opts)
-        -> ChildSpec | no_return()
-            when ChildId :: term(),
-                 DatabaseId :: atom(),
-                 LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
-                 DatabaseEdition :: database_edition(),
-                 DatabaseURL :: database_url(),
-                 CustomFetcher :: custom_fetcher(),
-                 Opts :: [locus_database:opt()],
-                 ChildSpec :: locus_database:static_child_spec().
+-spec loader_child_spec(ChildId, DatabaseId, LoadFrom, Opts) ->
+    ChildSpec | no_return()
+when
+    ChildId :: term(),
+    DatabaseId :: atom(),
+    LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
+    DatabaseEdition :: database_edition(),
+    DatabaseURL :: database_url(),
+    CustomFetcher :: custom_fetcher(),
+    Opts :: [locus_database:opt()],
+    ChildSpec :: locus_database:static_child_spec().
 loader_child_spec(ChildId, DatabaseId, {maxmind, _} = DatabaseEdition, Opts) ->
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults);
-loader_child_spec(ChildId, DatabaseId, DatabaseEdition, Opts)
-  when is_atom(DatabaseEdition) ->
+loader_child_spec(ChildId, DatabaseId, DatabaseEdition, Opts) when
+    is_atom(DatabaseEdition)
+->
     % Deprecated edition format
     Origin = parse_database_edition(DatabaseEdition),
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults);
-loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
-  when ?might_be_chardata(DatabaseURL) ->
+loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts) when
+    ?might_be_chardata(DatabaseURL)
+->
     case parse_url(DatabaseURL) of
         false ->
             error(invalid_url);
@@ -340,8 +369,9 @@ loader_child_spec(ChildId, DatabaseId, DatabaseURL, Opts)
             OptsWithDefaults = opts_with_defaults(Opts),
             locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults)
     end;
-loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts)
-  when is_atom(Module) ->
+loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts) when
+    is_atom(Module)
+->
     Origin = CustomFetcher,
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults).
@@ -362,13 +392,14 @@ loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomF
 %%      if all the load attempts performed before timing out have failed.</li>
 %% </ul>
 %% @see await_loader/2
--spec await_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Reason}
-            when DatabaseId :: atom(),
-                 LoadedVersion :: database_version(),
-                 Reason :: (database_unknown |
-                            {database_stopped, term()} |
-                            {timeout, LoadAttemptFailures}),
-                 LoadAttemptFailures :: [term()].
+-spec await_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Reason} when
+    DatabaseId :: atom(),
+    LoadedVersion :: database_version(),
+    Reason ::
+        (database_unknown
+        | {database_stopped, term()}
+        | {timeout, LoadAttemptFailures}),
+    LoadAttemptFailures :: [term()].
 await_loader(DatabaseId) ->
     await_loader(DatabaseId, 30000).
 
@@ -391,14 +422,15 @@ await_loader(DatabaseId) ->
 %% </ul>
 %% @see await_loader/1
 %% @see await_loaders/2
--spec await_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason}
-            when DatabaseId :: atom(),
-                 Timeout :: timeout(),
-                 LoadedVersion :: database_version(),
-                 Reason :: (database_unknown |
-                            {database_stopped, term()} |
-                            {timeout, LoadAttemptFailures}),
-                 LoadAttemptFailures :: [term()].
+-spec await_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason} when
+    DatabaseId :: atom(),
+    Timeout :: timeout(),
+    LoadedVersion :: database_version(),
+    Reason ::
+        (database_unknown
+        | {database_stopped, term()}
+        | {timeout, LoadAttemptFailures}),
+    LoadAttemptFailures :: [term()].
 await_loader(DatabaseId, Timeout) ->
     case await_loaders([DatabaseId], Timeout) of
         {ok, #{DatabaseId := LoadedVersion}} ->
@@ -435,19 +467,22 @@ await_loader(DatabaseId, Timeout) ->
 %% <li>`{error, {#{DatabaseId => ErrorReason}, _}}' in case of errors.</li>
 %% </ul>
 %% @see await_loader/2
--spec await_loaders(DatabaseIds, Timeout) -> ({ok, Successes} |
-                                              {error, {ErrorPerDatabase, PartialSuccesses}})
-            when DatabaseIds :: [DatabaseId],
-                 Timeout :: timeout(),
-                 Successes :: LoadedVersionPerDatabase,
-                 PartialSuccesses :: LoadedVersionPerDatabase,
-                 LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
-                 LoadedVersion :: database_version(),
-                 ErrorPerDatabase :: #{DatabaseId := Reason},
-                 Reason :: (database_unknown |
-                            {database_stopped, term()} |
-                            {timeout, LoadAttemptFailures}),
-                 LoadAttemptFailures :: [term()].
+-spec await_loaders(DatabaseIds, Timeout) ->
+    ({ok, Successes}
+    | {error, {ErrorPerDatabase, PartialSuccesses}})
+when
+    DatabaseIds :: [DatabaseId],
+    Timeout :: timeout(),
+    Successes :: LoadedVersionPerDatabase,
+    PartialSuccesses :: LoadedVersionPerDatabase,
+    LoadedVersionPerDatabase :: #{DatabaseId => LoadedVersion},
+    LoadedVersion :: database_version(),
+    ErrorPerDatabase :: #{DatabaseId := Reason},
+    Reason ::
+        (database_unknown
+        | {database_stopped, term()}
+        | {timeout, LoadAttemptFailures}),
+    LoadAttemptFailures :: [term()].
 await_loaders(DatabaseIds, Timeout) ->
     ReplyRef = make_ref(),
     UniqueDatabaseIds = lists:usort(DatabaseIds),
@@ -473,13 +508,15 @@ await_loaders(DatabaseIds, Timeout) ->
 %% <li>`{error, ipv4_database}' if `Address' represents an IPv6 address and the database
 %%      only supports IPv4 addresses.</li>
 %% </ul>
--spec lookup(DatabaseId, Address) -> {ok, Entry} | not_found | {error, Error}
-            when DatabaseId :: atom(),
-                 Address :: inet:ip_address() | string() | binary(),
-                 Entry :: database_entry(),
-                 Error :: (database_unknown | database_not_loaded |
-                           {invalid_address, Address} |
-                           ipv4_database).
+-spec lookup(DatabaseId, Address) -> {ok, Entry} | not_found | {error, Error} when
+    DatabaseId :: atom(),
+    Address :: inet:ip_address() | string() | binary(),
+    Entry :: database_entry(),
+    Error ::
+        (database_unknown
+        | database_not_loaded
+        | {invalid_address, Address}
+        | ipv4_database).
 lookup(DatabaseId, Address) ->
     case locus_database:find(DatabaseId) of
         {ok, Database, _Source, _Version} ->
@@ -501,10 +538,10 @@ lookup(DatabaseId, Address) ->
 %% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
 %% </ul>
 %% @see get_info/2
--spec get_info(DatabaseId) -> {ok, Info} | {error, Error}
-            when DatabaseId :: atom(),
-                 Info :: database_info(),
-                 Error :: database_unknown | database_not_loaded.
+-spec get_info(DatabaseId) -> {ok, Info} | {error, Error} when
+    DatabaseId :: atom(),
+    Info :: database_info(),
+    Error :: database_unknown | database_not_loaded.
 get_info(DatabaseId) ->
     case locus_database:find(DatabaseId) of
         {ok, Database, Source, Version} ->
@@ -528,11 +565,11 @@ get_info(DatabaseId) ->
 %% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
 %% </ul>
 %% @see get_info/1
--spec get_info(DatabaseId, Property) -> {ok, Value} | {error, Error}
-            when DatabaseId :: atom(),
-                 Property :: metadata | source | version,
-                 Value :: database_metadata() | database_source() | database_version(),
-                 Error :: database_unknown | database_not_loaded.
+-spec get_info(DatabaseId, Property) -> {ok, Value} | {error, Error} when
+    DatabaseId :: atom(),
+    Property :: metadata | source | version,
+    Value :: database_metadata() | database_source() | database_version(),
+    Error :: database_unknown | database_not_loaded.
 get_info(DatabaseId, Property) ->
     case get_info(DatabaseId) of
         {ok, Info} ->
@@ -560,14 +597,16 @@ get_info(DatabaseId, Property) ->
 %%    (check the definitions in {@link locus_mmdb_check})
 %% </li>
 %% </ul>
--spec check(DatabaseId) -> ok
-                           | {error, Error}
-                           | {validation_warnings, [ValidationWarning, ...]}
-                           | {validation_errors, [ValidationError, ...], [ValidationWarning]}
-            when DatabaseId :: atom(),
-                 Error :: database_unknown | database_not_loaded,
-                 ValidationWarning :: locus_mmdb_check:warning(),
-                 ValidationError :: locus_mmdb_check:error().
+-spec check(DatabaseId) ->
+    ok
+    | {error, Error}
+    | {validation_warnings, [ValidationWarning, ...]}
+    | {validation_errors, [ValidationError, ...], [ValidationWarning]}
+when
+    DatabaseId :: atom(),
+    Error :: database_unknown | database_not_loaded,
+    ValidationWarning :: locus_mmdb_check:warning(),
+    ValidationError :: locus_mmdb_check:error().
 check(DatabaseId) ->
     case locus_database:find(DatabaseId) of
         {ok, Database, _Source, _Version} ->
@@ -592,16 +631,19 @@ main(Args) ->
 %% ------------------------------------------------------------------
 
 -spec parse_database_edition(database_edition()) -> {maxmind, atom()}.
-parse_database_edition({maxmind, Atom})
-  when is_atom(Atom) ->
+parse_database_edition({maxmind, Atom}) when
+    is_atom(Atom)
+->
     {maxmind, Atom};
-parse_database_edition({maxmind, Chardata})
-  when ?might_be_chardata(Chardata) ->
+parse_database_edition({maxmind, Chardata}) when
+    ?might_be_chardata(Chardata)
+->
     Charlist = unicode:characters_to_list(Chardata),
     Atom = list_to_atom(Charlist),
     {maxmind, Atom};
-parse_database_edition(LegacyMaxMindDatabaseEdition)
-  when is_atom(LegacyMaxMindDatabaseEdition) ->
+parse_database_edition(LegacyMaxMindDatabaseEdition) when
+    is_atom(LegacyMaxMindDatabaseEdition)
+->
     {maxmind, LegacyMaxMindDatabaseEdition}.
 
 -spec parse_url(database_url()) -> locus_database:origin() | false.
@@ -624,8 +666,9 @@ parse_http_url(DatabaseURL) when is_list(DatabaseURL) ->
     end;
 parse_http_url(DatabaseURL) ->
     ByteList = binary_to_list(DatabaseURL),
-    try io_lib:printable_latin1_list(ByteList) andalso
-        locus_util:parse_absolute_http_url(ByteList)
+    try
+        io_lib:printable_latin1_list(ByteList) andalso
+            locus_util:parse_absolute_http_url(ByteList)
     of
         false ->
             false;
@@ -649,8 +692,8 @@ parse_filesystem_url(DatabaseURL) ->
         error:badarg -> false
     end.
 
--spec database_info(locus_mmdb:database(), locus_loader:source(), calendar:datetime())
-        -> database_info().
+-spec database_info(locus_mmdb:database(), locus_loader:source(), calendar:datetime()) ->
+    database_info().
 database_info(Database, Source, Version) ->
     #{metadata := Metadata} = Database,
     #{metadata => Metadata, source => Source, version => Version}.
@@ -659,8 +702,10 @@ opts_with_defaults(Opts) ->
     [{event_subscriber, locus_logger} | Opts].
 
 launch_waiters(ReplyRef, Timeout, UniqueDatabaseIds) ->
-    [{DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout)}
-     || DatabaseId <- UniqueDatabaseIds].
+    [
+        {DatabaseId, locus_waiter:start(ReplyRef, DatabaseId, Timeout)}
+     || DatabaseId <- UniqueDatabaseIds
+    ].
 
 perform_wait(_ReplyRef, [], Successes, Failures) ->
     case map_size(Failures) =:= 0 of
@@ -673,11 +718,11 @@ perform_wait(ReplyRef, WaitersLeft, Successes, Failures) ->
     case receive_waiter_reply(ReplyRef) of
         {DatabaseId, {ok, Version}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
-            UpdatedSuccesses = Successes#{ DatabaseId => Version },
+            UpdatedSuccesses = Successes#{DatabaseId => Version},
             perform_wait(ReplyRef, RemainingWaitersLeft, UpdatedSuccesses, Failures);
         {DatabaseId, {error, Reason}} ->
             {value, _, RemainingWaitersLeft} = lists:keytake(DatabaseId, 1, WaitersLeft),
-            UpdatedFailures = Failures#{ DatabaseId => Reason },
+            UpdatedFailures = Failures#{DatabaseId => Reason},
             perform_wait(ReplyRef, RemainingWaitersLeft, Successes, UpdatedFailures)
     end.
 

@@ -23,7 +23,7 @@ clean:
 	@rebar3 clean -a
 .PHONY: clean
 
-check: xref hank-dead-code-cleaner elvis-linter dialyzer
+check: check-formatted xref hank-dead-code-cleaner elvis-linter dialyzer
 .NOTPARALLEL: check
 .PHONY: check
 
@@ -31,6 +31,11 @@ test: eunit ct cli
 	./locus check --log-level debug test/priv/GeoLite2-Country.tar.gz
 .NOTPARALLEL: test
 .PHONY: test
+
+format:
+	@rebar3 fmt
+.NOTPARALLEL: format
+.PHONY: format
 
 ## Tests
 
@@ -43,6 +48,14 @@ eunit:
 .PHONY: eunit
 
 ## Checks
+
+check-formatted:
+	@if rebar3 plugins list | grep '^erlfmt\>' >/dev/null; then \
+		rebar3 fmt --check; \
+	else \
+		echo >&2 "WARN: skipping rebar3 erlfmt check"; \
+	fi
+.PHONY: check-formatted
 
 xref:
 	@rebar3 xref

@@ -38,9 +38,10 @@
 start(ReplyRef, DatabaseId, Timeout) ->
     OwnerPid = self(),
     spawn_link(
-      fun () ->
-              run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout)
-      end).
+        fun() ->
+            run_waiter(OwnerPid, ReplyRef, DatabaseId, Timeout)
+        end
+    ).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -58,32 +59,52 @@ reply_to_owner(OwnerPid, ReplyRef, DatabaseId, Reply) ->
     unlink(OwnerPid),
     exit(normal).
 
-wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                 Timeout, LoadAttemptFailures) ->
-
+wait_for_success(
+    OwnerPid,
+    SubscriptionRef,
+    ReplyRef,
+    DatabaseId,
+    Timeout,
+    LoadAttemptFailures
+) ->
     case receive_message(OwnerPid, SubscriptionRef, DatabaseId) of
         {already_loaded, Version} ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {ok, Version});
         database_unknown ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, database_unknown});
-
         {event, {load_attempt_finished, {cache, _}, {error, not_found}}} ->
-            wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                             Timeout, LoadAttemptFailures);
+            wait_for_success(
+                OwnerPid,
+                SubscriptionRef,
+                ReplyRef,
+                DatabaseId,
+                Timeout,
+                LoadAttemptFailures
+            );
         {event, {load_attempt_finished, _, {ok, Version}}} ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {ok, Version});
         {event, {load_attempt_finished, _, {error, Reason}}} ->
             UpdatedLoadAttemptFailures = [Reason | LoadAttemptFailures],
-            wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                             Timeout, UpdatedLoadAttemptFailures);
+            wait_for_success(
+                OwnerPid,
+                SubscriptionRef,
+                ReplyRef,
+                DatabaseId,
+                Timeout,
+                UpdatedLoadAttemptFailures
+            );
         {event, _} ->
-            wait_for_success(OwnerPid, SubscriptionRef, ReplyRef, DatabaseId,
-                             Timeout, LoadAttemptFailures);
-
+            wait_for_success(
+                OwnerPid,
+                SubscriptionRef,
+                ReplyRef,
+                DatabaseId,
+                Timeout,
+                LoadAttemptFailures
+            );
         timeout ->
             Reason = {timeout, lists:reverse(LoadAttemptFailures)},
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, Reason});
-
         {database_stopped, Reason} ->
             reply_to_owner(OwnerPid, ReplyRef, DatabaseId, {error, {stopped, Reason}});
         owner_stopped ->
@@ -97,13 +118,13 @@ receive_message(OwnerPid, SubscriptionRef, DatabaseId) ->
         {SubscriptionRef, {version, Version}} ->
             demonitor(SubscriptionRef, [flush]),
             {already_loaded, Version};
-        {'DOWN', SubscriptionRef, _, _, Reason}
-          when Reason =:= noproc;
-               Reason =:= normal;
-               Reason =:= shutdown;
-               element(1, Reason) =:= shutdown, tuple_size(Reason) =:= 2 ->
+        {'DOWN', SubscriptionRef, _, _, Reason} when
+            Reason =:= noproc;
+            Reason =:= normal;
+            Reason =:= shutdown;
+            element(1, Reason) =:= shutdown, tuple_size(Reason) =:= 2
+        ->
             database_unknown;
-
         {locus, DatabaseId, Event} ->
             {event, Event};
         {'DOWN', SubscriptionRef, _, _, Reason} ->

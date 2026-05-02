@@ -43,46 +43,54 @@
 %% Type Definitions
 %% ------------------------------------------------------------------
 
--type t()
-    :: #{ binary_format_version := binary_format_version(),
-          node_count := locus_mmdb_data:uint32(),
-          record_size := locus_mmdb_data:uint16(),
-          ip_version := 4 | 6,
-          database_type := locus_mmdb_data:utf8_string(),
-          languages => [locus_mmdb_data:utf8_string()],
-          build_epoch := locus_mmdb_data:uint64(), % UNIX timestamp
-          description => #{locus_mmdb_data:utf8_string() => locus_mmdb_data:utf8_string()},
-          {'$_unrecognized_properties'} => #{locus_mmdb_data:utf8_string()
-                                             := locus_mmdb_data_raw:value()}
-        }.
+-type t() ::
+    #{
+        binary_format_version := binary_format_version(),
+        node_count := locus_mmdb_data:uint32(),
+        record_size := locus_mmdb_data:uint16(),
+        ip_version := 4 | 6,
+        database_type := locus_mmdb_data:utf8_string(),
+        languages => [locus_mmdb_data:utf8_string()],
+        % UNIX timestamp
+        build_epoch := locus_mmdb_data:uint64(),
+        description => #{locus_mmdb_data:utf8_string() => locus_mmdb_data:utf8_string()},
+        {'$_unrecognized_properties'} => #{
+            locus_mmdb_data:utf8_string() :=
+                locus_mmdb_data_raw:value()
+        }
+    }.
 -export_type([t/0]).
 
--type binary_format_version() :: {2, locus_mmdb_data:uint16()}. % {Major, Minor}
+% {Major, Minor}
+-type binary_format_version() :: {2, locus_mmdb_data:uint16()}.
 -export_type([binary_format_version/0]).
 
--type parse_or_validation_error()
-    :: {marker_not_found, bitstring()}
-    |  {atom(), term(), list()} % Stacktrace
-    |  {not_a_map, term()}
-    |  {incompatible_binary_format_version, {locus_mmdb_data_raw:uint16(),
-                                             locus_mmdb_data_raw:uint16()}}
-    |  {invalid_binary_format_minor_version, term()}
-    |  {invalid_binary_format_major_version, term()}
-    |  {missing_metadata_keys, [unicode:unicode_binary(), ...]}
-    |  {invalid_node_count, locus_mmdb_data_raw:value()}
-    |  {missing_node_count, locus_mmdb_data_raw:map_()}
-    |  {invalid_record_size, locus_mmdb_data_raw:value()}
-    |  {missing_record_size, locus_mmdb_data_raw:map_()}
-    |  {invalid_ip_version, locus_mmdb_data_raw:value()}
-    |  {missing_ip_version, locus_mmdb_data_raw:map_()}
-    |  {invalid_database_type, locus_mmdb_data_raw:value()}
-    |  {missing_database_type, locus_mmdb_data_raw:map_()}
-    |  {languages_not_an_array, locus_mmdb_data_raw:value()}
-    |  {bad_languages, {language_number, pos_integer(), not_an_utf8_string,
-                        locus_mmdb_data_raw:value()}}
-    |  {description_not_a_map, locus_mmdb_data_raw:value()}
-    |  {bad_description, {for_language_code, unicode:unicode_binary(),
-                          {not_an_utf8_string, locus_mmdb_data_raw:value()}}}.
+-type parse_or_validation_error() ::
+    {marker_not_found, bitstring()}
+    % Stacktrace
+    | {atom(), term(), list()}
+    | {not_a_map, term()}
+    | {incompatible_binary_format_version, {
+        locus_mmdb_data_raw:uint16(), locus_mmdb_data_raw:uint16()
+    }}
+    | {invalid_binary_format_minor_version, term()}
+    | {invalid_binary_format_major_version, term()}
+    | {missing_metadata_keys, [unicode:unicode_binary(), ...]}
+    | {invalid_node_count, locus_mmdb_data_raw:value()}
+    | {missing_node_count, locus_mmdb_data_raw:map_()}
+    | {invalid_record_size, locus_mmdb_data_raw:value()}
+    | {missing_record_size, locus_mmdb_data_raw:map_()}
+    | {invalid_ip_version, locus_mmdb_data_raw:value()}
+    | {missing_ip_version, locus_mmdb_data_raw:map_()}
+    | {invalid_database_type, locus_mmdb_data_raw:value()}
+    | {missing_database_type, locus_mmdb_data_raw:map_()}
+    | {languages_not_an_array, locus_mmdb_data_raw:value()}
+    | {bad_languages,
+        {language_number, pos_integer(), not_an_utf8_string, locus_mmdb_data_raw:value()}}
+    | {description_not_a_map, locus_mmdb_data_raw:value()}
+    | {bad_description,
+        {for_language_code, unicode:unicode_binary(),
+            {not_an_utf8_string, locus_mmdb_data_raw:value()}}}.
 
 -export_type([parse_or_validation_error/0]).
 
@@ -95,22 +103,22 @@
 %% To proceed further with `TreeAndDataSection',
 %% see {@link locus_mmdb:unpack_tree_data_and_data_section/2}.
 %%
--spec parse_and_validate(EncodedDatabase) -> {ok, Metadata, TreeAndDataSection}
-                                             | {error, Reason}
-    when EncodedDatabase :: binary(),
-         Metadata :: t(),
-         TreeAndDataSection :: binary(),
-         Reason :: parse_or_validation_error().
+-spec parse_and_validate(EncodedDatabase) ->
+    {ok, Metadata, TreeAndDataSection}
+    | {error, Reason}
+when
+    EncodedDatabase :: binary(),
+    Metadata :: t(),
+    TreeAndDataSection :: binary(),
+    Reason :: parse_or_validation_error().
 parse_and_validate(EncodedDatabase) ->
     case binary:matches(EncodedDatabase, <<?METADATA_MARKER>>) of
         [_ | _] = PossibleMetadataMarkers ->
             {MetadataStart, _} = lists:last(PossibleMetadataMarkers),
-            <<TreeAndDataSection:MetadataStart/bytes,
-              ?METADATA_MARKER,
-              EncodedMetadata/bytes>> = EncodedDatabase,
+            <<TreeAndDataSection:MetadataStart/bytes, ?METADATA_MARKER, EncodedMetadata/bytes>> =
+                EncodedDatabase,
 
             parse_and_validate(EncodedMetadata, TreeAndDataSection);
-
         [] ->
             {error, {marker_not_found, <<?METADATA_MARKER>>}}
     end.
@@ -138,18 +146,31 @@ validate({map, MetadataMap}, TreeAndDataSection) ->
 validate(NotAMap, _OtherSections) ->
     {error, {not_a_map, NotAMap}}.
 
-validate_version(#{<<"binary_format_major_version">> := MajorVersion,
-                   <<"binary_format_minor_version">> := MinorVersion
-                  } = MetadataMap)
-->
+validate_version(
+    #{
+        <<"binary_format_major_version">> := MajorVersion,
+        <<"binary_format_minor_version">> := MinorVersion
+    } = MetadataMap
+) ->
     case {MajorVersion, MinorVersion} of
         {{uint16, 2}, {uint16, MinorVersionValue}} when MinorVersionValue >= 0 ->
-            RequiredKeys = [node_count, record_size, ip_version,
-                            database_type, languages, build_epoch, description],
+            RequiredKeys = [
+                node_count,
+                record_size,
+                ip_version,
+                database_type,
+                languages,
+                build_epoch,
+                description
+            ],
             Acc0 = [{binary_format_version, {2, MinorVersionValue}}],
-            RemainingMetadataMap = maps:without([<<"binary_format_major_version">>,
-                                                 <<"binary_format_minor_version">>],
-                                                MetadataMap),
+            RemainingMetadataMap = maps:without(
+                [
+                    <<"binary_format_major_version">>,
+                    <<"binary_format_minor_version">>
+                ],
+                MetadataMap
+            ),
             validate_recur(RequiredKeys, RemainingMetadataMap, Acc0);
         {{uint16, MajorVersionValue}, {uint16, MinorVersionValue}} ->
             {error, {incompatible_binary_format_version, {MajorVersionValue, MinorVersionValue}}};
@@ -185,8 +206,9 @@ validate_recur([record_size | Next], MetadataMap, Acc) ->
     end;
 validate_recur([ip_version | Next], MetadataMap, Acc) ->
     case maps:take(<<"ip_version">>, MetadataMap) of
-        {{uint16, IpVersionValue}, RemainingMetadataMap}
-          when IpVersionValue =:= 6; IpVersionValue =:= 4 ->
+        {{uint16, IpVersionValue}, RemainingMetadataMap} when
+            IpVersionValue =:= 6; IpVersionValue =:= 4
+        ->
             UpdatedAcc = [{ip_version, IpVersionValue} | Acc],
             validate_recur(Next, RemainingMetadataMap, UpdatedAcc);
         {InvalidIpVersion, _} ->
@@ -256,12 +278,18 @@ validate_languages(MetadataMap) ->
             skip
     end.
 
-validate_languages_recur([{utf8_string, LanguageValue} | Next],
-                         RemainingMetadataMap, Acc) ->
+validate_languages_recur(
+    [{utf8_string, LanguageValue} | Next],
+    RemainingMetadataMap,
+    Acc
+) ->
     UpdatedAcc = [LanguageValue | Acc],
     validate_languages_recur(Next, RemainingMetadataMap, UpdatedAcc);
-validate_languages_recur([BadLanguage | _Next],
-                         _RemainingMetadataMap, Acc) ->
+validate_languages_recur(
+    [BadLanguage | _Next],
+    _RemainingMetadataMap,
+    Acc
+) ->
     Position = length(Acc) + 1,
     {error, {bad_languages, {language_number, Position, not_an_utf8_string, BadLanguage}}};
 validate_languages_recur([], RemainingMetadataMap, Acc) ->
@@ -280,16 +308,27 @@ validate_description(MetadataMap) ->
             skip
     end.
 
-validate_description_recur([{<<LanguageCode/bytes>>, {utf8_string, LocalizedDescription}}
-                            | Next],
-                           RemainingMetadataMap, Acc) ->
+validate_description_recur(
+    [
+        {<<LanguageCode/bytes>>, {utf8_string, LocalizedDescription}}
+        | Next
+    ],
+    RemainingMetadataMap,
+    Acc
+) ->
     UpdatedAcc = [{LanguageCode, LocalizedDescription} | Acc],
     validate_description_recur(Next, RemainingMetadataMap, UpdatedAcc);
-validate_description_recur([{<<LanguageCode/bytes>>, BadLocalizedDescription}
-                            | _Next],
-                           _RemainingMetadataMap, _Acc) ->
-    {error, {bad_description, {for_language_code, LanguageCode,
-                               {not_an_utf8_string, BadLocalizedDescription}}}};
+validate_description_recur(
+    [
+        {<<LanguageCode/bytes>>, BadLocalizedDescription}
+        | _Next
+    ],
+    _RemainingMetadataMap,
+    _Acc
+) ->
+    {error,
+        {bad_description,
+            {for_language_code, LanguageCode, {not_an_utf8_string, BadLocalizedDescription}}}};
 validate_description_recur([], RemainingMetadataMap, Acc) ->
     Description = maps:from_list(Acc),
     {ok, Description, RemainingMetadataMap}.

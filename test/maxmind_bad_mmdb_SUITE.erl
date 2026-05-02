@@ -41,20 +41,27 @@ groups() ->
     DatabasePathsPattern = filename:join([BaseDatabasePath, "**", "*.mmdb"]),
     DatabasePaths = filelib:wildcard(DatabasePathsPattern),
     lists:filtermap(
-      fun (DatabasePath) ->
-              true = lists:prefix(BaseDatabasePath, DatabasePath),
-              DatabasePathTailLength = length(DatabasePath) - length(BaseDatabasePath),
-              DatabasePathTail = lists:sublist(DatabasePath, length(BaseDatabasePath) + 1,
-                                               DatabasePathTailLength),
-              Group = list_to_atom(DatabasePathTail),
-              {true, {Group, [parallel], test_cases()}}
-      end,
-      DatabasePaths).
+        fun(DatabasePath) ->
+            true = lists:prefix(BaseDatabasePath, DatabasePath),
+            DatabasePathTailLength = length(DatabasePath) - length(BaseDatabasePath),
+            DatabasePathTail = lists:sublist(
+                DatabasePath,
+                length(BaseDatabasePath) + 1,
+                DatabasePathTailLength
+            ),
+            Group = list_to_atom(DatabasePathTail),
+            {true, {Group, [parallel], test_cases()}}
+        end,
+        DatabasePaths
+    ).
 
 test_cases() ->
     Exports = ?MODULE:module_info(exports),
-    [Function || {Function, 1} <- Exports,
-                 lists:suffix("_test", atom_to_list(Function))].
+    [
+        Function
+     || {Function, 1} <- Exports,
+        lists:suffix("_test", atom_to_list(Function))
+    ].
 
 %%%%%%%%%%%%%%%
 init_per_suite(Config) ->
@@ -68,9 +75,11 @@ init_per_group(Group, Config) ->
     BaseDatabasePath = filename:join(?PROJECT_ROOT, ?DATABASES_ROOT_DIR),
     DatabasePathTail = atom_to_list(Group),
     DatabasePath = BaseDatabasePath ++ DatabasePathTail,
-    [{group, Group},
-     {database_path, DatabasePath}
-     | Config].
+    [
+        {group, Group},
+        {database_path, DatabasePath}
+        | Config
+    ].
 
 end_per_group(_Group, _Config) ->
     ok.
@@ -84,8 +93,10 @@ fail_to_unpack_or_check_test(Config) ->
     {ok, EncodedDatabase} = file:read_file(DatabasePath),
     case locus_mmdb:unpack_database(EncodedDatabase) of
         {ok, Database} ->
-            ?assertMatch({errors, [_ | _], _},
-                         locus_mmdb_check:run(Database));
+            ?assertMatch(
+                {errors, [_ | _], _},
+                locus_mmdb_check:run(Database)
+            );
         {error, _} ->
             ok
     end.

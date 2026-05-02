@@ -27,8 +27,13 @@
 -include_lib("stdlib/include/assert.hrl").
 
 -define(assertRecv(Pattern),
-        ((fun () -> receive Msg -> ?assertMatch((Pattern), Msg)
-                    after 30000 -> error(timeout) end end)())).
+    ((fun() ->
+        receive
+            Msg -> ?assertMatch((Pattern), Msg)
+        after 30000 -> error(timeout)
+        end
+    end)())
+).
 
 %% ------------------------------------------------------------------
 %% Setup
@@ -39,16 +44,24 @@ all() ->
 
 groups() ->
     LocalExtensions = ["tar.gz", "tgz", "tar", "mmdb", "mmdb.gz"],
-    FileSystemTests
-        = [{list_to_atom("from_filesystem_" ++ FileExtension),
-            _Opts = [parallel],
-            locus_test_utils:test_cases(?MODULE)}
-           || FileExtension <- LocalExtensions],
-    CustomFetcherTests
-        = [{list_to_atom("from_custom_" ++ FileExtension),
-            _Opts = [parallel],
-            locus_test_utils:test_cases(?MODULE)}
-           || FileExtension <- LocalExtensions],
+    FileSystemTests =
+        [
+            {
+                list_to_atom("from_filesystem_" ++ FileExtension),
+                _Opts = [parallel],
+                locus_test_utils:test_cases(?MODULE)
+            }
+         || FileExtension <- LocalExtensions
+        ],
+    CustomFetcherTests =
+        [
+            {
+                list_to_atom("from_custom_" ++ FileExtension),
+                _Opts = [parallel],
+                locus_test_utils:test_cases(?MODULE)
+            }
+         || FileExtension <- LocalExtensions
+        ],
 
     FileSystemTests ++ CustomFetcherTests.
 
@@ -61,43 +74,55 @@ init_per_group(GroupName, Config) ->
     case atom_to_list(GroupName) of
         "from_filesystem_" ++ FileExtension ->
             PathWithTestTarballs = locus_test_utils:path_with_test_tarballs(),
-            DatabasePath
-                = filename:join(PathWithTestTarballs, "GeoLite2-Country." ++ FileExtension),
-            WrongPath
-                = filename:join(PathWithTestTarballs, "foobarbarfoofoobar"),
-            CorruptPath
-                = filename:join(PathWithTestTarballs, "corruption." ++ FileExtension),
+            DatabasePath =
+                filename:join(PathWithTestTarballs, "GeoLite2-Country." ++ FileExtension),
+            WrongPath =
+                filename:join(PathWithTestTarballs, "foobarbarfoofoobar"),
+            CorruptPath =
+                filename:join(PathWithTestTarballs, "corruption." ++ FileExtension),
 
-            [{group_type, filesystem},
-             {load_from, DatabasePath},
-             {wrong_load_from, WrongPath},
-             {corrupt_load_from, CorruptPath}
-             | Config];
-
+            [
+                {group_type, filesystem},
+                {load_from, DatabasePath},
+                {wrong_load_from, WrongPath},
+                {corrupt_load_from, CorruptPath}
+                | Config
+            ];
         "from_custom_" ++ FileExtension ->
             ModifiedOn = calendar:universal_time(),
 
-            {ok, GoodPid} = locus_test_custom_fetcher:start("GeoLite2-Country", FileExtension,
-                                                            ModifiedOn),
+            {ok, GoodPid} = locus_test_custom_fetcher:start(
+                "GeoLite2-Country",
+                FileExtension,
+                ModifiedOn
+            ),
             GoodFetcherArgs = #{locality => local, pid => GoodPid},
             GoodFetcher = {custom_fetcher, locus_test_custom_fetcher, GoodFetcherArgs},
 
-            {ok, BadPid} = locus_test_custom_fetcher:start("foobarbarfoofoobar", FileExtension,
-                                                           ModifiedOn),
+            {ok, BadPid} = locus_test_custom_fetcher:start(
+                "foobarbarfoofoobar",
+                FileExtension,
+                ModifiedOn
+            ),
             BadFetcherArgs = #{locality => local, pid => BadPid},
             BadFetcher = {custom_fetcher, locus_test_custom_fetcher, BadFetcherArgs},
 
-            {ok, UglyPid} = locus_test_custom_fetcher:start("corruption", FileExtension,
-                                                           ModifiedOn),
+            {ok, UglyPid} = locus_test_custom_fetcher:start(
+                "corruption",
+                FileExtension,
+                ModifiedOn
+            ),
             UglyFetcherArgs = #{locality => local, pid => UglyPid},
             UglyFetcher = {custom_fetcher, locus_test_custom_fetcher, UglyFetcherArgs},
 
-            [{group_type, custom_fetcher},
-             {load_from, GoodFetcher},
-             {wrong_load_from, BadFetcher},
-             {corrupt_load_from, UglyFetcher},
-             {custom_fetcher_pids, [GoodPid, BadPid, UglyPid]}
-             | Config]
+            [
+                {group_type, custom_fetcher},
+                {load_from, GoodFetcher},
+                {wrong_load_from, BadFetcher},
+                {corrupt_load_from, UglyFetcher},
+                {custom_fetcher_pids, [GoodPid, BadPid, UglyPid]}
+                | Config
+            ]
     end.
 
 end_per_group(GroupName, Config) ->
@@ -105,7 +130,6 @@ end_per_group(GroupName, Config) ->
         "from_filesystem_" ++ _FileExtension ->
             ok = application:stop(locus),
             Config;
-
         "from_custom_" ++ _FileExtension ->
             [GoodPid, BadPid, UglyPid] = proplists:get_value(custom_fetcher_pids, Config),
             ok = locus_test_custom_fetcher:stop(GoodPid),
@@ -136,17 +160,15 @@ wrong_source_test(Config) ->
     ok = locus:start_loader(Loader, WrongLoadFrom, LoaderOpts),
     case proplists:get_value(group_type, Config) of
         filesystem ->
-            ?assertRecv({locus, Loader, {load_attempt_started,
-                                         {filesystem, _}}}),
-            ?assertRecv({locus, Loader, {load_attempt_finished,
-                                         {filesystem, _},
-                                         {error, not_found}}});
+            ?assertRecv({locus, Loader, {load_attempt_started, {filesystem, _}}}),
+            ?assertRecv(
+                {locus, Loader, {load_attempt_finished, {filesystem, _}, {error, not_found}}}
+            );
         custom_fetcher ->
-            ?assertRecv({locus, Loader, {load_attempt_started,
-                                         {local, {custom, _}}}}),
-            ?assertRecv({locus, Loader, {load_attempt_finished,
-                                         {local, {custom, _}},
-                                         {error, not_found}}})
+            ?assertRecv({locus, Loader, {load_attempt_started, {local, {custom, _}}}}),
+            ?assertRecv(
+                {locus, Loader, {load_attempt_finished, {local, {custom, _}}, {error, not_found}}}
+            )
     end,
     ok = locus:stop_loader(Loader).
 
@@ -157,17 +179,18 @@ corrupt_database_test(Config) ->
     ok = locus:start_loader(Loader, CorruptLoadFrom, LoaderOpts),
     case proplists:get_value(group_type, Config) of
         filesystem ->
-            ?assertRecv({locus, Loader, {load_attempt_started,
-                                         {filesystem, _}}}),
-            ?assertRecv({locus, Loader, {load_attempt_finished,
-                                         {filesystem, _},
-                                         {error, {unpack_database_from, _, _}}}});
+            ?assertRecv({locus, Loader, {load_attempt_started, {filesystem, _}}}),
+            ?assertRecv(
+                {locus, Loader,
+                    {load_attempt_finished, {filesystem, _}, {error, {unpack_database_from, _, _}}}}
+            );
         custom_fetcher ->
-            ?assertRecv({locus, Loader, {load_attempt_started,
-                                         {local, {custom, _}}}}),
-            ?assertRecv({locus, Loader, {load_attempt_finished,
-                                         {local, {custom,  _}},
-                                         {error, {unpack_database_from, _, _}}}})
+            ?assertRecv({locus, Loader, {load_attempt_started, {local, {custom, _}}}}),
+            ?assertRecv(
+                {locus, Loader,
+                    {load_attempt_finished, {local, {custom, _}},
+                        {error, {unpack_database_from, _, _}}}}
+            )
     end,
     ok = locus:stop_loader(Loader).
 

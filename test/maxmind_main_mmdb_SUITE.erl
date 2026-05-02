@@ -41,18 +41,22 @@ groups() ->
     DatabasePathsPattern = filename:join([?PROJECT_ROOT, ?TEST_DBS_REL_PATH, "*.mmdb"]),
     DatabasePaths = filelib:wildcard(DatabasePathsPattern),
     lists:filtermap(
-      fun (DatabasePath) ->
-              DatabaseFilename = filename:basename(DatabasePath),
-              GroupName = filename:rootname(DatabaseFilename),
-              Group = list_to_atom(GroupName),
-              {true, {Group, [parallel], test_cases()}}
-      end,
-      DatabasePaths).
+        fun(DatabasePath) ->
+            DatabaseFilename = filename:basename(DatabasePath),
+            GroupName = filename:rootname(DatabaseFilename),
+            Group = list_to_atom(GroupName),
+            {true, {Group, [parallel], test_cases()}}
+        end,
+        DatabasePaths
+    ).
 
 test_cases() ->
     Exports = ?MODULE:module_info(exports),
-    [Function || {Function, 1} <- Exports,
-                 lists:suffix("_test", atom_to_list(Function))].
+    [
+        Function
+     || {Function, 1} <- Exports,
+        lists:suffix("_test", atom_to_list(Function))
+    ].
 
 %%%%%%%%%%%%%%%
 init_per_group(Group, Config) ->
@@ -69,15 +73,19 @@ init_per_group(Group, Config) ->
     case file:read_file(SourcePath) of
         {ok, BinGroupDef} when not IsBroken ->
             JsonGroupDef = jsx:decode(BinGroupDef),
-            [{json_group_def, JsonGroupDef},
-             {json_group_def_filename, SourceFilename},
-             {bin_database, BinDatabase}
-             | Config];
+            [
+                {json_group_def, JsonGroupDef},
+                {json_group_def_filename, SourceFilename},
+                {bin_database, BinDatabase}
+                | Config
+            ];
         {error, enoent} ->
-            [{bin_database, BinDatabase},
-             {json_group_def_filename, SourceFilename},
-             {is_broken, IsBroken}
-             | Config]
+            [
+                {bin_database, BinDatabase},
+                {json_group_def_filename, SourceFilename},
+                {is_broken, IsBroken}
+                | Config
+            ]
     end.
 
 end_per_group(_Group, _Config) ->
@@ -94,30 +102,42 @@ unpack_and_check_database_test(Config) ->
             ?assertMatch(ok, unpack_and_check_database(Config));
         true ->
             ?assertMatch(
-               {errors, [_ | _], _},
-               unpack_and_check_database(Config))
+                {errors, [_ | _], _},
+                unpack_and_check_database(Config)
+            )
     end.
-
 
 expected_lookup_results_test(Config) ->
     case lists:keymember(json_group_def, 1, Config) of
         true ->
-            {json_group_def_filename, SourceFilename} = lists:keyfind(json_group_def_filename,
-                                                                      1, Config),
+            {json_group_def_filename, SourceFilename} = lists:keyfind(
+                json_group_def_filename,
+                1,
+                Config
+            ),
             {ok, Database} = unpack_database(Config),
             lists:foreach(
-              fun ({TestCaseIndex, Address, Expectation}) ->
-                      Reality = determine_lookup_reality(Database, Address),
-                      ?assertEqual(Expectation, Reality,
-                                   unicode:characters_to_list(
-                                     io_lib:format("Source filename: '~ts'"
-                                                   ", test case index: ~b"
-                                                   ", address ~p",
-                                                   [SourceFilename, TestCaseIndex,
-                                                    Address])
-                                    ))
-              end,
-              expected_lookup_results(Config));
+                fun({TestCaseIndex, Address, Expectation}) ->
+                    Reality = determine_lookup_reality(Database, Address),
+                    ?assertEqual(
+                        Expectation,
+                        Reality,
+                        unicode:characters_to_list(
+                            io_lib:format(
+                                "Source filename: '~ts'"
+                                ", test case index: ~b"
+                                ", address ~p",
+                                [
+                                    SourceFilename,
+                                    TestCaseIndex,
+                                    Address
+                                ]
+                            )
+                        )
+                    )
+                end,
+                expected_lookup_results(Config)
+            );
         false ->
             {skip, "No source available for comparison."}
     end.
@@ -129,17 +149,19 @@ expected_lookup_results_test(Config) ->
 guess_brokenness(GroupName) ->
     LowerCase = string:to_lower(GroupName),
     lists:any(
-      fun (Pattern) ->
-              string:str(LowerCase, Pattern) > 0
-      end,
-      ["-broken-", "-invalid-"]).
+        fun(Pattern) ->
+            string:str(LowerCase, Pattern) > 0
+        end,
+        ["-broken-", "-invalid-"]
+    ).
 
 unpack_and_check_database(Config) ->
     case unpack_database(Config) of
         {ok, Database} ->
             locus_mmdb_check:run(Database);
         {error, Reason} ->
-            {errors, [Reason], []} % Dirty hack
+            % Dirty hack
+            {errors, [Reason], []}
     end.
 
 unpack_database(Config) ->
@@ -151,16 +173,23 @@ expected_lookup_results(Config) ->
     JsonGroupDefIndices = lists:seq(1, length(JsonGroupDef)),
     EnumeratedJsonGroupDef = lists:zip(JsonGroupDefIndices, JsonGroupDef),
     lists:foldr(
-      fun ({TestCaseIndex, JsonDict}, Acc) ->
-              maps:fold(
-                fun (Address, UncomparableSuccess, SubAcc) ->
-                        expected_lookup_results(TestCaseIndex, Address,
-                                                UncomparableSuccess,
-                                                SubAcc)
+        fun({TestCaseIndex, JsonDict}, Acc) ->
+            maps:fold(
+                fun(Address, UncomparableSuccess, SubAcc) ->
+                    expected_lookup_results(
+                        TestCaseIndex,
+                        Address,
+                        UncomparableSuccess,
+                        SubAcc
+                    )
                 end,
-                Acc, JsonDict)
-      end,
-      [], EnumeratedJsonGroupDef).
+                Acc,
+                JsonDict
+            )
+        end,
+        [],
+        EnumeratedJsonGroupDef
+    ).
 
 expected_lookup_results(TestCaseIndex, Address, UncomparableSuccess, Acc) ->
     ComparableSuccess = comparable_lookup_success(UncomparableSuccess),
@@ -178,14 +207,16 @@ determine_lookup_reality(Database, Address) ->
 
 comparable_lookup_success(Map) when is_map(Map) ->
     maps:map(
-      fun (_Key, Value) ->
-              comparable_lookup_success(Value)
-      end,
-      Map);
+        fun(_Key, Value) ->
+            comparable_lookup_success(Value)
+        end,
+        Map
+    );
 comparable_lookup_success(List) when is_list(List) ->
     lists:map(
-      fun comparable_lookup_success/1,
-      List);
+        fun comparable_lookup_success/1,
+        List
+    );
 comparable_lookup_success(Binary) when is_binary(Binary) ->
     try binary_to_float(Binary) of
         Float ->

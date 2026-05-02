@@ -35,26 +35,28 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [version/1
-   ]).
+    [version/1]
+).
 
 %% ------------------------------------------------------------------
 %% "Private" API Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [start/3,
-    stop/2,
-    start_link/3,
-    dynamic_child_spec/1,
-    static_child_spec/4,
-    async_get_version_or_subscribe/1,
-    find/1
-   ]).
+    [
+        start/3,
+        stop/2,
+        start_link/3,
+        dynamic_child_spec/1,
+        static_child_spec/4,
+        async_get_version_or_subscribe/1,
+        find/1
+    ]
+).
 
 -ignore_xref(
-   [start_link/3
-   ]).
+    [start_link/3]
+).
 
 -ifdef(TEST).
 -export([whereis/1]).
@@ -66,13 +68,15 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -87,34 +91,35 @@
 %% ------------------------------------------------------------------
 
 -type opt() ::
-    database_opt() |
-    locus_loader:opt().
+    database_opt()
+    | locus_loader:opt().
 -export_type([opt/0]).
 
 -type database_opt() :: {event_subscriber, atom() | pid()}.
 -export_type([database_opt/0]).
 
 -type static_child_spec() ::
-    #{ id := term(),
-       start := {?MODULE, start_link, [atom() | origin() | [opt()], ...]},
-       restart := permanent,
-       shutdown := non_neg_integer(),
-       type := worker,
-       modules := [?MODULE, ...]
-     }.
+    #{
+        id := term(),
+        start := {?MODULE, start_link, [atom() | origin() | [opt()], ...]},
+        restart := permanent,
+        shutdown := non_neg_integer(),
+        type := worker,
+        modules := [?MODULE, ...]
+    }.
 -export_type([static_child_spec/0]).
 
 -type origin() :: locus_loader:origin().
 -export_type([origin/0]).
 
 -type event() ::
-    locus_loader:event() |
-    event_load_attempt_finished().
+    locus_loader:event()
+    | event_load_attempt_finished().
 -export_type([event/0]).
 
 -type event_load_attempt_finished() ::
-    {load_attempt_finished, locus_loader:source(), {ok, Version :: calendar:datetime()}} |
-    {load_attempt_finished, locus_loader:source(), {error, term()}}.
+    {load_attempt_finished, locus_loader:source(), {ok, Version :: calendar:datetime()}}
+    | {load_attempt_finished, locus_loader:source(), {error, term()}}.
 -export_type([event_load_attempt_finished/0]).
 
 %% ------------------------------------------------------------------
@@ -122,30 +127,30 @@
 %% ------------------------------------------------------------------
 
 -record(state, {
-          id :: atom(),
-          loader_pid :: pid(),
-          subscribers :: [atom() | pid()],
-          subscriber_mons :: #{monitor() => pid()}
-         }).
+    id :: atom(),
+    loader_pid :: pid(),
+    subscribers :: [atom() | pid()],
+    subscriber_mons :: #{monitor() => pid()}
+}).
 -opaque state() :: #state{}.
 -export_type([state/0]).
 
 -type monitor() :: reference().
 
 -record(shared_state, {
-          database :: locus_mmdb:database(),
-          source :: locus_loader:source(),
-          version :: calendar:datetime()
-         }).
+    database :: locus_mmdb:database(),
+    source :: locus_loader:source(),
+    version :: calendar:datetime()
+}).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
 %% @doc Returns the database version based on its build epoch (UNIX timestamp)
--spec version(BuildEpoch) -> Version
-        when BuildEpoch :: non_neg_integer(),
-             Version :: calendar:datetime().
+-spec version(BuildEpoch) -> Version when
+    BuildEpoch :: non_neg_integer(),
+    Version :: calendar:datetime().
 version(BuildEpoch) ->
     GregorianEpoch = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}),
     calendar:gregorian_seconds_to_datetime(GregorianEpoch + BuildEpoch).
@@ -154,11 +159,11 @@ version(BuildEpoch) ->
 %% "Private" API Function Definitions
 %% ------------------------------------------------------------------
 
--spec start(atom(), origin(), [opt()])
-        -> ok |
-           {error, already_started} |
-           {error, {invalid_opt, term()}} |
-           {error, application_not_running}.
+-spec start(atom(), origin(), [opt()]) ->
+    ok
+    | {error, already_started}
+    | {error, {invalid_opt, term()}}
+    | {error, application_not_running}.
 %% @private
 start(Id, Origin, Opts) ->
     case locus_database_sup:start_child([Id, Origin, Opts]) of
@@ -193,24 +198,26 @@ start_link(Id, Origin, Opts) ->
 -spec dynamic_child_spec(term()) -> supervisor:child_spec().
 %% @private
 dynamic_child_spec(ChildId) ->
-    #{ id => ChildId,
-       start => {?MODULE, start_link, []},
-       restart => transient,
-       shutdown => timer:seconds(5),
-       type => worker,
-       modules => [?MODULE]
-     }.
+    #{
+        id => ChildId,
+        start => {?MODULE, start_link, []},
+        restart => transient,
+        shutdown => timer:seconds(5),
+        type => worker,
+        modules => [?MODULE]
+    }.
 
 -spec static_child_spec(term(), atom(), origin(), [opt()]) -> static_child_spec().
 %% @private
 static_child_spec(ChildId, DatabaseId, Origin, Opts) ->
-    #{ id => ChildId,
-       start => {?MODULE, start_link, [DatabaseId, Origin, Opts]},
-       restart => permanent,
-       shutdown => timer:seconds(5),
-       type => worker,
-       modules => [?MODULE]
-     }.
+    #{
+        id => ChildId,
+        start => {?MODULE, start_link, [DatabaseId, Origin, Opts]},
+        restart => permanent,
+        shutdown => timer:seconds(5),
+        type => worker,
+        modules => [?MODULE]
+    }.
 
 -spec async_get_version_or_subscribe(atom()) -> {await, reference()}.
 %% @private
@@ -221,9 +228,10 @@ async_get_version_or_subscribe(Id) ->
     gen_server:cast(ServerPid, {get_version_or_subscribe, {self(), Ref}}),
     {await, Ref}.
 
--spec find(atom()) -> {ok, locus_mmdb:database(), locus_loader:source(), calendar:datetime()}
-                      | {error, database_not_loaded}
-                      | {error, database_unknown}.
+-spec find(atom()) ->
+    {ok, locus_mmdb:database(), locus_loader:source(), calendar:datetime()}
+    | {error, database_not_loaded}
+    | {error, database_unknown}.
 %% @private
 find(Id) ->
     case find_shared_state(Id) of
@@ -232,8 +240,10 @@ find(Id) ->
         error ->
             ServerName = server_name(Id),
             DoesLoaderExist = (erlang:whereis(ServerName) =/= undefined),
-            ErrorReason = maps:get(DoesLoaderExist, #{true => database_not_loaded,
-                                                      false => database_unknown}),
+            ErrorReason = maps:get(DoesLoaderExist, #{
+                true => database_not_loaded,
+                false => database_unknown
+            }),
             {error, ErrorReason}
     end.
 
@@ -252,9 +262,9 @@ list_subscribers(Id) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([atom() | origin() | [opt()], ...])
-    -> {ok, state()} |
-       {stop, {invalid_opt, term()}}.
+-spec init([atom() | origin() | [opt()], ...]) ->
+    {ok, state()}
+    | {stop, {invalid_opt, term()}}.
 %% @private
 init([Id, Origin, Opts]) ->
     _ = process_flag(trap_exit, true),
@@ -265,15 +275,15 @@ init([Id, Origin, Opts]) ->
             {stop, {invalid_opt, BadOpt}}
     end.
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {stop, unexpected_call, state()}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
     {stop, unexpected_call, State}.
 
--spec handle_cast(term(), state())
-        -> {noreply, state()} |
-           {stop, unexpected_cast, state()}.
+-spec handle_cast(term(), state()) ->
+    {noreply, state()}
+    | {stop, unexpected_cast, state()}.
 %% @private
 handle_cast({get_version_or_subscribe, {Pid, Ref}}, State) ->
     case find_shared_state(State#state.id) of
@@ -281,8 +291,10 @@ handle_cast({get_version_or_subscribe, {Pid, Ref}}, State) ->
             Mon = monitor(process, Pid),
             UpdatedSubscribers = [Pid | State#state.subscribers],
             UpdatedSubscriberMons = maps:put(Mon, Pid, State#state.subscriber_mons),
-            UpdatedState = State#state{ subscribers = UpdatedSubscribers,
-                                        subscriber_mons = UpdatedSubscriberMons },
+            UpdatedState = State#state{
+                subscribers = UpdatedSubscribers,
+                subscriber_mons = UpdatedSubscriberMons
+            },
             {noreply, UpdatedState};
         {ok, #shared_state{version = LastVersion}} ->
             _ = Pid ! {Ref, {version, LastVersion}},
@@ -291,12 +303,13 @@ handle_cast({get_version_or_subscribe, {Pid, Ref}}, State) ->
 handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
 
--spec handle_info(term(), state())
-        -> {noreply, state()} |
-           {stop, term(), state()}.
+-spec handle_info(term(), state()) ->
+    {noreply, state()}
+    | {stop, term(), state()}.
 %% @private
-handle_info({LoaderPid, Msg}, State)
-  when LoaderPid =:= State#state.loader_pid ->
+handle_info({LoaderPid, Msg}, State) when
+    LoaderPid =:= State#state.loader_pid
+->
     handle_loader_msg(Msg, State);
 handle_info({'DOWN', Ref, process, _, _}, State) ->
     handle_monitored_process_death(Ref, State);
@@ -308,11 +321,12 @@ handle_info(_Info, State) ->
 -spec terminate(term(), state()) -> ok.
 %% @private
 terminate(Reason, State) ->
-    _ = (locus_util:is_termination_reason_harmless(Reason)
-         % Avoid erasing shared state if we're in a crash cycle
-         % (as frequent restarts could put quite a strain on
-         %  the GC and/or memory consumption.)
-         andalso erase_shared_state(State#state.id)),
+    _ =
+        (locus_util:is_termination_reason_harmless(Reason) andalso
+            % Avoid erasing shared state if we're in a crash cycle
+            % (as frequent restarts could put quite a strain on
+            %  the GC and/or memory consumption.)
+            erase_shared_state(State#state.id)),
     ok.
 
 -spec code_change(term(), state(), term()) -> {ok, state()}.
@@ -327,14 +341,14 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 -spec server_name(atom()) -> atom().
 server_name(Id) ->
     list_to_atom(
-      atom_to_list(?MODULE)
-      ++ "."
-      ++ atom_to_list(Id)
-     ).
+        atom_to_list(?MODULE) ++
+            "." ++
+            atom_to_list(Id)
+    ).
 
--spec validate_opts(origin(), list())
-        -> {ok, {[database_opt()], [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]}} |
-           {error, term()}.
+-spec validate_opts(origin(), list()) ->
+    {ok, {[database_opt()], [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]}}
+    | {error, term()}.
 validate_opts(Origin, Opts) ->
     case locus_loader:validate_opts(Origin, Opts) of
         {ok, {LoaderOpts, FetcherOpts, DatabaseOpts}} ->
@@ -343,20 +357,22 @@ validate_opts(Origin, Opts) ->
             {error, BadOpt}
     end.
 
--spec validate_database_opts(list(), [locus_loader:loader_opt()], [locus_loader:fetcher_opt()])
-        -> {ok, {[database_opt()], [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]}} |
-           {error, term()}.
+-spec validate_database_opts(list(), [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]) ->
+    {ok, {[database_opt()], [locus_loader:loader_opt()], [locus_loader:fetcher_opt()]}}
+    | {error, term()}.
 validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts) ->
     case
         locus_util:lists_anymap(
-          fun ({event_subscriber, Module}) when is_atom(Module) ->
-                  Module =:= undefined;
-              ({event_subscriber, Pid}) ->
-                  not is_pid(Pid);
-              (_) ->
-                  true
-          end,
-          DatabaseOpts)
+            fun
+                ({event_subscriber, Module}) when is_atom(Module) ->
+                    Module =:= undefined;
+                ({event_subscriber, Pid}) ->
+                    not is_pid(Pid);
+                (_) ->
+                    true
+            end,
+            DatabaseOpts
+        )
     of
         {true, BadOpt} ->
             {error, BadOpt};
@@ -364,36 +380,45 @@ validate_database_opts(DatabaseOpts, LoaderOpts, FetcherOpts) ->
             {ok, {DatabaseOpts, LoaderOpts, FetcherOpts}}
     end.
 
--spec init(atom(), origin(), [database_opt()], [locus_loader:loader_opt()],
-           [locus_loader:fetcher_opt()]) -> {ok, state()}.
+-spec init(
+    atom(),
+    origin(),
+    [database_opt()],
+    [locus_loader:loader_opt()],
+    [locus_loader:fetcher_opt()]
+) -> {ok, state()}.
 init(Id, Origin, DatabaseOpts, LoaderOpts, FetcherOpts) ->
     {ok, LoaderPid} = locus_loader:start_link(Id, Origin, LoaderOpts, FetcherOpts),
     BaseState =
         #state{
-           id = Id,
-           loader_pid = LoaderPid,
-           subscribers = [],
-           subscriber_mons = #{}
-          },
+            id = Id,
+            loader_pid = LoaderPid,
+            subscribers = [],
+            subscriber_mons = #{}
+        },
     init_opts(DatabaseOpts, BaseState).
 
 -spec init_opts([database_opt()], state()) -> {ok, state()}.
-init_opts([{event_subscriber, Module} | Opts], State)
-  when is_atom(Module) ->
+init_opts([{event_subscriber, Module} | Opts], State) when
+    is_atom(Module)
+->
     #state{subscribers = Subscribers} = State,
     UpdatedSubscribers = [Module | Subscribers],
-    UpdatedState = State#state{ subscribers = UpdatedSubscribers },
+    UpdatedState = State#state{subscribers = UpdatedSubscribers},
     init_opts(Opts, UpdatedState);
 init_opts([{event_subscriber, Pid} | Opts], State) ->
     #state{subscribers = Subscribers, subscriber_mons = SubscriberMons} = State,
     Mon = monitor(process, Pid),
     UpdatedSubscribers = [Pid | Subscribers],
     UpdatedSubscriberMons = SubscriberMons#{Mon => Pid},
-    UpdatedState = State#state{ subscribers = UpdatedSubscribers,
-                                subscriber_mons = UpdatedSubscriberMons },
+    UpdatedState = State#state{
+        subscribers = UpdatedSubscribers,
+        subscriber_mons = UpdatedSubscriberMons
+    },
     init_opts(Opts, UpdatedState);
 init_opts([], State) ->
-    _ = process_flag(trap_exit, true), % ensure `:terminate/2' is called (unless killed)
+    % ensure `:terminate/2' is called (unless killed)
+    _ = process_flag(trap_exit, true),
     {ok, State}.
 
 -spec handle_loader_msg(locus_loader:msg(), state()) -> {noreply, state()}.
@@ -411,26 +436,31 @@ handle_loader_msg({load_failure, Source, Reason}, State) ->
 -spec report_event(event(), state()) -> ok.
 report_event(Event, #state{id = Id, subscribers = Subscribers}) ->
     lists:foreach(
-      fun (Module) when is_atom(Module) ->
-              locus_event_subscriber:report(Module, Id, Event);
-          (Pid) ->
-              erlang:send(Pid, {locus, Id, Event}, [noconnect])
-      end,
-      Subscribers).
+        fun
+            (Module) when is_atom(Module) ->
+                locus_event_subscriber:report(Module, Id, Event);
+            (Pid) ->
+                erlang:send(Pid, {locus, Id, Event}, [noconnect])
+        end,
+        Subscribers
+    ).
 
 -spec handle_monitored_process_death(monitor(), state()) -> {noreply, state()}.
 handle_monitored_process_death(Ref, State) ->
     #state{subscribers = Subscribers, subscriber_mons = SubscriberMons} = State,
     {Pid, UpdatedSubscriberMons} = maps:take(Ref, SubscriberMons),
     {ok, UpdatedSubscribers} = locus_util:lists_take(Pid, Subscribers),
-    UpdatedState = State#state{ subscribers = UpdatedSubscribers,
-                                subscriber_mons = UpdatedSubscriberMons },
+    UpdatedState = State#state{
+        subscribers = UpdatedSubscribers,
+        subscriber_mons = UpdatedSubscriberMons
+    },
     {noreply, UpdatedState}.
 
--spec handle_linked_process_death(pid(), term(), state())
-        -> {stop, {loader_stopped, pid(), term()}, state()}.
-handle_linked_process_death(Pid, Reason, State)
-  when Pid =:= State#state.loader_pid ->
+-spec handle_linked_process_death(pid(), term(), state()) ->
+    {stop, {loader_stopped, pid(), term()}, state()}.
+handle_linked_process_death(Pid, Reason, State) when
+    Pid =:= State#state.loader_pid
+->
     {stop, {loader_stopped, Pid, Reason}, State}.
 
 %% ------------------------------------------------------------------
@@ -470,40 +500,45 @@ large_binaries_in_gcollected_persistent_term_are_copied_by_ref_test() ->
     Key = {?MODULE, ?FUNCTION_NAME, make_ref()},
 
     Randomizer = rand:uniform(1024),
-    BinarySize = 1024 * 1024, % large enough to be ref counted
+    % large enough to be ref counted
+    BinarySize = 1024 * 1024,
     Binary = <<0:BinarySize/integer-unit:8>>,
     SubBinarySize = 1024 + Randomizer,
     <<SubBinary:SubBinarySize/bytes, _/bytes>> = Binary,
     persistent_term:put(Key, SubBinary),
 
     TestPid = self(),
-    HelperPid
-        = spawn_link(
-            fun () ->
-                    RetrievedSubBinary = persistent_term:get(Key),
-                    TestPid ! ready_to_check,
-                    receive
-                        check_it ->
-                            erlang:garbage_collect(), % just to be sure
-                            ?assertEqual(BinarySize,
-                                         binary:referenced_byte_size(RetrievedSubBinary))
-                    after
-                        5000 ->
-                            error(timeout)
-                    end
-            end),
+    HelperPid =
+        spawn_link(
+            fun() ->
+                RetrievedSubBinary = persistent_term:get(Key),
+                TestPid ! ready_to_check,
+                receive
+                    check_it ->
+                        % just to be sure
+                        erlang:garbage_collect(),
+                        ?assertEqual(
+                            BinarySize,
+                            binary:referenced_byte_size(RetrievedSubBinary)
+                        )
+                after 5000 ->
+                    error(timeout)
+                end
+            end
+        ),
 
-    _ = receive
+    _ =
+        receive
             ready_to_check -> ok
-        after
-            5000 ->
-                error(timeout)
+        after 5000 ->
+            error(timeout)
         end,
 
     RetrievedSubBinary = persistent_term:get(Key),
     persistent_term:put(Key, updated_value),
     HelperPid ! check_it,
-    erlang:garbage_collect(), % just to be sure
+    % just to be sure
+    erlang:garbage_collect(),
 
     ?assertEqual(BinarySize, binary:referenced_byte_size(RetrievedSubBinary)).
 
@@ -555,4 +590,5 @@ wait_for_database_to_load(Ref, Id) ->
             exit(Reason)
     end.
 
--endif. % -ifdef(TEST).
+% -ifdef(TEST).
+-endif.

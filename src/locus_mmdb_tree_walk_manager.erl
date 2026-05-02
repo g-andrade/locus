@@ -32,26 +32,30 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [new_counters/0,
-    start_link/2,
-    new_handle/3,
-    take_index/1,
-    maybe_give_index/3,
-    stop/1
-   ]).
+    [
+        new_counters/0,
+        start_link/2,
+        new_handle/3,
+        take_index/1,
+        maybe_give_index/3,
+        stop/1
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -68,19 +72,19 @@
 -export_type([counters/0]).
 
 -record(handle, {
-          pid :: pid(),
-          counters :: counters(),
-          concurrent :: boolean()
-         }).
+    pid :: pid(),
+    counters :: counters(),
+    concurrent :: boolean()
+}).
 -opaque handle() :: #handle{}.
 -export_type([handle/0]).
 
 -record(state, {
-          walk_started :: boolean(),
-          counters :: counters(),
-          concurrency :: pos_integer(),
-          free_workers :: [{pid(), reply_tag()}]
-         }).
+    walk_started :: boolean(),
+    counters :: counters(),
+    concurrency :: pos_integer(),
+    free_workers :: [{pid(), reply_tag()}]
+}).
 -opaque state() :: #state{}.
 -export_type([state/0]).
 
@@ -104,24 +108,27 @@ start_link(Counters, Concurrency) ->
 
 -spec new_handle(pid(), counters(), pos_integer()) -> handle().
 new_handle(Pid, Counters, Concurrency) ->
-    #handle{pid = Pid,
-            counters = Counters,
-            concurrent = Concurrency > 1}.
+    #handle{
+        pid = Pid,
+        counters = Counters,
+        concurrent = Concurrency > 1
+    }.
 
 -spec take_index(handle()) -> {ok, non_neg_integer(), pos_integer()} | stop.
 take_index(#handle{pid = Pid}) ->
     try
         gen_server:call(Pid, take_index, _Timeout = infinity)
     catch
-        exit:{Reason, {gen_server, call, [Pid | _]}}
-          when Reason =:= normal; Reason =:= noproc ->
+        exit:{Reason, {gen_server, call, [Pid | _]}} when
+            Reason =:= normal; Reason =:= noproc
+        ->
             stop
     end.
 
 -spec maybe_give_index(handle(), non_neg_integer(), pos_integer()) -> boolean().
 maybe_give_index(#handle{concurrent = true, counters = Counters} = Handle, NodeIndex, Path) ->
-    atomics:get(Counters, ?FREE_WORKERS_COUNTER) > 0
-    andalso maybe_give_index_step2(Handle, NodeIndex, Path);
+    atomics:get(Counters, ?FREE_WORKERS_COUNTER) > 0 andalso
+        maybe_give_index_step2(Handle, NodeIndex, Path);
 maybe_give_index(#handle{concurrent = false}, _NodeIndex, _Path) ->
     false.
 
@@ -139,21 +146,25 @@ stop(Pid) ->
 
 -spec init([counters() | pos_integer(), ...]) -> {ok, state()}.
 init([Counters, Concurrency]) ->
-    _ = process_flag(trap_exit, true), % always call `:terminate/2' unless killed
-    {ok, #state{walk_started = false,
-                counters = Counters,
-                concurrency = Concurrency,
-                free_workers = []}}.
+    % always call `:terminate/2' unless killed
+    _ = process_flag(trap_exit, true),
+    {ok, #state{
+        walk_started = false,
+        counters = Counters,
+        concurrency = Concurrency,
+        free_workers = []
+    }}.
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {noreply, state()} |
-           {reply, {ok, 0, 1}, state()} |
-           {stop, normal, stop, state()} |
-           {stop, {unexpected_call, #{request := _, from := {pid(), reference()}}}, state()}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {noreply, state()}
+    | {reply, {ok, 0, 1}, state()}
+    | {stop, normal, stop, state()}
+    | {stop, {unexpected_call, #{request := _, from := {pid(), reference()}}}, state()}.
 handle_call(take_index, From, State) ->
     case State#state.walk_started of
-        true
-          when length(State#state.free_workers) < (State#state.concurrency - 1) ->
+        true when
+            length(State#state.free_workers) < (State#state.concurrency - 1)
+        ->
             atomics:add(State#state.counters, ?FREE_WORKERS_COUNTER, +1),
             UpdatedFreeWorkers = [From | State#state.free_workers],
             UpdatedState = State#state{free_workers = UpdatedFreeWorkers},
@@ -163,8 +174,10 @@ handle_call(take_index, From, State) ->
             Reply = stop,
             {stop, normal, Reply, State};
         false ->
-            RootIndex = 0, % give root index to whomever calls us first
-            RootPath = 1, % start at one so we can always infer its length
+            % give root index to whomever calls us first
+            RootIndex = 0,
+            % start at one so we can always infer its length
+            RootPath = 1,
             UpdatedState = State#state{walk_started = true},
             {reply, {ok, RootIndex, RootPath}, UpdatedState}
     end;
@@ -172,9 +185,9 @@ handle_call(Request, From, State) ->
     ErrorDetails = #{request => Request, from => From},
     {stop, {unexpected_call, ErrorDetails}, State}.
 
--spec handle_cast(term(), state())
-        -> {noreply, state()} |
-           {stop, {unexpected_cast, term()}, state()}.
+-spec handle_cast(term(), state()) ->
+    {noreply, state()}
+    | {stop, {unexpected_cast, term()}, state()}.
 handle_cast({give_index, NodeIndex, Path}, State) ->
     % ct:pal("???? ~p", [State#state.free_workers]),
     [ReplyTo | RemainingFreeworkers] = State#state.free_workers,
@@ -184,21 +197,22 @@ handle_cast({give_index, NodeIndex, Path}, State) ->
 handle_cast(Request, State) ->
     {stop, {unexpected_cast, Request}, State}.
 
--spec handle_info(term(), state())
-        -> {stop, {unexpected_info, term()}, state()}.
+-spec handle_info(term(), state()) ->
+    {stop, {unexpected_info, term()}, state()}.
 handle_info(Info, State) ->
     {stop, {unexpected_info, Info}, State}.
 
 -spec terminate(term(), state()) -> ok.
 terminate(_Reason, State) ->
     lists:foreach(
-      fun (ReplyTo) ->
-              gen_server:reply(ReplyTo, stop)
-      end,
-      State#state.free_workers).
+        fun(ReplyTo) ->
+            gen_server:reply(ReplyTo, stop)
+        end,
+        State#state.free_workers
+    ).
 
--spec code_change(term(), state() | term(), term())
-        -> {ok, state()} | {error, {cannot_convert_state, term()}}.
+-spec code_change(term(), state() | term(), term()) ->
+    {ok, state()} | {error, {cannot_convert_state, term()}}.
 code_change(_OldVsn, #state{} = State, _Extra) ->
     {ok, State};
 code_change(_OldVsn, State, _Extra) ->
@@ -214,6 +228,7 @@ maybe_give_index_step2(Handle, NodeIndex, Path) ->
             gen_server:cast(Handle#handle.pid, {give_index, NodeIndex, Path}),
             true;
         _ ->
-            atomics:add(Handle#handle.counters, ?FREE_WORKERS_COUNTER, +1), % too late
+            % too late
+            atomics:add(Handle#handle.counters, ?FREE_WORKERS_COUNTER, +1),
             false
     end.

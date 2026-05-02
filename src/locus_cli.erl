@@ -46,11 +46,12 @@ main(Args) ->
             handle_check_command(CmdArgs);
         _ ->
             fall_from_grace(
-              "~n"
-              "Usage: locus [<command>] [<command_args>]~n"
-              "~n"
-              "Available commands:~n"
-              "  check")
+                "~n"
+                "Usage: locus [<command>] [<command_args>]~n"
+                "~n"
+                "Available commands:~n"
+                "  check"
+            )
     end.
 
 %% ------------------------------------------------------------------
@@ -59,10 +60,11 @@ main(Args) ->
 
 ensure_apps_are_started(Apps) ->
     lists:foreach(
-      fun (App) ->
-              {ok, _} = application:ensure_all_started(App)
-      end,
-      Apps).
+        fun(App) ->
+            {ok, _} = application:ensure_all_started(App)
+        end,
+        Apps
+    ).
 
 prepare_database(DatabaseURL, LoadTimeout, SuccessHandler) ->
     DatabaseId = cli_check,
@@ -85,9 +87,8 @@ wait_for_database_load(DatabaseId, LoadTimeout, SuccessHandler) ->
             SuccessHandler(DatabaseId);
         {locus, DatabaseId, {load_attempt_finished, _, {error, Reason}}} ->
             fall_from_grace("Failed to load database: ~p", [Reason])
-    after
-        LoadTimeout ->
-            fall_from_grace("Timeout loading the database")
+    after LoadTimeout ->
+        fall_from_grace("Timeout loading the database")
     end.
 
 fall_from_grace() ->
@@ -112,32 +113,39 @@ stderr_println(Fmt, Args) ->
 
 handle_check_command(CmdArgs) ->
     OptSpecList =
-        [{load_timeout, undefined, "load-timeout",
-          {integer, 30}, "Database load timeout (in seconds)"},
+        [
+            {load_timeout, undefined, "load-timeout", {integer, 30},
+                "Database load timeout (in seconds)"},
 
-         {log_level, undefined, "log-level",
-          {string, "error"}, "debug | info | warning | error"},
+            {log_level, undefined, "log-level", {string, "error"},
+                "debug | info | warning | error"},
 
-         {url, undefined, undefined,
-          utf8_binary, "Database URL (local or remote)"},
+            {url, undefined, undefined, utf8_binary, "Database URL (local or remote)"},
 
-         {warnings_as_errors, undefined, "warnings-as-errors",
-          {boolean, false}, "Treat check warnings as errors"}],
+            {warnings_as_errors, undefined, "warnings-as-errors", {boolean, false},
+                "Treat check warnings as errors"}
+        ],
 
     case getopt:parse_and_check(OptSpecList, CmdArgs) of
         {ok, {ParsedArgs, []}} ->
             {load_timeout, LoadTimeoutSecs} = lists:keyfind(load_timeout, 1, ParsedArgs),
             {log_level, StrLogLevel} = lists:keyfind(log_level, 1, ParsedArgs),
             {url, DatabaseURL} = lists:keyfind(url, 1, ParsedArgs),
-            {warnings_as_errors, WarningsAsErrors} = lists:keyfind(warnings_as_errors,
-                                                                   1, ParsedArgs),
+            {warnings_as_errors, WarningsAsErrors} = lists:keyfind(
+                warnings_as_errors,
+                1,
+                ParsedArgs
+            ),
             LoadTimeout = timer:seconds(LoadTimeoutSecs),
             LogLevel = list_to_atom(StrLogLevel),
             ok = locus_logger:set_loglevel(LogLevel),
-            prepare_database(DatabaseURL, LoadTimeout,
-                             fun (DatabaseId) ->
-                                     perform_check(DatabaseId, WarningsAsErrors)
-                             end);
+            prepare_database(
+                DatabaseURL,
+                LoadTimeout,
+                fun(DatabaseId) ->
+                    perform_check(DatabaseId, WarningsAsErrors)
+                end
+            );
         _ ->
             getopt:usage(OptSpecList, "locus check"),
             fall_from_grace()
@@ -148,26 +156,36 @@ perform_check(DatabaseId, WarningsAsErrors) ->
     case locus:check(DatabaseId) of
         ok ->
             stderr_println("Database is wholesome.");
-        {validation_warnings, Warnings}
-          when not WarningsAsErrors ->
-            stderr_println("Database has a few quirks but is otherwise wholesome:~n"
-                           ++ lists:flatten(["* ~p~n" || _ <- Warnings]),
-                           WarningsAsErrors);
-        {validation_warnings, Warnings}
-          when WarningsAsErrors ->
-            stderr_println("Database has a few quirks:~n"
-                           ++ lists:flatten(["* ~p~n" || _ <- Warnings]),
-                           WarningsAsErrors);
+        {validation_warnings, Warnings} when
+            not WarningsAsErrors
+        ->
+            stderr_println(
+                "Database has a few quirks but is otherwise wholesome:~n" ++
+                    lists:flatten(["* ~p~n" || _ <- Warnings]),
+                WarningsAsErrors
+            );
+        {validation_warnings, Warnings} when
+            WarningsAsErrors
+        ->
+            stderr_println(
+                "Database has a few quirks:~n" ++
+                    lists:flatten(["* ~p~n" || _ <- Warnings]),
+                WarningsAsErrors
+            );
         {validation_errors, Errors, [] = _Warnings} ->
-            fall_from_grace("Database is corrupt or incompatible:~n"
-                            ++ lists:flatten(["* ~p~n" || _ <- Errors]),
-                            Errors);
+            fall_from_grace(
+                "Database is corrupt or incompatible:~n" ++
+                    lists:flatten(["* ~p~n" || _ <- Errors]),
+                Errors
+            );
         {validation_errors, Errors, Warnings} ->
-            fall_from_grace("Database is corrupt or incompatible:~n"
-                            ++ lists:flatten(["* ~p~n" || _ <- Errors])
-                            ++ "~n...and also:~n"
-                            ++ lists:flatten(["* ~p~n" || _ <- Warnings]),
-                            Errors ++ Warnings)
+            fall_from_grace(
+                "Database is corrupt or incompatible:~n" ++
+                    lists:flatten(["* ~p~n" || _ <- Errors]) ++
+                    "~n...and also:~n" ++
+                    lists:flatten(["* ~p~n" || _ <- Warnings]),
+                Errors ++ Warnings
+            )
     end.
 
 -endif.

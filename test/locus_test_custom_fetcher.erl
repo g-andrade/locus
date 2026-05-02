@@ -32,34 +32,40 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start/3,
-    set_modification_datetime/2,
-    get_database_is_fetched_from/1,
-    stop/1
-   ]).
+    [
+        start/3,
+        set_modification_datetime/2,
+        get_database_is_fetched_from/1,
+        stop/1
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% locus_custom_fetcher Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [description/1,
-    fetch/1,
-    conditionally_fetch/2
-   ]).
+    [
+        description/1,
+        fetch/1,
+        conditionally_fetch/2
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
@@ -69,18 +75,18 @@
 -export_type([args/0]).
 
 -record(state, {
-          path :: nonempty_string(),
-          database :: database() | undefined
-         }).
+    path :: nonempty_string(),
+    database :: database() | undefined
+}).
 
 -opaque state() :: #state{}.
 -export_type([state/0]).
 
 -record(database, {
-          format :: locus_loader:blob_format(),
-          content :: binary(),
-          modified_on :: calendar:datetime() | undefined
-         }).
+    format :: locus_loader:blob_format(),
+    content :: binary(),
+    modified_on :: calendar:datetime() | undefined
+}).
 
 -type database() :: #database{}.
 
@@ -109,32 +115,35 @@ stop(Pid) ->
 %% locus_custom_fetcher Function Definitions
 %% ------------------------------------------------------------------
 
--spec description(Args) -> Description
-        when Args :: args(),
-             Description :: locus_custom_fetcher:description().
+-spec description(Args) -> Description when
+    Args :: args(),
+    Description :: locus_custom_fetcher:description().
 description(Args) ->
     #{locality := Locality, pid := Pid} = Args,
     FetchedFrom = gen_server:call(Pid, get_path),
 
-    #{database_is_stored_remotely => (Locality =:= remote),
-      database_is_fetched_from => FetchedFrom}.
+    #{
+        database_is_stored_remotely => (Locality =:= remote),
+        database_is_fetched_from => FetchedFrom
+    }.
 
--spec fetch(Args) -> {fetched, Success} | {error, Reason}
-        when Args :: args(),
-             Success :: locus_custom_fetcher:success(),
-             Reason :: term().
+-spec fetch(Args) -> {fetched, Success} | {error, Reason} when
+    Args :: args(),
+    Success :: locus_custom_fetcher:success(),
+    Reason :: term().
 fetch(Args) ->
     #{pid := Pid} = Args,
     gen_server:call(Pid, fetch).
 
--spec conditionally_fetch(Args, {depending_on, PreviousFetchMetadata})
-    -> {fetched, Success}
-       | dismissed
-       | {error, Reason}
-        when Args :: args(),
-             PreviousFetchMetadata :: locus_custom_fetcher:successful_fetch_metadata(),
-             Success :: locus_custom_fetcher:success(),
-             Reason :: term().
+-spec conditionally_fetch(Args, {depending_on, PreviousFetchMetadata}) ->
+    {fetched, Success}
+    | dismissed
+    | {error, Reason}
+when
+    Args :: args(),
+    PreviousFetchMetadata :: locus_custom_fetcher:successful_fetch_metadata(),
+    Success :: locus_custom_fetcher:success(),
+    Reason :: term().
 conditionally_fetch(Args, {depending_on, PreviousFetchMetadata}) ->
     #{pid := Pid} = Args,
     gen_server:call(Pid, {conditionally_fetch, PreviousFetchMetadata}).
@@ -152,23 +161,26 @@ init([BaseFilename, FileExtension, ModifiedOn]) ->
     case file:read_file(DatabasePath) of
         {ok, DatabaseBlob} ->
             DatabaseFormat = database_format(FileExtension),
-            Database = #database{format = DatabaseFormat,
-                                 content = DatabaseBlob,
-                                 modified_on = ModifiedOn},
-            {ok, #state{path = DatabasePath,
-                        database = Database}};
-
+            Database = #database{
+                format = DatabaseFormat,
+                content = DatabaseBlob,
+                modified_on = ModifiedOn
+            },
+            {ok, #state{
+                path = DatabasePath,
+                database = Database
+            }};
         {error, enoent} ->
             {ok, #state{path = DatabasePath}}
     end.
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {reply, ok, state()} |
-           {reply, {loaded_from, nonempty_string()}, state()} |
-           {reply, {fetched, locus_custom_fetcher:success()}, state()} |
-           {reply, dismissed, state()} |
-           {reply, {error, not_found}, state()} |
-           {stop, {unexpected_call, #{request := _, from := {pid(), reference()}}}, state()}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {reply, ok, state()}
+    | {reply, {loaded_from, nonempty_string()}, state()}
+    | {reply, {fetched, locus_custom_fetcher:success()}, state()}
+    | {reply, dismissed, state()}
+    | {reply, {error, not_found}, state()}
+    | {stop, {unexpected_call, #{request := _, from := {pid(), reference()}}}, state()}.
 handle_call({set_modification_datetime, ModifiedOn}, _From, State) ->
     Database = State#state.database,
     UpdatedDatabase = Database#database{modified_on = ModifiedOn},
@@ -177,15 +189,20 @@ handle_call({set_modification_datetime, ModifiedOn}, _From, State) ->
 handle_call(get_path, _From, State) ->
     Path = State#state.path,
     {reply, Path, State};
-handle_call(fetch, _From, #state{database = Database} = State)
-  when Database =/= undefined ->
+handle_call(fetch, _From, #state{database = Database} = State) when
+    Database =/= undefined
+->
     handle_fetch(_PreviouslyModifiedOn = unknown, Database, State);
 handle_call(fetch, _From, State) ->
     Reply = {error, not_found},
     {reply, Reply, State};
-handle_call({conditionally_fetch, PreviousFetchMetadata}, _From,
-            #state{database = Database} = State)
-  when Database =/= undefined ->
+handle_call(
+    {conditionally_fetch, PreviousFetchMetadata},
+    _From,
+    #state{database = Database} = State
+) when
+    Database =/= undefined
+->
     ?assertEqual(State#state.path, maps:get(fetched_from, PreviousFetchMetadata)),
     PreviouslyModifiedOn = maps:get(modified_on, PreviousFetchMetadata),
     handle_fetch(PreviouslyModifiedOn, Database, State);
@@ -196,13 +213,13 @@ handle_call(Request, From, State) ->
     ErrorDetails = #{request => Request, from => From},
     {stop, {unexpected_call, ErrorDetails}, State}.
 
--spec handle_cast(term(), state())
-        -> {stop, {unexpected_cast, term()}, state()}.
+-spec handle_cast(term(), state()) ->
+    {stop, {unexpected_cast, term()}, state()}.
 handle_cast(Request, State) ->
     {stop, {unexpected_cast, Request}, State}.
 
--spec handle_info(term(), state())
-        -> {stop, {unexpected_info, term()}, state()}.
+-spec handle_info(term(), state()) ->
+    {stop, {unexpected_info, term()}, state()}.
 handle_info(Info, State) ->
     {stop, {unexpected_info, Info}, State}.
 
@@ -210,8 +227,8 @@ handle_info(Info, State) ->
 terminate(_Reason, _State) ->
     ok.
 
--spec code_change(term(), state() | term(), term())
-        -> {ok, state()} | {error, {cannot_convert_state, term()}}.
+-spec code_change(term(), state() | term(), term()) ->
+    {ok, state()} | {error, {cannot_convert_state, term()}}.
 code_change(_OldVsn, #state{} = State, _Extra) ->
     {ok, State};
 code_change(_OldVsn, State, _Extra) ->
@@ -222,31 +239,39 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 
 database_format(Extension) ->
-    maps:get(Extension, #{"tar.gz" => tgz,
-                          "tgz" => tgz,
-                          "tar" => tarball,
-                          "mmdb" => mmdb,
-                          "mmdb.gz" => gzipped_mmdb}).
+    maps:get(Extension, #{
+        "tar.gz" => tgz,
+        "tgz" => tgz,
+        "tar" => tarball,
+        "mmdb" => mmdb,
+        "mmdb.gz" => gzipped_mmdb
+    }).
 
 handle_fetch(PreviouslyModifiedOn, Database, State) ->
     case Database#database.modified_on of
         undefined ->
             NewMetadata = #{fetched_from => State#state.path, modified_on => unknown},
-            Success = #{format => Database#database.format,
-                        content => Database#database.content,
-                        metadata => NewMetadata},
+            Success = #{
+                format => Database#database.format,
+                content => Database#database.content,
+                metadata => NewMetadata
+            },
             Reply = {fetched, Success},
             {reply, Reply, State};
-        ModifiedOn
-          when ModifiedOn =/= PreviouslyModifiedOn ->
+        ModifiedOn when
+            ModifiedOn =/= PreviouslyModifiedOn
+        ->
             NewMetadata = #{fetched_from => State#state.path, modified_on => ModifiedOn},
-            Success = #{format => Database#database.format,
-                        content => Database#database.content,
-                        metadata => NewMetadata},
+            Success = #{
+                format => Database#database.format,
+                content => Database#database.content,
+                metadata => NewMetadata
+            },
             Reply = {fetched, Success},
             {reply, Reply, State};
-        ModifiedOn
-          when ModifiedOn =:= PreviouslyModifiedOn ->
-           Reply = dismissed,
-           {reply, Reply, State}
+        ModifiedOn when
+            ModifiedOn =:= PreviouslyModifiedOn
+        ->
+            Reply = dismissed,
+            {reply, Reply, State}
     end.

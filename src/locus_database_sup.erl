@@ -29,8 +29,12 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0]).                      -ignore_xref(start_link/0).
--export([start_child/1]).
+-export([
+    start_link/0,
+    start_child/1
+]).
+
+-ignore_xref(start_link/0).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
@@ -57,11 +61,12 @@ start_child(Args) ->
     try supervisor:start_child(?SERVER, Args) of
         Result -> Result
     catch
-        exit:{Reason, {gen_server, call, [?SERVER | _]}}
-          when Reason =:= noproc orelse
-               Reason =:= normal orelse
-               Reason =:= shutdown orelse
-               (tuple_size(Reason) =:= 2 andalso element(1, Reason) =:= shutdown) ->
+        exit:{Reason, {gen_server, call, [?SERVER | _]}} when
+            Reason =:= noproc orelse
+                Reason =:= normal orelse
+                Reason =:= shutdown orelse
+                (tuple_size(Reason) =:= 2 andalso element(1, Reason) =:= shutdown)
+        ->
             {error, application_not_running}
     end.
 
@@ -69,13 +74,14 @@ start_child(Args) ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([])
-    -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
+-spec init([]) ->
+    {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
-        #{strategy => simple_one_for_one,
-          intensity => 10,
-          period => 5
-         },
+        #{
+            strategy => simple_one_for_one,
+            intensity => 10,
+            period => 5
+        },
     ChildSpec = locus_database:dynamic_child_spec(database),
     {ok, {SupFlags, [ChildSpec]}}.

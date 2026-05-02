@@ -31,24 +31,26 @@
 %% Callback Declarations
 %% ------------------------------------------------------------------
 
--callback description(Args) ->  description()
-        when Args :: term().
+-callback description(Args) -> description() when
+    Args :: term().
 
--callback fetch(Args)
-    ->   {fetched, Success}
-       | {error, Reason}
-        when Args :: term(),
-             Success :: success(),
-             Reason :: term().
+-callback fetch(Args) ->
+    {fetched, Success}
+    | {error, Reason}
+when
+    Args :: term(),
+    Success :: success(),
+    Reason :: term().
 
--callback conditionally_fetch(Args, {depending_on, PreviousFetchMetadata})
-    ->   {fetched, Success}
-       | dismissed
-       | {error, Reason}
-        when Args :: term(),
-             PreviousFetchMetadata :: successful_fetch_metadata(),
-             Success :: success(),
-             Reason :: term().
+-callback conditionally_fetch(Args, {depending_on, PreviousFetchMetadata}) ->
+    {fetched, Success}
+    | dismissed
+    | {error, Reason}
+when
+    Args :: term(),
+    PreviousFetchMetadata :: successful_fetch_metadata(),
+    Success :: success(),
+    Reason :: term().
 
 -ignore_xref(behaviour_info/1).
 
@@ -57,46 +59,53 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [source/2,
-    description/2,
-    start_link/4
-   ]).
+    [
+        source/2,
+        description/2,
+        start_link/4
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_continue/2,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_continue/2,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Callback Record and Type Definitions
 %% ------------------------------------------------------------------
 
--type description()
-    :: #{ database_is_stored_remotely := boolean(),
-          database_is_fetched_from := term()
-        }.
+-type description() ::
+    #{
+        database_is_stored_remotely := boolean(),
+        database_is_fetched_from := term()
+    }.
 -export_type([description/0]).
 
--type success()
-    :: #{ format := locus_loader:blob_format(),
-          content := binary(),
-          metadata := successful_fetch_metadata()
-        }.
+-type success() ::
+    #{
+        format := locus_loader:blob_format(),
+        content := binary(),
+        metadata := successful_fetch_metadata()
+    }.
 -export_type([success/0]).
 
--type successful_fetch_metadata()
-    :: #{ fetched_from := term(),
-          modified_on := calendar:datetime() | unknown
-        }.
+-type successful_fetch_metadata() ::
+    #{
+        fetched_from := term(),
+        modified_on := calendar:datetime() | unknown
+    }.
 -export_type([successful_fetch_metadata/0]).
 
 %% ------------------------------------------------------------------
@@ -104,8 +113,8 @@
 %% ------------------------------------------------------------------
 
 -type event() ::
-    event_load_attempt_started() |
-    event_load_attempt_dismissed().
+    event_load_attempt_started()
+    | event_load_attempt_dismissed().
 -export_type([event/0]).
 
 -type event_load_attempt_started() :: {load_attempt_started, source()}.
@@ -122,19 +131,19 @@
 %% ------------------------------------------------------------------
 
 -type msg() ::
-    {event, event()} |
-    {finished, {success, success()}} |
-    {finished, dismissed} |
-    {finished, {error, term()}}.
+    {event, event()}
+    | {finished, {success, success()}}
+    | {finished, dismissed}
+    | {finished, {error, term()}}.
 -export_type([msg/0]).
 
 -record(state, {
-          owner_pid :: pid(),
-          source :: source(),
-          module :: module(),
-          args :: term(),
-          previous_fetch_metadata :: successful_fetch_metadata() | undefined
-         }).
+    owner_pid :: pid(),
+    source :: source(),
+    module :: module(),
+    args :: term(),
+    previous_fetch_metadata :: successful_fetch_metadata() | undefined
+}).
 -opaque state() :: #state{}.
 -export_type([state/0]).
 
@@ -146,9 +155,10 @@
 %% @private
 source(Module, Args) ->
     Description = description(Module, Args),
-    #{database_is_stored_remotely := IsRemote,
-      database_is_fetched_from := FetchedFrom
-     } = Description,
+    #{
+        database_is_stored_remotely := IsRemote,
+        database_is_fetched_from := FetchedFrom
+    } = Description,
 
     SourceType = source_type(IsRemote),
     {SourceType, {custom, FetchedFrom}}.
@@ -157,15 +167,15 @@ source(Module, Args) ->
 %% @private
 description(Module, Args) ->
     #{
-      database_is_stored_remotely := IsRemote,
-      database_is_fetched_from := _
-     } = Description = Module:description(Args),
+        database_is_stored_remotely := IsRemote,
+        database_is_fetched_from := _
+    } = Description = Module:description(Args),
 
     ?assertMatch(_ when is_boolean(IsRemote), IsRemote),
     Description.
 
--spec start_link(source(), module(), term(), successful_fetch_metadata() | undefined)
-        -> {ok, pid()}.
+-spec start_link(source(), module(), term(), successful_fetch_metadata() | undefined) ->
+    {ok, pid()}.
 %% @private
 start_link(Source, Module, Args, PreviousFetchMetadata) ->
     gen_server:start_link(?MODULE, [self(), Source, Module, Args, PreviousFetchMetadata], []).
@@ -174,22 +184,22 @@ start_link(Source, Module, Args, PreviousFetchMetadata) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([InitArg, ...]) -> {ok, state(), {continue, fetch}}
-        when InitArg :: OwnerPid | Source | Module | Args | PreviousFetchMetadata,
-             OwnerPid :: pid(),
-             Source :: source(),
-             Module :: module(),
-             Args :: term(),
-             PreviousFetchMetadata :: successful_fetch_metadata() | undefined.
+-spec init([InitArg, ...]) -> {ok, state(), {continue, fetch}} when
+    InitArg :: OwnerPid | Source | Module | Args | PreviousFetchMetadata,
+    OwnerPid :: pid(),
+    Source :: source(),
+    Module :: module(),
+    Args :: term(),
+    PreviousFetchMetadata :: successful_fetch_metadata() | undefined.
 %% @private
 init([OwnerPid, Source, Module, Args, PreviousFetchMetadata]) ->
     State = #state{
-               owner_pid = OwnerPid,
-               source = Source,
-               module = Module,
-               args = Args,
-               previous_fetch_metadata = PreviousFetchMetadata
-              },
+        owner_pid = OwnerPid,
+        source = Source,
+        module = Module,
+        args = Args,
+        previous_fetch_metadata = PreviousFetchMetadata
+    },
     {ok, State, {continue, fetch}}.
 
 -spec handle_continue(fetch, state()) -> {stop, normal, state()}.
@@ -207,20 +217,20 @@ handle_continue(fetch, State) ->
             handle_conditional_fetch(PreviousFetchMetadata, State)
     end.
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {stop, unexpected_call, state()}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {stop, unexpected_call, state()}.
 %% @private
 handle_call(_Call, _From, State) ->
     {stop, unexpected_call, State}.
 
--spec handle_cast(term(), state())
-        -> {stop, unexpected_cast, state()}.
+-spec handle_cast(term(), state()) ->
+    {stop, unexpected_cast, state()}.
 %% @private
 handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
 
--spec handle_info(term(), state())
-        -> {stop, unexpected_info, state()}.
+-spec handle_info(term(), state()) ->
+    {stop, unexpected_info, state()}.
 %% @private
 handle_info(_Info, State) ->
     {stop, unexpected_info, State}.

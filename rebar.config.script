@@ -17,6 +17,11 @@ begin
             TakeOutProjPlugin(rebar3_lint, Config)
           end,
 
+    TakeOutErlFmt 
+        = fun (Config) ->
+            TakeOutProjPlugin(erlfmt, Config)
+          end,
+
     TakeOutHank
         = fun (Config) ->
             TakeOutProjPlugin(rebar3_hank, Config)
@@ -45,7 +50,7 @@ begin
     try list_to_integer(OtpRelease) of
         TooOld when TooOld =< 22 ->
             % Take dev helpers away as they're no longer compatible with OTP 22
-            TakeOutHank(TakeOutElvis(CONFIG));
+            TakeOutHank(TakeOutErlFmt(TakeOutElvis(CONFIG)));
         25 ->
             TakeOutHankIfMaybeExprNotEnabledOnEnv(CONFIG);
         _ ->

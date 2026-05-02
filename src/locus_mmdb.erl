@@ -35,62 +35,70 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([unpack_database/1,
-         unpack_tree_data_and_data_section/2,
-         lookup_address/2]).
+-export([
+    unpack_database/1,
+    unpack_tree_data_and_data_section/2,
+    lookup_address/2
+]).
 
 -ignore_xref(
-        [unpack_tree_data_and_data_section/2]).
+    [unpack_tree_data_and_data_section/2]
+).
 
 %% ------------------------------------------------------------------
 %% Debug API Function Exports
 %% ------------------------------------------------------------------
 
--export([parse_all_data_section_values/1,
-         parse_data_section_value/2]).
+-export([
+    parse_all_data_section_values/1,
+    parse_data_section_value/2
+]).
 
 -ignore_xref(
-        [parse_all_data_section_values/1,
-         parse_data_section_value/2]).
+    [
+        parse_all_data_section_values/1,
+        parse_data_section_value/2
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% API Type Definitions
 %% ------------------------------------------------------------------
 
--type database()
-    :: #{ metadata := locus_mmdb_metadata:t(),
-          tree := locus_mmdb_tree:t(),
-          data_section := binary()
-        }.
+-type database() ::
+    #{
+        metadata := locus_mmdb_metadata:t(),
+        tree := locus_mmdb_tree:t(),
+        data_section := binary()
+    }.
 -export_type([database/0]).
 
--type unpack_error()
-    :: {bad_metadata, locus_mmdb_metadata:parse_or_validation_error()}
-
+-type unpack_error() ::
+    {bad_metadata, locus_mmdb_metadata:parse_or_validation_error()}
     | failed_to_unpack_tree_data_and_data_section()
-
-    | {bad_tree,
-       {{because, locus_mmdb_tree:bad_tree_error()},
-        {with_metadata, locus_mmdb_metadata:t()}}}.
+    | {bad_tree, {
+        {because, locus_mmdb_tree:bad_tree_error()}, {with_metadata, locus_mmdb_metadata:t()}
+    }}.
 
 -export_type([unpack_error/0]).
 
--type failed_to_unpack_tree_data_and_data_section()
-    :: {intermediate_128bits_of_zero_not_found_after_tree,
-        {{not_zeroes, binary()},
-         {at_offset, non_neg_integer()},
-         {with_metadata, locus_mmdb_metadata:t()}}}
-
-    |  {missing_data_after_tree,
-        {{required, {128, bits}},
-         {but_got, {0..127, bits}},
-         {at_offset, non_neg_integer()},
-         {with_metadata, locus_mmdb_metadata:t()}}}
-
-    | {not_enough_data_for_tree,
-       {{required, {pos_integer(), bytes}},
+-type failed_to_unpack_tree_data_and_data_section() ::
+    {intermediate_128bits_of_zero_not_found_after_tree, {
+        {not_zeroes, binary()},
+        {at_offset, non_neg_integer()},
+        {with_metadata, locus_mmdb_metadata:t()}
+    }}
+    | {missing_data_after_tree, {
+        {required, {128, bits}},
+        {but_got, {0..127, bits}},
+        {at_offset, non_neg_integer()},
+        {with_metadata, locus_mmdb_metadata:t()}
+    }}
+    | {not_enough_data_for_tree, {
+        {required, {pos_integer(), bytes}},
         {but_got, {non_neg_integer(), bytes}},
-        {with_metadata, locus_mmdb_metadata:t()}}}.
+        {with_metadata, locus_mmdb_metadata:t()}
+    }}.
 
 -export_type([failed_to_unpack_tree_data_and_data_section/0]).
 
@@ -99,10 +107,10 @@
 %% ------------------------------------------------------------------
 
 %% @doc Unpacks an `EncodedDatabase' binary into a ready-to-use `Database'.
--spec unpack_database(EncodedDatabase) -> {ok, Database} | {error, ErrorReason}
-        when EncodedDatabase :: binary(),
-             Database :: database(),
-             ErrorReason :: unpack_error().
+-spec unpack_database(EncodedDatabase) -> {ok, Database} | {error, ErrorReason} when
+    EncodedDatabase :: binary(),
+    Database :: database(),
+    ErrorReason :: unpack_error().
 unpack_database(<<EncodedDatabase/bytes>>) ->
     try
         unpack_database_impl(EncodedDatabase)
@@ -125,13 +133,14 @@ unpack_database(<<EncodedDatabase/bytes>>) ->
 %% For how to obtain `Metadata' and `TreeAndDataSection'
 %% in the first place, see {@link locus_mmdb_metadata:parse_and_validate/1}.
 %%
--spec unpack_tree_data_and_data_section(Metadata, TreeAndDataSection)
-        -> {ok, TreeData, DataSection} | {error, Reason}
-        when Metadata :: locus_mmdb_metadata:t(),
-             TreeAndDataSection :: binary(),
-             TreeData :: binary(),
-             DataSection :: binary(),
-             Reason ::  failed_to_unpack_tree_data_and_data_section().
+-spec unpack_tree_data_and_data_section(Metadata, TreeAndDataSection) ->
+    {ok, TreeData, DataSection} | {error, Reason}
+when
+    Metadata :: locus_mmdb_metadata:t(),
+    TreeAndDataSection :: binary(),
+    TreeData :: binary(),
+    DataSection :: binary(),
+    Reason :: failed_to_unpack_tree_data_and_data_section().
 unpack_tree_data_and_data_section(Metadata, TreeAndDataSection) ->
     #{node_count := NodeCount, record_size := RecordSize} = Metadata,
     TreeSize = ((RecordSize * 2) div 8) * NodeCount,
@@ -140,31 +149,37 @@ unpack_tree_data_and_data_section(Metadata, TreeAndDataSection) ->
         <<TreeData:TreeSize/bytes, 0:128, DataSection/bytes>> ->
             {ok, TreeData, DataSection};
         <<_:TreeSize/bytes, NotZeroes:128/bits, _NotZeroes/bytes>> ->
-            {error, {intermediate_128bits_of_zero_not_found_after_tree,
-                     {{not_zeroes, NotZeroes},
-                      {at_offset, TreeSize},
-                      {with_metadata, Metadata}}}};
+            {error,
+                {intermediate_128bits_of_zero_not_found_after_tree, {
+                    {not_zeroes, NotZeroes}, {at_offset, TreeSize}, {with_metadata, Metadata}
+                }}};
         <<_:TreeSize/bytes, MissingData/bits>> ->
-            {error, {missing_data_after_tree,
-                     {{required, {128, bits}},
-                      {but_got, {bit_size(MissingData), bits}},
-                      {at_offset, TreeSize},
-                      {with_metadata, Metadata}}}};
+            {error,
+                {missing_data_after_tree, {
+                    {required, {128, bits}},
+                    {but_got, {bit_size(MissingData), bits}},
+                    {at_offset, TreeSize},
+                    {with_metadata, Metadata}
+                }}};
         <<MissingTree/bytes>> ->
-            {error, {not_enough_data_for_tree,
-                     {{required, {TreeSize, bytes}},
-                      {but_got, {byte_size(MissingTree), bytes}},
-                      {with_metadata, Metadata}}}}
+            {error,
+                {not_enough_data_for_tree, {
+                    {required, {TreeSize, bytes}},
+                    {but_got, {byte_size(MissingTree), bytes}},
+                    {with_metadata, Metadata}
+                }}}
     end.
 
 %% @doc Looks up for an entry matching `Address' within `Database'
--spec lookup_address(Address, Database) -> {ok, Entry} | not_found | {error, ErrorReason}
-    when Address :: inet:ip_address() | string() | unicode:unicode_binary(),
-         Database :: database(),
-         Entry :: locus_mmdb_data:value(),
-         ErrorReason :: (database_unknown | database_not_loaded |
-                         {invalid_address, Address} |
-                         ipv4_database).
+-spec lookup_address(Address, Database) -> {ok, Entry} | not_found | {error, ErrorReason} when
+    Address :: inet:ip_address() | string() | unicode:unicode_binary(),
+    Database :: database(),
+    Entry :: locus_mmdb_data:value(),
+    ErrorReason ::
+        (database_unknown
+        | database_not_loaded
+        | {invalid_address, Address}
+        | ipv4_database).
 lookup_address(Address, Database) ->
     case locus_util:parse_ip_address(Address) of
         {ok, ParsedAddress} ->
@@ -177,8 +192,8 @@ lookup_address(Address, Database) ->
 %% Debug API Function Definitions
 %% ------------------------------------------------------------------
 
--spec parse_all_data_section_values(file:name_all())
-        -> [locus_mmdb_data_raw:value()].
+-spec parse_all_data_section_values(file:name_all()) ->
+    [locus_mmdb_data_raw:value()].
 %% @private
 parse_all_data_section_values(Filename) ->
     {ok, EncodedDatabase} = file:read_file(Filename),
@@ -186,15 +201,18 @@ parse_all_data_section_values(Filename) ->
     #{data_section := DataSection} = Database,
     locus_mmdb_data_codec:parse_all(DataSection, _Raw = true).
 
--spec parse_data_section_value(file:name_all(), locus_mmdb_data_codec:index())
-        -> locus_mmdb_data_raw:value().
+-spec parse_data_section_value(file:name_all(), locus_mmdb_data_codec:index()) ->
+    locus_mmdb_data_raw:value().
 %% @private
 parse_data_section_value(Filename, Index) ->
     {ok, EncodedDatabase} = file:read_file(Filename),
     {ok, Database} = unpack_database_impl(EncodedDatabase),
     #{data_section := DataSection} = Database,
-    {Entry, _RemainingData} = locus_mmdb_data_codec:parse_on_index(Index, DataSection,
-                                                                   _Raw = true),
+    {Entry, _RemainingData} = locus_mmdb_data_codec:parse_on_index(
+        Index,
+        DataSection,
+        _Raw = true
+    ),
     Entry.
 
 %% ------------------------------------------------------------------
@@ -221,17 +239,23 @@ unpack_tree_and_data_section(Metadata, TreeAndDataSection) ->
 instantiate_database(Metadata, TreeData, DataSection) ->
     #{node_count := NodeCount, record_size := RecordSize, ip_version := IpVersion} = Metadata,
 
-    case locus_mmdb_tree:new(TreeData, NodeCount, RecordSize, IpVersion,
-                             byte_size(DataSection))
+    case
+        locus_mmdb_tree:new(
+            TreeData,
+            NodeCount,
+            RecordSize,
+            IpVersion,
+            byte_size(DataSection)
+        )
     of
         {ok, Tree} ->
-            {ok, #{metadata => Metadata,
-                   tree => Tree,
-                   data_section => DataSection}};
+            {ok, #{
+                metadata => Metadata,
+                tree => Tree,
+                data_section => DataSection
+            }};
         {error, Reason} ->
-            {error, {bad_tree,
-                     {{because, Reason},
-                      {with_metadata, Metadata}}}}
+            {error, {bad_tree, {{because, Reason}, {with_metadata, Metadata}}}}
     end.
 
 lookup_parsed_address(ParsedAddress, Database) ->

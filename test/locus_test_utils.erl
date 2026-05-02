@@ -27,9 +27,11 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([test_cases/1,
-         test_cases/2,
-         path_with_test_tarballs/0]).
+-export([
+    test_cases/1,
+    test_cases/2,
+    path_with_test_tarballs/0
+]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -54,9 +56,14 @@ path_with_test_tarballs() ->
 %% ------------------------------------------------------------------
 
 exported_functions_with_suffixes(Module, Suffixes) ->
-    [Name || {Name, 1} <- exported_functions(Module),
-             lists:any(fun (Suffix) -> lists:suffix(Suffix, atom_to_list(Name)) end,
-                       Suffixes)].
+    [
+        Name
+     || {Name, 1} <- exported_functions(Module),
+        lists:any(
+            fun(Suffix) -> lists:suffix(Suffix, atom_to_list(Name)) end,
+            Suffixes
+        )
+    ].
 
 exported_functions(Module) ->
     ModuleInfo = Module:module_info(),
@@ -72,4 +79,3 @@ priv_dir() ->
         Priv ->
             Priv
     end.
-

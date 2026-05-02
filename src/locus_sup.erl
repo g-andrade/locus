@@ -58,13 +58,13 @@ start_link() ->
 -spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
-        #{strategy => one_for_one,
-          intensity => 5,
-          period => 1
-         },
+        #{
+            strategy => one_for_one,
+            intensity => 5,
+            period => 1
+        },
     ChildSpecs =
-        [database_sup_child_spec()
-        ],
+        [database_sup_child_spec()],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% ------------------------------------------------------------------
@@ -72,7 +72,8 @@ init([]) ->
 %% ------------------------------------------------------------------
 
 database_sup_child_spec() ->
-    #{ id => database_sup,
-       start => {locus_database_sup, start_link, []},
-       type => supervisor
-     }.
+    #{
+        id => database_sup,
+        start => {locus_database_sup, start_link, []},
+        type => supervisor
+    }.

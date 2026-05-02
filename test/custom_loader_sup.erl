@@ -29,10 +29,12 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/2,
-    start_link/3,
-    stop/1
-   ]).
+    [
+        start_link/2,
+        start_link/3,
+        stop/1
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
@@ -60,11 +62,12 @@ stop(Pid) ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([InitArg, ...])
-         -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}
-        when InitArg :: DatabaseId | DatabaseURL,
-             DatabaseId :: atom(),
-             DatabaseURL :: string().
+-spec init([InitArg, ...]) ->
+    {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}
+when
+    InitArg :: DatabaseId | DatabaseURL,
+    DatabaseId :: atom(),
+    DatabaseURL :: string().
 init([DatabaseId, DatabaseURL | TailArgs]) ->
     case TailArgs of
         [] ->
@@ -79,11 +82,11 @@ init([DatabaseId, DatabaseURL | TailArgs]) ->
 
 init_valid(DatabaseId, DatabaseURL, TailArgs) ->
     SupFlags =
-        #{ strategy => one_for_one,
-           intensity => 5,
-           period => 1
-         },
+        #{
+            strategy => one_for_one,
+            intensity => 5,
+            period => 1
+        },
     ChildSpecs =
-        [apply(locus, loader_child_spec, [DatabaseId, DatabaseURL | TailArgs])
-        ],
+        [apply(locus, loader_child_spec, [DatabaseId, DatabaseURL | TailArgs])],
     {ok, {SupFlags, ChildSpecs}}.
