@@ -255,6 +255,7 @@ lookup_address_data(DataIndex, DataSection) ->
             safer_raise(Class, Reason, Stacktrace)
     end.
 
+-spec safer_raise(atom(), term(), [term()]) -> no_return().
 safer_raise(Class, Reason, Stacktrace) ->
     SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
     SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),

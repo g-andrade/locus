@@ -94,6 +94,8 @@
           journal :: locus_mmdb_check_journal:t()
          }).
 
+-type validation_aux() :: #validation_aux{}.
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -555,7 +557,7 @@ validate_position_if_unvisited(Aux, Position, Path) ->
             validate_position_if_not_in_loop(Aux, Position, Path)
     catch
         throw:{position_out_of_bounds, Position} ->
-            fail_position_out_of_bounds(Aux, Position, Path, Position)
+            fail_position_out_of_bounds(Aux, Position, Path)
     end.
 
 validate_position_if_not_in_loop(Aux, Position, Path) ->
@@ -694,7 +696,7 @@ validate_indirect_map_key_if_not_validated_before(Aux, Pointer, DataAfterKey, Pa
             Success
     catch
         throw:{position_out_of_bounds, Position} ->
-            fail_position_out_of_bounds(Aux, Position, Path, Position)
+            fail_position_out_of_bounds(Aux, Position, Path)
     end.
 
 validate_indirect_map_key_if_not_in_loop(Aux, Pointer, DataAfterKey, Path) ->
@@ -769,7 +771,7 @@ validate_direct_map_value(Aux, Position, {Type, _, DataAfterValue} = ParseResult
             RemainingData
     catch
         throw:{position_out_of_bounds, Position} ->
-            fail_position_out_of_bounds(Aux, Position, Path, Position)
+            fail_position_out_of_bounds(Aux, Position, Path)
     end;
 validate_direct_map_value(Aux, Position, {error, Reason}, Path) ->
     fail_other(Aux, Position, Path, Reason).
@@ -811,7 +813,7 @@ validate_direct_array_value(Aux, Position, {Type, _, DataAfterValue} = ParseResu
             {ok, RemainingData}
     catch
         throw:{position_out_of_bounds, Position} ->
-            fail_position_out_of_bounds(Aux, Position, Path, Position)
+            fail_position_out_of_bounds(Aux, Position, Path)
     end;
 validate_direct_array_value(Aux, Position, {error, Reason}, Path) ->
     locus_mmdb_check_journal:bad_chunk_in_data_section(Aux#validation_aux.journal,
@@ -841,11 +843,24 @@ parse_all_recur(Chunk, FullData, Opts, Acc) ->
 %% Internal Function Definitions - Controlled Failures
 %% ------------------------------------------------------------------
 
-fail_position_out_of_bounds(Aux, Position, Path, Position) ->
+-spec fail_position_out_of_bounds(
+    validation_aux(), non_neg_integer(),
+    [non_neg_integer(), ...]
+) -> no_return().
+
+fail_position_out_of_bounds(Aux, Position, Path) ->
     locus_mmdb_check_journal:invalid_position_in_data_section(
       Aux#validation_aux.journal, Position, lists:reverse(Path)
      ),
     throw(controlled_validation_error).
+
+%%
+
+-spec fail_other(
+    validation_aux(), non_neg_integer(),
+    [non_neg_integer(), ...],
+    term()
+) -> no_return().
 
 fail_other(Aux, Position, Path, Reason) ->
     locus_mmdb_check_journal:bad_chunk_in_data_section(Aux#validation_aux.journal,
