@@ -7,7 +7,8 @@ Erlang/OTP library for IP geolocation using MaxMind GeoIP2/GeoLite2 databases (M
 ```bash
 make compile         # compile
 make test            # eunit + CT + CLI smoke test
-make check           # xref + dead-code (hank) + lint (elvis) + dialyzer
+make check           # format check (erlfmt) + xref + dead-code (hank) + lint (elvis) + dialyzer
+make format          # auto-format source with erlfmt
 make eunit           # unit tests only
 make ct              # common test suites + coverage
 make dialyzer        # type analysis
@@ -51,7 +52,8 @@ locus_sup
 
 - Module names follow the pattern `locus_<subsystem>[_<role>].erl`.
 - Internal functions only callable by tests are exported under `-ifdef(TEST)` or tagged `-ignore_xref([…])`.
-- No `if` expressions; use pattern matching or `case`.
+- Prefer pattern matching or `case` over `if` expressions; `no_if_expression` is disabled in `elvis.config` where `if` is genuinely cleaner.
+- Code is formatted with `erlfmt`; run `make format` before committing. The formatting commit is listed in `.git-blame-ignore-revs`.
 - Atom naming and line-length rules come from `elvis.config`; exceptions are documented there.
 - `ERL_FLAGS = -enable-feature maybe_expr` is set by the Makefile — required for katana-code under OTP 25.
 
@@ -74,7 +76,7 @@ Use `?assertRecv(Pattern)` (30 s timeout) for async message assertions in test c
 
 Runtime: `tls_certificate_check ~> 1.9` (TLS cert validation for HTTPS downloads).
 
-Dev plugins: `rebar3_ex_doc`, `rebar3_hank` (dead code), `rebar3_lint` (Elvis), `rebar3_hex`. Both hank and lint are excluded on OTP 22 via `rebar.config.script`.
+Dev plugins: `rebar3_ex_doc`, `rebar3_hank` (dead code), `rebar3_lint` (Elvis), `rebar3_hex`, `erlfmt` (formatter). `erlfmt`, `rebar3_hank`, and `rebar3_lint` are excluded on OTP ≤ 25 via `rebar.config.script` due to compatibility.
 
 Test deps: `jsx ~> 3.1` (JSON), `maxmind_test_data` (git submodule of MaxMind's test DB repo).
 
