@@ -7,8 +7,6 @@ SHELL := bash
 MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 
-export ERL_FLAGS = -enable-feature maybe_expr # needed for katana-code under OTP 25
-
 ## General Rules
 
 all: compile

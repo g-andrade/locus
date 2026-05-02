@@ -55,7 +55,6 @@ locus_sup
 - Prefer pattern matching or `case` over `if` expressions; `no_if_expression` is disabled in `elvis.config` where `if` is genuinely cleaner.
 - Code is formatted with `erlfmt`; run `make format` before committing. The formatting commit is listed in `.git-blame-ignore-revs`.
 - Atom naming and line-length rules come from `elvis.config`; exceptions are documented there.
-- `ERL_FLAGS = -enable-feature maybe_expr` is set by the Makefile — required for katana-code under OTP 25.
 
 ## Tests
 
