@@ -16,12 +16,27 @@ providers](#alternative-providers).
 The databases will be loaded on-demand and, when retrieved from the
 network, cached on the filesystem and updated automatically.
 
-> ⚠️ For instructions on how to upgrade to 2.x, check
-> [`MIGRATION.md`](https://github.com/g-andrade/locus/blob/master/MIGRATION.md)
-
 ## Usage
 
-#### 1\. Configure your license key
+#### 1\. Add as a dependency
+
+**Erlang** (`rebar.config`):
+
+``` erlang
+{deps, [
+    {locus, "~> 2.3"}
+]}.
+```
+
+**Elixir** (`mix.exs`):
+
+``` elixir
+defp deps do
+  [{:locus, "~> 2.3"}]
+end
+```
+
+#### 2\. Configure your license key
 
 *Skip this step if you're not loading databases directly from
 MaxMind.*
@@ -30,31 +45,22 @@ Get a free [license key](https://www.maxmind.com/en/geolite2/signup)
 from MaxMind if you haven't one already. Once logged in, you'll find the
 page to generate it on the left menu, under "Manage License Keys".
 
-Then clone the repository, run `make shell` and declare your key:
+**Erlang** (`sys.config`):
 
 ``` erlang
-application:set_env(locus, license_key, "YOUR_LICENSE_KEY").
+[{locus, [{license_key, "YOUR_LICENSE_KEY"}]}].
 ```
 
-If you're using Elixir, add locus as a dependency to your mix project:
+**Elixir** (`config/config.exs`):
 
-```elixir
-defp deps do
-    [
-      ...
-      {:locus, "~> 2.3"}
-    ]
-  end
-```
-
-Then, configure your license key in `config.exs`:
-
-```elixir
+``` elixir
 config :locus,
-  license_key: <MAXMIND_API_KEY>
+  license_key: "YOUR_LICENSE_KEY"
 ```
 
-#### 2\. Start the database loader
+#### 3\. Start the database loader
+
+**Erlang:**
 
 ``` erlang
 ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
@@ -65,24 +71,24 @@ ok = locus:start_loader(country, {maxmind, "GeoLite2-Country"}).
 %   implementing the locus_custom_fetcher behaviour.
 ```
 
-Or, in Elixir, start the database loaders that you'll be using in `application.ex`:
+**Elixir** (`application.ex`):
 
-```elixir
-  def start(_type, _args) do
-    # :locus.start_loader(:asn, {:maxmind, "GeoLite2-ASN"})
-    # :locus.start_loader(:country, {:maxmind, "GeoLite2-Country"})
-    :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
+``` elixir
+def start(_type, _args) do
+  # :locus.start_loader(:asn, {:maxmind, "GeoLite2-ASN"})
+  # :locus.start_loader(:country, {:maxmind, "GeoLite2-Country"})
+  :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
 
-    ...
+  ...
 ```
 
-#### 3\. Wait for the database to load (optional)
+#### 4\. Wait for the database to load (optional)
 
 ``` erlang
-{ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}'
+{ok, _DatabaseVersion} = locus:await_loader(country). % or `{error, Reason}`
 ```
 
-#### 4\. Look up IP addresses
+#### 5\. Look up IP addresses
 
 ``` erlang
 
@@ -160,6 +166,7 @@ iex> :locus.lookup(:city, "93.184.216.34")
 12. [Alternative Providers](#alternative-providers)
 13. [Alternative Libraries (Erlang)](#alternative-libraries-erlang)
 14. [Alternative Libraries (Elixir)](#alternative-libraries-elixir)
+15. [Upgrading from 1.x](#upgrading-from-1x)
 
 ### Supported File Formats
 
@@ -385,4 +392,8 @@ sponsored, or otherwise approved by MaxMind.
     location to a Plug connection based upon the client IP address by
     using MaxMind's GeoIP2 database
   - [tz\_world](https://hex.pm/packages/tz_world): Resolve timezones
-    rom a location efficiently using PostGIS and Ecto
+    from a location efficiently using PostGIS and Ecto
+
+### Upgrading from 1.x
+
+See [`MIGRATION.md`](https://github.com/g-andrade/locus/blob/master/MIGRATION.md).
