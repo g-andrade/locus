@@ -27,32 +27,11 @@ begin
             TakeOutProjPlugin(rebar3_hank, Config)
           end,
 
-    TakeOutHankIfMaybeExprNotEnabledOnEnv
-        = fun (Config) ->
-            Env = os:getenv(),
-
-            case [V || "ERL_FLAGS=" ++ V <- Env] of
-                [Flags | _] ->
-                    % katana-code (a dependent of rebar3_hank) requires maybe_expr
-                    case string:find(Flags, "-enable-feature maybe_expr") of
-                        nomatch ->
-                            TakeOutHank(Config);
-                        _ ->
-                            Config
-                    end;
-                [] ->
-                    TakeOutHank(Config)
-            end
-        end,
-
-
     OtpRelease = erlang:system_info(otp_release),
     try list_to_integer(OtpRelease) of
-        TooOld when TooOld =< 22 ->
+        TooOld when TooOld =< 25 ->
             % Take dev helpers away as they're no longer compatible with OTP 22
             TakeOutHank(TakeOutErlFmt(TakeOutElvis(CONFIG)));
-        25 ->
-            TakeOutHankIfMaybeExprNotEnabledOnEnv(CONFIG);
         _ ->
             CONFIG
     catch
