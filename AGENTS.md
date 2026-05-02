@@ -7,7 +7,9 @@ Erlang/OTP library for IP geolocation using MaxMind GeoIP2/GeoLite2 databases (M
 ```bash
 make compile         # compile
 make test            # eunit + CT + CLI smoke test
-make check           # format check (erlfmt) + xref + dead-code (hank) + lint (elvis) + dialyzer
+make check           # check-fast + check-slow
+make check-fast      # format check (erlfmt) + xref + dead-code (hank) + lint (elvis)
+make check-slow      # dialyzer
 make format          # auto-format source with erlfmt
 make eunit           # unit tests only
 make ct              # common test suites + coverage
@@ -15,7 +17,7 @@ make dialyzer        # type analysis
 make shell           # interactive REPL with the app started
 ```
 
-All checks run sequentially (`.NOTPARALLEL`). CI runs both `make test` and `make check` on OTP 24–28, Linux and Windows.
+All checks run sequentially (`.NOTPARALLEL`). CI runs `make check-fast`, `make test`, and `make check-slow` on OTP 24–28, Linux and Windows.
 
 ## Compiler flags
 

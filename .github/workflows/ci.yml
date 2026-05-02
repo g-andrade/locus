@@ -72,13 +72,16 @@ jobs:
             ${{env.build_cache_prefix_with_hash}}-
             ${{env.build_cache_prefix}}-
 
+      - name: Run Fast Checks
+        run: make check-fast
+
       - name: Run Tests
         run: make test
         env:
           MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
 
-      - name: Run Checks
-        run: make check
+      - name: Run Slow Checks
+        run: make check-slow
 
       - name: Save build artifacts to cache
         if: always()

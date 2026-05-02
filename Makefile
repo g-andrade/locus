@@ -21,9 +21,17 @@ clean:
 	@rebar3 clean -a
 .PHONY: clean
 
-check: check-formatted xref hank-dead-code-cleaner elvis-linter dialyzer
+check: check-fast check-slow
 .NOTPARALLEL: check
 .PHONY: check
+
+check-fast: check-formatted xref hank-dead-code-cleaner elvis-linter
+.NOTPARALLEL: check-fast
+.PHONY: check-fast
+
+check-slow: dialyzer
+.NOTPARALLEL: check-slow
+.PHONY: check-slow
 
 test: eunit ct cli
 	./locus check --log-level debug test/priv/GeoLite2-Country.tar.gz
