@@ -571,7 +571,7 @@ get_info(DatabaseId, Property) ->
 check(DatabaseId) ->
     case locus_database:find(DatabaseId) of
         {ok, Database, _Source, _Version} ->
-            check_(Database);
+            check_database(Database);
         {error, _} = Error ->
             Error
     end.
@@ -687,7 +687,7 @@ receive_waiter_reply(ReplyRef) ->
             {DatabaseId, Reply}
     end.
 
-check_(Database) ->
+check_database(Database) ->
     case locus_mmdb_check:run(Database) of
         ok ->
             ok;

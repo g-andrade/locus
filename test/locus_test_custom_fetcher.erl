@@ -171,7 +171,7 @@ init([BaseFilename, FileExtension, ModifiedOn]) ->
            {stop, {unexpected_call, #{request := _, from := {pid(), reference()}}}, state()}.
 handle_call({set_modification_datetime, ModifiedOn}, _From, State) ->
     Database = State#state.database,
-    UpdatedDatabase = Database#database{modified_on= ModifiedOn},
+    UpdatedDatabase = Database#database{modified_on = ModifiedOn},
     UpdatedState = State#state{database = UpdatedDatabase},
     {reply, ok, UpdatedState};
 handle_call(get_path, _From, State) ->

@@ -741,7 +741,7 @@ time_to_next_update(LastFetchSource, State) ->
     if LastFetchSourceType =:= cache ->
            0;
 
-       ErrorBackoffCount > 0,
+       ErrorBackoffCount > 0 andalso
        (Settings#settings.error_retry_behaviour_applies_after_readiness
         orelse not HasAchievedReadiness) ->
            error_backoff_interval(ErrorBackoffCount, Settings#settings.error_retry_behaviour);

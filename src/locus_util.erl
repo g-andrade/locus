@@ -63,6 +63,9 @@
 
 -define(TERM_PURGE_LARGE_BINARY_THRESHOLD, (1024 * 1024)).
 
+-define(GUARD_IS_PROPER_LIST(L), (length((L)) >= 0)).
+-define(GUARD_IS_PROPER_NON_EMPTY_LIST(L), (length((L)) > 0)).
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -79,7 +82,7 @@ parse_ip_address({A, B, C, D, E, F, G, H} = Address)
 parse_ip_address(Binary) when is_binary(Binary) ->
     String = binary_to_list(Binary),
     parse_ip_address(String);
-parse_ip_address(String) when length(String) >= 0 ->
+parse_ip_address(String) when ?GUARD_IS_PROPER_LIST(String) ->
     case string:tokens(String, "/") of
         [StrAddress] ->
             inet:parse_address(StrAddress);
@@ -150,7 +153,7 @@ is_utf8_binary(_) ->
 
 -spec is_unicode_string(term()) -> boolean().
 is_unicode_string(Value)
-  when length(Value) >= 0 ->
+  when ?GUARD_IS_PROPER_LIST(Value) ->
     try unicode:characters_to_binary(Value) of
         <<_/bytes>> -> true;
         _ -> false
@@ -259,8 +262,8 @@ parse_absolute_http_url(URI)
   when is_list(URI) ->
     case uri_string:parse(URI) of
         #{scheme := SchemeStr, host := Host} = ParsedURI
-          when (SchemeStr =:= "http" orelse SchemeStr =:= "https"),
-               length(Host) > 0 ->
+          when (SchemeStr =:= "http" orelse SchemeStr =:= "https")
+               andalso ?GUARD_IS_PROPER_NON_EMPTY_LIST(Host) ->
 
             Scheme = list_to_existing_atom(SchemeStr),
             DefaultPort =
@@ -270,7 +273,7 @@ parse_absolute_http_url(URI)
                 end,
             Query =
                 case ParsedURI of
-                    #{query := QueryStr} when length(QueryStr) > 0 ->
+                    #{query := QueryStr} when ?GUARD_IS_PROPER_NON_EMPTY_LIST(QueryStr) ->
                         [$? | QueryStr]; % simulate http_uri:parse/2 behaviour
                     #{} ->
                         ""
@@ -340,7 +343,7 @@ url_query_encode_codepoint(Codepoint) ->
 
 -spec build_url(atom(), string(), iodata(), inet:port_number(), iodata(), iodata()) -> string().
 build_url(Scheme, UserInfo, Host, Port, Path, Query)
-  when UserInfo =:= "",
+  when UserInfo =:= "" andalso
        ((Scheme =:= http andalso Port =:= 80) orelse
         (Scheme =:= https andalso Port =:= 443))
        ->

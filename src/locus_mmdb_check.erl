@@ -103,8 +103,7 @@
     |  invalid_position_in_data_section()
     |  bad_chunk_in_data_section()
     |  map_key_of_wrong_type_in_data_section()
-    |  invalid_utf8_string_in_data_section()
-    .
+    |  invalid_utf8_string_in_data_section().
 -export_type([error/0]).
 
 -type unprintable_utf8_string_in_data_section()
@@ -116,8 +115,7 @@
 -export_type([unprintable_utf8_string_in_data_section/0]).
 
 -type warning()
-    :: unprintable_utf8_string_in_data_section()
-    .
+    :: unprintable_utf8_string_in_data_section().
 -export_type([warning/0]).
 
 %% ------------------------------------------------------------------

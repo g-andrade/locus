@@ -555,10 +555,7 @@ validate_position_if_unvisited(Aux, Position, Path) ->
             validate_position_if_not_in_loop(Aux, Position, Path)
     catch
         throw:{position_out_of_bounds, Position} ->
-            locus_mmdb_check_journal:invalid_position_in_data_section(
-                Aux#validation_aux.journal, Position, lists:reverse(Path)
-            ),
-            throw(controlled_validation_error)
+            fail_position_out_of_bounds(Aux, Position, Path, Position)
     end.
 
 validate_position_if_not_in_loop(Aux, Position, Path) ->
@@ -613,10 +610,7 @@ validate_parsed_chunk(Aux, Position, Path, ParseResult) ->
             {ok, RemainingData};
 
         {error, Reason} ->
-            locus_mmdb_check_journal:bad_chunk_in_data_section(
-                Aux#validation_aux.journal, Position, Reason, lists:reverse(Path)
-            ),
-            throw(controlled_validation_error)
+            fail_other(Aux, Position, Path, Reason)
     end.
 
 validate_pointer(Aux, Pointer, RemainingData, Path) ->
@@ -700,10 +694,7 @@ validate_indirect_map_key_if_not_validated_before(Aux, Pointer, DataAfterKey, Pa
             Success
     catch
         throw:{position_out_of_bounds, Position} ->
-            locus_mmdb_check_journal:invalid_position_in_data_section(
-                Aux#validation_aux.journal, Position, lists:reverse(Path)
-            ),
-            throw(controlled_validation_error)
+            fail_position_out_of_bounds(Aux, Position, Path, Position)
     end.
 
 validate_indirect_map_key_if_not_in_loop(Aux, Pointer, DataAfterKey, Path) ->
@@ -778,16 +769,10 @@ validate_direct_map_value(Aux, Position, {Type, _, DataAfterValue} = ParseResult
             RemainingData
     catch
         throw:{position_out_of_bounds, Position} ->
-            locus_mmdb_check_journal:invalid_position_in_data_section(
-                Aux#validation_aux.journal, Position, lists:reverse(Path)
-            ),
-            throw(controlled_validation_error)
+            fail_position_out_of_bounds(Aux, Position, Path, Position)
     end;
 validate_direct_map_value(Aux, Position, {error, Reason}, Path) ->
-    locus_mmdb_check_journal:bad_chunk_in_data_section(Aux#validation_aux.journal,
-                                                          Position, Reason,
-                                                          lists:reverse(Path)),
-    throw(controlled_validation_error).
+    fail_other(Aux, Position, Path, Reason).
 
 validate_array(Aux, Count, RemainingData, Path) ->
     validate_array_recur(Aux, Count, RemainingData, Path).
@@ -826,10 +811,7 @@ validate_direct_array_value(Aux, Position, {Type, _, DataAfterValue} = ParseResu
             {ok, RemainingData}
     catch
         throw:{position_out_of_bounds, Position} ->
-            locus_mmdb_check_journal:invalid_position_in_data_section(
-                Aux#validation_aux.journal, Position, lists:reverse(Path)
-            ),
-            throw(controlled_validation_error)
+            fail_position_out_of_bounds(Aux, Position, Path, Position)
     end;
 validate_direct_array_value(Aux, Position, {error, Reason}, Path) ->
     locus_mmdb_check_journal:bad_chunk_in_data_section(Aux#validation_aux.journal,
@@ -854,3 +836,19 @@ parse_all_recur(Chunk, FullData, Opts, Acc) ->
             SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
             erlang:raise(Class, SaferReason, SaferStacktrace)
     end.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions - Controlled Failures
+%% ------------------------------------------------------------------
+
+fail_position_out_of_bounds(Aux, Position, Path, Position) ->
+    locus_mmdb_check_journal:invalid_position_in_data_section(
+      Aux#validation_aux.journal, Position, lists:reverse(Path)
+     ),
+    throw(controlled_validation_error).
+
+fail_other(Aux, Position, Path, Reason) ->
+    locus_mmdb_check_journal:bad_chunk_in_data_section(Aux#validation_aux.journal,
+                                                          Position, Reason,
+                                                          lists:reverse(Path)),
+    throw(controlled_validation_error).

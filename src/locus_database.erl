@@ -487,10 +487,19 @@ large_binaries_in_gcollected_persistent_term_are_copied_by_ref_test() ->
                             erlang:garbage_collect(), % just to be sure
                             ?assertEqual(BinarySize,
                                          binary:referenced_byte_size(RetrievedSubBinary))
+                    after
+                        5000 ->
+                            error(timeout)
                     end
             end),
 
-    receive ready_to_check -> ok end,
+    _ = receive
+            ready_to_check -> ok
+        after
+            5000 ->
+                error(timeout)
+        end,
+
     RetrievedSubBinary = persistent_term:get(Key),
     persistent_term:put(Key, updated_value),
     HelperPid ! check_it,

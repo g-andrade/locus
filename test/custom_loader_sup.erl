@@ -65,9 +65,19 @@ stop(Pid) ->
         when InitArg :: DatabaseId | DatabaseURL,
              DatabaseId :: atom(),
              DatabaseURL :: string().
-init([DatabaseId, DatabaseURL | TailArgs])
-  when length(TailArgs) =:= 0;
-       length(TailArgs) =:= 1 ->
+init([DatabaseId, DatabaseURL | TailArgs]) ->
+    case TailArgs of
+        [] ->
+            init_valid(DatabaseId, DatabaseURL, TailArgs);
+        [_] ->
+            init_valid(DatabaseId, DatabaseURL, TailArgs)
+    end.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+init_valid(DatabaseId, DatabaseURL, TailArgs) ->
     SupFlags =
         #{ strategy => one_for_one,
            intensity => 5,

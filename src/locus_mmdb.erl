@@ -105,12 +105,10 @@
              ErrorReason :: unpack_error().
 unpack_database(<<EncodedDatabase/bytes>>) ->
     try
-        unpack_database_(EncodedDatabase)
+        unpack_database_impl(EncodedDatabase)
     catch
         Class:Reason:Stacktrace ->
-            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
-            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            erlang:raise(Class, SaferReason, SaferStacktrace)
+            safer_raise(Class, Reason, Stacktrace)
     end.
 
 %% @doc Unpacks a single `TreeAndDataSection' binary into
@@ -184,7 +182,7 @@ lookup_address(Address, Database) ->
 %% @private
 parse_all_data_section_values(Filename) ->
     {ok, EncodedDatabase} = file:read_file(Filename),
-    {ok, Database} = unpack_database_(EncodedDatabase),
+    {ok, Database} = unpack_database_impl(EncodedDatabase),
     #{data_section := DataSection} = Database,
     locus_mmdb_data_codec:parse_all(DataSection, _Raw = true).
 
@@ -193,7 +191,7 @@ parse_all_data_section_values(Filename) ->
 %% @private
 parse_data_section_value(Filename, Index) ->
     {ok, EncodedDatabase} = file:read_file(Filename),
-    {ok, Database} = unpack_database_(EncodedDatabase),
+    {ok, Database} = unpack_database_impl(EncodedDatabase),
     #{data_section := DataSection} = Database,
     {Entry, _RemainingData} = locus_mmdb_data_codec:parse_on_index(Index, DataSection,
                                                                    _Raw = true),
@@ -203,7 +201,7 @@ parse_data_section_value(Filename, Index) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-unpack_database_(EncodedDatabase) ->
+unpack_database_impl(EncodedDatabase) ->
     case locus_mmdb_metadata:parse_and_validate(EncodedDatabase) of
         {ok, Metadata, OtherSections} ->
             TreeAndDataSection = OtherSections,
@@ -254,7 +252,10 @@ lookup_address_data(DataIndex, DataSection) ->
             {ok, Entry}
     catch
         Class:Reason:Stacktrace ->
-            SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
-            SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
-            erlang:raise(Class, SaferReason, SaferStacktrace)
+            safer_raise(Class, Reason, Stacktrace)
     end.
+
+safer_raise(Class, Reason, Stacktrace) ->
+    SaferReason = locus_util:purge_term_of_very_large_binaries(Reason),
+    SaferStacktrace = locus_util:purge_term_of_very_large_binaries(Stacktrace),
+    erlang:raise(Class, SaferReason, SaferStacktrace).

@@ -44,11 +44,11 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [init_/1
+   [proc_lib_init/1
    ]).
 
 -ignore_xref(
-   [init_/1
+   [proc_lib_init/1
    ]).
 
 %% ------------------------------------------------------------------
@@ -63,6 +63,12 @@
     terminate/2,
     code_change/3
    ]).
+
+%% ------------------------------------------------------------------
+%% Macro Definitions
+%% ------------------------------------------------------------------
+
+-define(GUARD_IS_PROPER_LIST(L), (length(L) >= 0)).
 
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
@@ -150,20 +156,20 @@ validate_opts(MixedOpts) ->
 -spec start_link(atom(), locus_http_download:headers(), [opt()]) -> {ok, pid()}.
 %% @private
 start_link(Edition, RequestHeaders, Opts) ->
-    proc_lib:start_link(?MODULE, init_, [[self(), Edition, RequestHeaders, Opts]]).
+    proc_lib:start_link(?MODULE, proc_lib_init, [[self(), Edition, RequestHeaders, Opts]]).
 
 %% ------------------------------------------------------------------
 %% proc_lib Function Definitions
 %% ------------------------------------------------------------------
 
--spec init_([InitArg, ...]) -> no_return()
+-spec proc_lib_init([InitArg, ...]) -> no_return()
         when InitArg :: OwnerPid | Edition | RequestHeaders | Opts,
              OwnerPid :: pid(),
              Edition :: atom(),
              RequestHeaders :: locus_http_download:headers(),
              Opts :: [opt()].
 %% @private
-init_([OwnerPid, Edition, RequestHeaders, Opts]) ->
+proc_lib_init([OwnerPid, Edition, RequestHeaders, Opts]) ->
     _ = process_flag(trap_exit, true),
     proc_lib:init_ack(OwnerPid, {ok, self()}),
     {MyOpts, HttpDownloadOpts} =
@@ -266,7 +272,7 @@ get_license_key(Opts) ->
            {ok, OptValue};
        is_binary(AppConfigValue), AppConfigValue =/= <<"YOUR_LICENSE_KEY">> ->
            {ok, AppConfigValue};
-       length(AppConfigValue) >= 0, AppConfigValue =/= "YOUR_LICENSE_KEY" ->
+       ?GUARD_IS_PROPER_LIST(AppConfigValue), AppConfigValue =/= "YOUR_LICENSE_KEY" ->
            <<Value/bytes>> = unicode:characters_to_binary(AppConfigValue),
            {ok, Value};
        true ->

@@ -184,9 +184,7 @@ comparable_lookup_success(Map) when is_map(Map) ->
       Map);
 comparable_lookup_success(List) when is_list(List) ->
     lists:map(
-      fun (Value) ->
-              comparable_lookup_success(Value)
-      end,
+      fun comparable_lookup_success/1,
       List);
 comparable_lookup_success(Binary) when is_binary(Binary) ->
     try binary_to_float(Binary) of

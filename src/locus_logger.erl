@@ -150,9 +150,9 @@ report(MinWeight, DatabaseId, {load_attempt_finished, Source, {ok, Version}}) ->
            ok
     end;
 report(MinWeight, DatabaseId, {load_attempt_finished, Source, {error, Reason}}) ->
-    {Weight, LogFun}= ?case_match(Source, {cache, _},
-                                  {?warning, fun log_warning/2},
-                                  {?error, fun log_error/2}),
+    {Weight, LogFun} = ?case_match(Source, {cache, _},
+                                   {?warning, fun log_warning/2},
+                                   {?error, fun log_error/2}),
     if MinWeight =< ?debug ->
            LogFun("[~ts] database failed to load from ~p: ~p", [DatabaseId, Source, Reason]);
        MinWeight =< Weight ->
@@ -275,7 +275,7 @@ log_error(Fmt, Args) ->
 
 log_to_logger(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt,
-    logger:Fun(FullFmt, Args).
+    apply(logger, Fun, [FullFmt, Args]).
 
 % `lager' and `logger' don`t play nice with each other (as of Jun 2019)
 % * https://github.com/erlang-lager/lager/issues/492
@@ -296,7 +296,7 @@ has_usable_logger() ->
 
 log_to_error_logger(Fun, Fmt, Args) ->
     FullFmt = "[locus] " ++ Fmt ++ "~n",
-    error_logger:(Fun)(FullFmt, Args).
+    apply(error_logger, Fun, [FullFmt, Args]).
 
 -spec maybe_truncate_url(locus_http_download:url()) -> locus_http_download:url().
 maybe_truncate_url(URL) ->

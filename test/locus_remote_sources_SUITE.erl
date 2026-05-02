@@ -34,6 +34,8 @@
 -define(VERSION1_TIMESTAMP, {{2018, 01, 01}, {00, 00, 00}}).
 -define(VERSION2_TIMESTAMP, {{2018, 02, 01}, {00, 00, 00}}).
 
+-define(GUARD_IS_PROPER_NON_EMPTY_LIST(L), (length((L)) > 0)).
+
 %% ------------------------------------------------------------------
 %% Setup
 %% ------------------------------------------------------------------
@@ -86,7 +88,7 @@ currently_checkedout_commit_is_likely_tagged() ->
 
 license_key_from_environment_is_defined() ->
     LicenseKey = license_key_from_environment(),
-    LicenseKey =/= false andalso length(LicenseKey) > 0.
+    is_list(LicenseKey) andalso ?GUARD_IS_PROPER_NON_EMPTY_LIST(LicenseKey).
 
 license_key_from_environment() ->
     os:getenv("MAXMIND_LICENSE_KEY").

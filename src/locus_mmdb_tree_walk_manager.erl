@@ -121,7 +121,7 @@ take_index(#handle{pid = Pid}) ->
 -spec maybe_give_index(handle(), non_neg_integer(), pos_integer()) -> boolean().
 maybe_give_index(#handle{concurrent = true, counters = Counters} = Handle, NodeIndex, Path) ->
     atomics:get(Counters, ?FREE_WORKERS_COUNTER) > 0
-    andalso maybe_give_index_(Handle, NodeIndex, Path);
+    andalso maybe_give_index_step2(Handle, NodeIndex, Path);
 maybe_give_index(#handle{concurrent = false}, _NodeIndex, _Path) ->
     false.
 
@@ -208,7 +208,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-maybe_give_index_(Handle, NodeIndex, Path) ->
+maybe_give_index_step2(Handle, NodeIndex, Path) ->
     case atomics:sub_get(Handle#handle.counters, ?FREE_WORKERS_COUNTER, 1) of
         UpdatedNumberOfFreeWorkers when UpdatedNumberOfFreeWorkers >= 0 ->
             gen_server:cast(Handle#handle.pid, {give_index, NodeIndex, Path}),

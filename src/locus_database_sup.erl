@@ -58,9 +58,9 @@ start_child(Args) ->
         Result -> Result
     catch
         exit:{Reason, {gen_server, call, [?SERVER | _]}}
-          when Reason =:= noproc;
-               Reason =:= normal;
-               Reason =:= shutdown;
+          when Reason =:= noproc orelse
+               Reason =:= normal orelse
+               Reason =:= shutdown orelse
                (tuple_size(Reason) =:= 2 andalso element(1, Reason) =:= shutdown) ->
             {error, application_not_running}
     end.

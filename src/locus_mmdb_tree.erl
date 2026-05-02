@@ -166,7 +166,7 @@ validate(Fun, WalkManager, Journal, Tree) ->
     case locus_mmdb_tree_walk_manager:take_index(WalkManager) of
         {ok, NodeIndex, Path} ->
             Depth = tree_depth_from_path(Path),
-            validate_(NodeIndex, Fun, WalkManager, Journal, Tree, Path, Depth);
+            validate_index(NodeIndex, Fun, WalkManager, Journal, Tree, Path, Depth);
         stop ->
             ok
     end.
@@ -336,7 +336,7 @@ bitstring_ip_address_prefix(BitAddress, SuffixSize) when bit_size(BitAddress) =:
 tree_depth_from_path(Path) ->
     floor(math:log2(Path)) + 1.
 
-validate_(NodeIndex, Fun, WalkManager, Journal, Tree, Path, Depth) ->
+validate_index(NodeIndex, Fun, WalkManager, Journal, Tree, Path, Depth) ->
     Aux = #validation_aux{node_count = Tree#tree.node_count,
                           node_size = Tree#tree.node_size,
                           record_size = Tree#tree.record_size,

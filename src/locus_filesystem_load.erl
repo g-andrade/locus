@@ -172,12 +172,8 @@ handle_read(State) ->
             {stop, normal, State};
         {ok, #file_info{ mtime = ModificationDT }} ->
             handle_new_read(Path, ModificationDT, State);
-        {error, enoent} ->
-            notify_owner({finished, {error, not_found}}, State),
-            {stop, normal, State};
         {error, Reason} ->
-            notify_owner({finished, {error, {read_file_info, Reason}}}, State),
-            {stop, normal, State}
+            handle_read_error(Reason, read_file_info, State)
     end.
 
 -spec handle_new_read(path(), calendar:datetime(), state()) -> {stop, normal, state()}.
@@ -190,11 +186,17 @@ handle_new_read(Path, ModificationDT, State) ->
                  },
             notify_owner({finished, {success, Success}}, State),
             {stop, normal, State};
-        {error, enoent} ->
+        {error, Reason} ->
+            handle_read_error(Reason, read_file, State)
+    end.
+
+handle_read_error(Reason, Function, State) ->
+    case Reason of
+        enoent ->
             notify_owner({finished, {error, not_found}}, State),
             {stop, normal, State};
-        {error, Reason} ->
-            notify_owner({finished, {error, {read_file, Reason}}}, State),
+        _ ->
+            notify_owner({finished, {error, {Function, Reason}}}, State),
             {stop, normal, State}
     end.
 
