@@ -312,6 +312,8 @@ parse_chunk_head(Data) ->
             {pointer, BasePointer + 526336, RemainingData};
         <<?pointer:3, _:5, Pointer:32, RemainingData/bytes>> ->
             {pointer, Pointer, RemainingData};
+        %
+        %
         <<?utf8_string:3, Size:5, Bytes:Size/bytes, RemainingData/bytes>> when
             Size < 29
         ->
@@ -328,6 +330,8 @@ parse_chunk_head(Data) ->
             Size = BaseSize + 65821,
             <<Bytes:Size/bytes, RemainingData/bytes>> = Tail,
             {utf8_string, Bytes, RemainingData};
+        %
+        %
         <<?double:3, 8:5, Value:64/float, RemainingData/bytes>> ->
             {double, Value, RemainingData};
         <<?double:3, 8:5, Signal:1, Exponent:11, Mantissa:52, RemainingData/bytes>> when
@@ -338,6 +342,8 @@ parse_chunk_head(Data) ->
             Signal =:= 1, Exponent =:= ((1 bsl 11) - 1), Mantissa =:= 0
         ->
             {double, '#-Inf', RemainingData};
+        %
+        %
         <<?bytes:3, Size:5, Bytes:Size/bytes, RemainingData/bytes>> when
             Size < 29
         ->
@@ -354,14 +360,20 @@ parse_chunk_head(Data) ->
             Size = BaseSize + 65821,
             <<Bytes:Size/bytes, RemainingData/bytes>> = Tail,
             {bytes, Bytes, RemainingData};
+        %
+        %
         <<?uint16:3, Size:5, Value:Size/integer-unit:8, RemainingData/bytes>> when
             Size =< 2
         ->
             {uint16, Value, RemainingData};
+        %
+        %
         <<?uint32:3, Size:5, Value:Size/integer-unit:8, RemainingData/bytes>> when
             Size =< 4
         ->
             {uint32, Value, RemainingData};
+        %
+        %
         <<?map:3, Count:5, RemainingData/bytes>> when
             Count < 29
         ->
@@ -375,6 +387,8 @@ parse_chunk_head(Data) ->
         <<?map:3, _:5, BaseCount:24, RemainingData/bytes>> ->
             Count = BaseCount + 65821,
             {map, Count, RemainingData};
+        %
+        %
         <<0:3, Size:5, ?extended_int32, Value:Size/signed-integer-unit:8, RemainingData/bytes>> when
             Size =:= 4
         ->
@@ -389,14 +403,20 @@ parse_chunk_head(Data) ->
             %  A 1 is negative and a 0 is positive."
             %
             {int32, Value, RemainingData};
+        %
+        %
         <<0:3, Size:5, ?extended_uint64, Value:Size/integer-unit:8, RemainingData/bytes>> when
             Size =< 8
         ->
             {uint64, Value, RemainingData};
+        %
+        %
         <<0:3, Size:5, ?extended_uint128, Value:Size/integer-unit:8, RemainingData/bytes>> when
             Size =< 16
         ->
             {uint128, Value, RemainingData};
+        %
+        %
         <<0:3, Count:5, ?extended_array, RemainingData/bytes>> when Count < 29 ->
             {array, Count, RemainingData};
         <<0:3, 29:5, ?extended_array, BaseCount, RemainingData/bytes>> ->
@@ -408,14 +428,22 @@ parse_chunk_head(Data) ->
         <<0:3, _:5, ?extended_array, BaseCount:24, RemainingData/bytes>> ->
             Count = BaseCount + 65821,
             {array, Count, RemainingData};
+        %
+        %
         <<0:3, _:5, ?extended_data_cache_container, _RemainingData/bytes>> ->
             {error, '`data cache container` type not yet supported'};
+        %
+        %
         <<0:3, 0:5, ?extended_end_marker>> ->
             {error, {finished, extended_end_marker}};
+        %
+        %
         <<0:3, 0:5, ?extended_boolean, RemainingData/bytes>> ->
             {boolean, false, RemainingData};
         <<0:3, 1:5, ?extended_boolean, RemainingData/bytes>> ->
             {boolean, true, RemainingData};
+        %
+        %
         <<0:3, 4:5, ?extended_float, Value:32/float, RemainingData/bytes>> ->
             {float, Value, RemainingData};
         <<0:3, 4:5, ?extended_float, Signal:1, Exponent:8, Mantissa:23, RemainingData/bytes>> when
@@ -426,6 +454,8 @@ parse_chunk_head(Data) ->
             Signal =:= 1, Exponent =:= ((1 bsl 8) - 1), Mantissa =:= 0
         ->
             {float, '#-Inf', RemainingData};
+        %
+        %
         <<>> ->
             {error, {finished, no_more_data}};
         _Invalid ->
@@ -447,18 +477,24 @@ fail_to_parse_chunk_head(Data) ->
         ->
             {error,
                 {insufficient_data, utf8_string_1, {Size, bytes}, binary:copy(InsufficientData)}};
+        %
+        %
         <<?utf8_string:3, 29:5, InsufficientData/bytes>> ->
             {error, {insufficient_data_for_size, utf8_string_2, binary:copy(InsufficientData)}};
         <<?utf8_string:3, 30:5, InsufficientData/bytes>> ->
             {error, {insufficient_data_for_size, utf8_string_3, binary:copy(InsufficientData)}};
         <<?utf8_string:3, 31:5, InsufficientData/bytes>> ->
             {error, {insufficient_data_for_size, utf8_string_4, binary:copy(InsufficientData)}};
+        %
+        %
         <<?double:3, 8:5, InvalidDouble:64/bits, _RemainingData/bytes>> ->
             {error, {invalid_double, binary:copy(InvalidDouble)}};
         <<?double:3, 8:5, InsufficientData/bytes>> ->
             {error, {insufficient_data, double, binary:copy(InsufficientData)}};
         <<?double:3, SizeTag:5, _RemainingData/bytes>> ->
             {error, {invalid_double_size_tag, SizeTag}};
+        %
+        %
         <<?bytes:3, Size:5, InsufficientData/bytes>> when
             Size < 29
         ->
@@ -469,58 +505,78 @@ fail_to_parse_chunk_head(Data) ->
             {error, {insufficient_data_for_size, bytes_3, binary:copy(InsufficientData)}};
         <<?bytes:3, _:5, InsufficientData/bytes>> ->
             {error, {insufficient_data_for_size, bytes_4, binary:copy(InsufficientData)}};
+        %
+        %
         <<?uint16:3, Size:5, _RemainingData/bytes>> when
             Size > 2
         ->
             {error, {too_large, uint16, {Size, bytes}}};
         <<?uint16:3, Size:5, InsufficientData/bytes>> ->
             {error, {insufficient_data, uint16, {Size, bytes}, binary:copy(InsufficientData)}};
+        %
+        %
         <<?uint32:3, Size:5, _RemainingData/bytes>> when
             Size > 4
         ->
             {error, {too_large, uint32, {Size, bytes}}};
         <<?uint32:3, Size:5, InsufficientData/bytes>> ->
             {error, {insufficient_data, uint32, {Size, bytes}, binary:copy(InsufficientData)}};
+        %
+        %
         <<?map:3, 29:5, InsufficientData/bits>> ->
             {error, {insufficient_data_for_size, map_2, bitstring_copy(InsufficientData)}};
         <<?map:3, 30:5, InsufficientData/bits>> ->
             {error, {insufficient_data_for_size, map_3, bitstring_copy(InsufficientData)}};
         <<?map:3, 31:5, InsufficientData/bits>> ->
             {error, {insufficient_data_for_size, map_4, bitstring_copy(InsufficientData)}};
+        %
+        %
         <<0:3, Size:5, ?extended_int32, _RemainingData/bytes>> when
             Size > 4
         ->
             {error, {too_large, int32, {Size, bytes}}};
         <<0:3, Size:5, ?extended_int32, InsufficientData/bytes>> ->
             {error, {insufficient_data, int32, {Size, bytes}, binary:copy(InsufficientData)}};
+        %
+        %
         <<0:3, Size:5, ?extended_uint64, _RemainingData/bytes>> when
             Size > 8
         ->
             {error, {too_large, uint64, {Size, bytes}}};
         <<0:3, Size:5, ?extended_uint64, InsufficientData/bytes>> ->
             {error, {insufficient_data, uint64, {Size, bytes}, binary:copy(InsufficientData)}};
+        %
+        %
         <<0:3, Size:5, ?extended_uint128, _RemainingData/bytes>> when
             Size > 16
         ->
             {error, {too_large, uint128, {Size, bytes}}};
         <<0:3, Size:5, ?extended_uint128, InsufficientData/bytes>> ->
             {error, {insufficient_data, uint128, {Size, bytes}, binary:copy(InsufficientData)}};
+        %
+        %
         <<0:3, 29:5, ?extended_array, InsufficientData/bytes>> ->
             {error, {insufficient_data_for_size, array_2, binary:copy(InsufficientData)}};
         <<0:3, 30:5, ?extended_array, InsufficientData/bytes>> ->
             {error, {insufficient_data_for_size, array_3, binary:copy(InsufficientData)}};
         <<0:3, 31:5, ?extended_array, InsufficientData/bytes>> ->
             {error, {insufficient_data_for_size, array_4, binary:copy(InsufficientData)}};
+        %
+        %
         <<0:3, 0:5, ?extended_end_marker, ExcessiveData/bytes>> ->
             {error,
                 {data_beyond_end_marker,
                     locus_util:purge_term_of_very_large_binaries(ExcessiveData)}};
+        %
+        %
         <<0:3, 4:5, ?extended_float, InvalidFloat:32/bits, _RemainingData/bytes>> ->
             {error, {invalid_float, binary:copy(InvalidFloat)}};
         <<0:3, 4:5, ?extended_float, InsufficientData/bytes>> ->
             {error, {insufficient_data, float, binary:copy(InsufficientData)}};
         <<0:3, SizeTag:5, ?extended_float, _RemainingData/bytes>> ->
             {error, {invalid_float_size_tag, SizeTag}};
+        %
+        %
         <<0:3, _SizeTag:5, UnknownExtendedType, _RemainingData/bytes>> ->
             {error, {unknown_extended_type, UnknownExtendedType}};
         <<0:3, _SizeTag:5, InsufficientData/bytes>> ->
