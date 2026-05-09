@@ -21,3 +21,4 @@ locus
 *.mmdb
 /doc/
 /.claude/settings.local.json
+/tmp/

@@ -4,10 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [2.3.14] - 2026-05-09
 
 ### Added
 
+- llms.txt
 - OTP 28.5 to CI
 - code formatter (erlfmt)
 
@@ -15,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - outdated checks, and the fixes that they required
 - whole library was re-formatted by erlfmt
+- doc generation from `rebar3_ex_doc` to direct use of `ExDoc`
 
 ### Fixed
 

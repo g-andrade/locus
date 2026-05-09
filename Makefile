@@ -93,6 +93,10 @@ eqwalizer:
 
 ## Shell, docs and publication
 
+publish:
+publish: doc
+	@rebar3 hex publish
+
 shell: export ERL_FLAGS = +pc unicode
 shell:
 	@rebar3 as shell shell
@@ -101,10 +105,22 @@ cli:
 	@rebar3 as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
 
-doc-dry:
-	@rebar3 hex build
-.PHONY: doc-dry
+doc: SOURCE_REF := $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)
+doc: tmp/ex_doc
+doc:
+	./tmp/ex_doc "locus" "2.3.13" \
+		_build/default/lib/locus/ebin \
+		-c doc.config \
+		--source-ref "${SOURCE_REF}";
+.PHONY: doc
 
-publish:
-publish: doc
-	@rebar3 hex publish
+tmp/ex_doc: EX_DOC_VER=0.40.2
+tmp/ex_doc: OTP_VER := $(shell erl -noshell -eval 'io:fwrite("~s", [erlang:system_info(otp_release)]), init:stop().')
+tmp/ex_doc: | tmp
+tmp/ex_doc:
+	curl -fL -o tmp/ex_doc \
+		"https://github.com/elixir-lang/ex_doc/releases/download/v${EX_DOC_VER}/ex_doc_otp_${OTP_VER}"; \
+		chmod a+x tmp/ex_doc
+
+tmp:
+	mkdir tmp
