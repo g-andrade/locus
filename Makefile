@@ -93,9 +93,10 @@ eqwalizer:
 
 ## Shell, docs and publication
 
-publish:
 publish: doc
-	@rebar3 hex publish
+publish:
+	@rebar3 hex publish --doc-dir=doc
+.NOTPARALLEL: publish
 
 shell: export ERL_FLAGS = +pc unicode
 shell:
@@ -108,9 +109,10 @@ cli:
 doc: SOURCE_REF := $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)
 doc: tmp/ex_doc
 doc:
-	./tmp/ex_doc "locus" "2.3.13" \
-		_build/default/lib/locus/ebin \
-		-c doc.config \
+	rebar3 as docs edoc; \
+		./tmp/ex_doc "locus" "${SOURCE_REF}" \
+		_build/docs/lib/locus/ebin \
+		-c ex_doc.config \
 		--source-ref "${SOURCE_REF}";
 .PHONY: doc
 
