@@ -21,8 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Stores a file in the filesystem without blocking the caller
 -module(locus_filesystem_store).
+
+-ifdef(E48).
+-moduledoc "Stores a file in the filesystem without blocking the caller.".
+-endif.
 -behaviour(gen_server).
 
 -include_lib("kernel/include/file.hrl").

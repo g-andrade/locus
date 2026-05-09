@@ -21,8 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Callbacks for providing your own database fetcher
 -module(locus_custom_fetcher).
+
+-ifdef(E48).
+-moduledoc "Callbacks for providing your own database fetcher.".
+-endif.
 -behaviour(gen_server).
 
 -include_lib("stdlib/include/assert.hrl").

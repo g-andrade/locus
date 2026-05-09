@@ -21,8 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc API for working with MMDB - wholesomeness check
 -module(locus_mmdb_check).
+
+-ifdef(E48).
+-moduledoc "API for working with MMDB - wholesomeness check.".
+-endif.
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -125,7 +128,10 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Checks for errors and quirks within `Database'
+-ifdef(E48).
+-doc "Checks for errors and quirks within `Database`.".
+-endif.
+
 -spec run(locus_mmdb:database()) ->
     ok
     | {warnings, [warning(), ...]}

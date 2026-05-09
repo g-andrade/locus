@@ -21,8 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc The main API
 -module(locus).
+
+-ifdef(E48).
+-moduledoc "The main API.".
+-endif.
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -131,30 +134,28 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Like `:start_loader/3' but with default options
-%%
-%% <ul>
-%% <li>`DatabaseId' must be an atom.</li>
-%% <li>`LoadFrom' must be either:
-%%  <ul>
-%%      <li>a `database_edition()' tuple, or</li>
-%%      <li>a `DatabaseURL' containing either a string or binary representation
-%%      of a HTTP(s) URL or local path, or</li>
-%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
-%%      the `locus_custom_fetcher' behaviour</li>
-%%  </ul>
-%% </li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`ok' in case of success.</li>
-%% <li>`{error, invalid_url}' if the source is invalid.</li>
-%% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
-%% </ul>
-%% @see await_loader/1
-%% @see await_loader/2
-%% @see start_loader/3
+-ifdef(E48).
+-doc """
+Like `start_loader/3` but with default options.
+
+- `DatabaseId` must be an atom.
+- `LoadFrom` must be either:
+  - a `t:database_edition/0` tuple, or
+  - a `DatabaseURL` containing either a string or binary representation
+    of a HTTP(s) URL or local path, or
+  - a `{custom_fetcher, Module, Args}` tuple, with `Module` implementing
+    the `m:locus_custom_fetcher` behaviour
+
+Returns:
+
+- `ok` in case of success.
+- `{error, invalid_url}` if the source is invalid.
+- `{error, already_started}` if the loader under `DatabaseId` has already been started.
+
+See also: `await_loader/1`, `await_loader/2`, `start_loader/3`.
+""".
+-endif.
+
 -spec start_loader(DatabaseId, LoadFrom) -> ok | {error, Error} when
     DatabaseId :: atom(),
     LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
@@ -165,31 +166,31 @@
 start_loader(DatabaseId, LoadFrom) ->
     start_loader(DatabaseId, LoadFrom, []).
 
-%% @doc Starts a database loader under id `DatabaseId' with options `Opts'.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom.</li>
-%% <li>`LoadFrom' must be either:
-%%  <ul>
-%%      <li>a `database_edition()' tuple, or</li>
-%%      <li>a `DatabaseURL' containing either a string or binary representation
-%%      of a HTTP(s) URL or local path, or</li>
-%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
-%%      the `locus_custom_fetcher' behaviour</li>
-%%  </ul>
-%% </li>
-%% <li>`Opts' must be a list of `locus_database:opt()' values</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`ok' in case of success.</li>
-%% <li>`{error, invalid_url}' if the source is invalid.</li>
-%% <li>`{error, already_started}' if the loader under `DatabaseId' has already been started.</li>
-%% </ul>
-%% @see await_loader/1
-%% @see await_loader/2
-%% @see start_loader/2
+
+-ifdef(E48).
+-doc """
+Starts a database loader under id `DatabaseId` with options `Opts`.
+
+- `DatabaseId` must be an atom.
+- `LoadFrom` must be either:
+  - a `t:database_edition/0` tuple, or
+  - a `DatabaseURL` containing either a string or binary representation
+    of a HTTP(s) URL or local path, or
+  - a `{custom_fetcher, Module, Args}` tuple, with `Module` implementing
+    the `m:locus_custom_fetcher` behaviour
+- `Opts` must be a list of `t:locus_database:opt/0` values
+
+Returns:
+
+- `ok` in case of success.
+- `{error, invalid_url}` if the source is invalid.
+- `{error, already_started}` if the loader under `DatabaseId` has already been started.
+
+See also: `await_loader/1`, `await_loader/2`, `start_loader/2`.
+""".
+-endif.
+
 -spec start_loader(DatabaseId, LoadFrom, Opts) -> ok | {error, Error} when
     DatabaseId :: atom(),
     LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
@@ -230,42 +231,46 @@ start_loader(DatabaseId, {custom_fetcher, Module, _Args} = CustomFetcher, Opts) 
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:start(DatabaseId, Origin, OptsWithDefaults).
 
-%% @doc Stops the database loader under id `DatabaseId'.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns `ok' in case of success, `{error, not_found}' otherwise.
+
+-ifdef(E48).
+-doc """
+Stops the database loader under id `DatabaseId`.
+
+- `DatabaseId` must be an atom and refer to a database loader.
+
+Returns `ok` in case of success, `{error, not_found}` otherwise.
+""".
+-endif.
+
 -spec stop_loader(DatabaseId) -> ok | {error, Error} when
     DatabaseId :: atom(),
     Error :: not_found.
 stop_loader(DatabaseId) ->
     locus_database:stop(DatabaseId, _Reason = normal).
 
-%% @doc Like `:loader_child_spec/2' but with default options
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom.</li>
-%% <li>`LoadFrom' must be either:
-%%  <ul>
-%%      <li>a `database_edition()' tuple, or</li>
-%%      <li>a `DatabaseURL' containing either a string or binary representation
-%%      of a HTTP(s) URL or local path, or</li>
-%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
-%%      the `locus_custom_fetcher' behaviour</li>
-%%  </ul>
-%% </li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>A `supervisor:child_spec()'.</li>
-%% </ul>
-%% @see loader_child_spec/3
-%% @see await_loader/1
-%% @see await_loader/2
-%% @see start_loader/2
+
+-ifdef(E48).
+-doc """
+Like `loader_child_spec/3` but with default options.
+
+- `DatabaseId` must be an atom.
+- `LoadFrom` must be either:
+  - a `t:database_edition/0` tuple, or
+  - a `DatabaseURL` containing either a string or binary representation
+    of a HTTP(s) URL or local path, or
+  - a `{custom_fetcher, Module, Args}` tuple, with `Module` implementing
+    the `m:locus_custom_fetcher` behaviour
+
+Returns:
+
+- A `t:supervisor:child_spec/0`.
+
+See also: `loader_child_spec/3`, `await_loader/1`, `await_loader/2`, `start_loader/2`.
+""".
+-endif.
+
 -spec loader_child_spec(DatabaseId, LoadFrom) -> ChildSpec | no_return() when
     DatabaseId :: atom(),
     LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
@@ -276,31 +281,30 @@ stop_loader(DatabaseId) ->
 loader_child_spec(DatabaseId, LoadFrom) ->
     loader_child_spec(DatabaseId, LoadFrom, []).
 
-%% @doc Like `:loader_child_spec/3' but with default child id
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom.</li>
-%% <li>`LoadFrom' must be either:
-%%  <ul>
-%%      <li>a `database_edition()' tuple, or</li>
-%%      <li>a `DatabaseURL' containing either a string or binary representation
-%%      of a HTTP(s) URL or local path, or</li>
-%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
-%%      the `locus_custom_fetcher' behaviour</li>
-%%  </ul>
-%% </li>
-%% <li>`Opts' must be a list of `locus_database:opt()' values</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>A `supervisor:child_spec()'.</li>
-%% </ul>
-%% @see loader_child_spec/2
-%% @see loader_child_spec/4
-%% @see await_loader/1
-%% @see await_loader/2
-%% @see start_loader/3
+
+-ifdef(E48).
+-doc """
+Like `loader_child_spec/4` but with default child id.
+
+- `DatabaseId` must be an atom.
+- `LoadFrom` must be either:
+  - a `t:database_edition/0` tuple, or
+  - a `DatabaseURL` containing either a string or binary representation
+    of a HTTP(s) URL or local path, or
+  - a `{custom_fetcher, Module, Args}` tuple, with `Module` implementing
+    the `m:locus_custom_fetcher` behaviour
+- `Opts` must be a list of `t:locus_database:opt/0` values
+
+Returns:
+
+- A `t:supervisor:child_spec/0`.
+
+See also: `loader_child_spec/2`, `loader_child_spec/4`, `await_loader/1`,
+`await_loader/2`, `start_loader/3`.
+""".
+-endif.
+
 -spec loader_child_spec(DatabaseId, LoadFrom, Opts) -> ChildSpec | no_return() when
     DatabaseId :: atom(),
     LoadFrom :: DatabaseEdition | DatabaseURL | CustomFetcher,
@@ -312,31 +316,29 @@ loader_child_spec(DatabaseId, LoadFrom) ->
 loader_child_spec(DatabaseId, LoadFrom, Opts) ->
     loader_child_spec({locus_database, DatabaseId}, DatabaseId, LoadFrom, Opts).
 
-%% @doc Returns a supervisor child spec for a database loader
-%% under id `DatabaseId' with options `Opts'.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom.</li>
-%% <li>`LoadFrom' must be either:
-%%  <ul>
-%%      <li>a `database_edition()' tuple, or</li>
-%%      <li>a `DatabaseURL' containing either a string or binary representation
-%%      of a HTTP(s) URL or local path, or</li>
-%%      <li>a `{custom_fetcher, Module, Args}' tuple, with `Module' implementing
-%%      the `locus_custom_fetcher' behaviour</li>
-%%  </ul>
-%% </li>
-%% <li>`Opts' must be a list of `locus_database:opt()' values</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>A `supervisor:child_spec()'.</li>
-%% </ul>
-%% @see loader_child_spec/3
-%% @see await_loader/1
-%% @see await_loader/2
-%% @see start_loader/3
+
+-ifdef(E48).
+-doc """
+Returns a supervisor child spec for a database loader under id `DatabaseId` with options `Opts`.
+
+- `DatabaseId` must be an atom.
+- `LoadFrom` must be either:
+  - a `t:database_edition/0` tuple, or
+  - a `DatabaseURL` containing either a string or binary representation
+    of a HTTP(s) URL or local path, or
+  - a `{custom_fetcher, Module, Args}` tuple, with `Module` implementing
+    the `m:locus_custom_fetcher` behaviour
+- `Opts` must be a list of `t:locus_database:opt/0` values
+
+Returns:
+
+- A `t:supervisor:child_spec/0`.
+
+See also: `loader_child_spec/3`, `await_loader/1`, `await_loader/2`, `start_loader/3`.
+""".
+-endif.
+
 -spec loader_child_spec(ChildId, DatabaseId, LoadFrom, Opts) ->
     ChildSpec | no_return()
 when
@@ -376,22 +378,25 @@ loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomF
     OptsWithDefaults = opts_with_defaults(Opts),
     locus_database:static_child_spec(ChildId, DatabaseId, Origin, OptsWithDefaults).
 
-%% @doc Like `await_loader/1' but with a default timeout of 30 seconds.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {database_stopped, _}}'
-%%      if the database loader for `DatabaseId' stopped while we waited.</li>
-%% <li>`{error, {timeout, [_]}}'
-%%      if all the load attempts performed before timing out have failed.</li>
-%% </ul>
-%% @see await_loader/2
+
+-ifdef(E48).
+-doc """
+Like `await_loader/2` but with a default timeout of 30 seconds.
+
+- `DatabaseId` must be an atom and refer to a database loader.
+
+Returns:
+
+- `{ok, LoadedVersion}` when the database is ready to use.
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, {database_stopped, _}}` if the database loader for `DatabaseId` stopped while we waited.
+- `{error, {timeout, [_]}}` if all the load attempts performed before timing out have failed.
+
+See also: `await_loader/2`.
+""".
+-endif.
+
 -spec await_loader(DatabaseId) -> {ok, LoadedVersion} | {error, Reason} when
     DatabaseId :: atom(),
     LoadedVersion :: database_version(),
@@ -403,25 +408,26 @@ loader_child_spec(ChildId, DatabaseId, {custom_fetcher, Module, _Args} = CustomF
 await_loader(DatabaseId) ->
     await_loader(DatabaseId, 30000).
 
-%% @doc Blocks caller execution until either readiness is achieved
-%% or the default timeout is triggered.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, LoadedVersion}' when the database is ready to use.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {database_stopped, _}}'
-%%      if the database loader for `DatabaseId' stopped while we waited.</li>
-%% <li>`{error, {timeout, [_]}}'
-%%      if all the load attempts performed before timing out have failed.</li>
-%% </ul>
-%% @see await_loader/1
-%% @see await_loaders/2
+
+-ifdef(E48).
+-doc """
+Blocks caller execution until either readiness is achieved or the given timeout is triggered.
+
+- `DatabaseId` must be an atom and refer to a database loader.
+- `Timeout` must be either a non-negative integer (milliseconds) or `infinity`.
+
+Returns:
+
+- `{ok, LoadedVersion}` when the database is ready to use.
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, {database_stopped, _}}` if the database loader for `DatabaseId` stopped while we waited.
+- `{error, {timeout, [_]}}` if all the load attempts performed before timing out have failed.
+
+See also: `await_loader/1`, `await_loaders/2`.
+""".
+-endif.
+
 -spec await_loader(DatabaseId, Timeout) -> {ok, LoadedVersion} | {error, Reason} when
     DatabaseId :: atom(),
     Timeout :: timeout(),
@@ -439,34 +445,24 @@ await_loader(DatabaseId, Timeout) ->
             {error, Reason}
     end.
 
-%% <ul>
-%% <li>`DatabaseIds' must be a list of atoms that refer to database loaders.</li>
-%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
-%% </ul>
 %%
-%% Returns:
-%% <ul>
-%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the databases are ready to use.</li>
-%% <li>`{error, {DatabaseId, database_unknown}}'
-%%      if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, {DatabaseId, {loading, term()}}}'
-%%      if loading `DatabaseId' failed for some reason.</li>
-%% <li>`{error, timeout}' if we've given up on waiting.</li>
-%% </ul>
 
-%% @doc Like `await_loader/2' but it can concurrently await status from more than one database.
-%%
-%% <ul>
-%% <li>`DatabaseIds' must be list of atom referring to database loaders.</li>
-%% <li>`Timeout' must be either a non-negative integer (milliseconds) or `infinity'.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, #{DatabaseId => LoadedVersion}}' when all the database are ready to use.</li>
-%% <li>`{error, {#{DatabaseId => ErrorReason}, _}}' in case of errors.</li>
-%% </ul>
-%% @see await_loader/2
+-ifdef(E48).
+-doc """
+Like `await_loader/2` but concurrently awaits status from more than one database.
+
+- `DatabaseIds` must be a list of atoms referring to database loaders.
+- `Timeout` must be either a non-negative integer (milliseconds) or `infinity`.
+
+Returns:
+
+- `{ok, #{DatabaseId => LoadedVersion}}` when all the databases are ready to use.
+- `{error, {#{DatabaseId => ErrorReason}, _}}` in case of errors.
+
+See also: `await_loader/2`.
+""".
+-endif.
+
 -spec await_loaders(DatabaseIds, Timeout) ->
     ({ok, Successes}
     | {error, {ErrorPerDatabase, PartialSuccesses}})
@@ -489,25 +485,29 @@ await_loaders(DatabaseIds, Timeout) ->
     Waiters = launch_waiters(ReplyRef, Timeout, UniqueDatabaseIds),
     perform_wait(ReplyRef, Waiters, #{}, #{}).
 
-%% @doc Looks-up info on IPv4 and IPv6 addresses.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% <li>`Address' must be either an `inet:ip_address()' tuple, or a string/binary
-%%    containing a valid representation of the address.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, Entry}' in case of success</li>
-%% <li>`not_found' if no data was found for this `Address'.</li>
-%% <li>`{error, invalid_address}' if `Address' is not either a `inet:ip_address()'
-%%    tuple or a valid textual representation of an IP address.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
-%% <li>`{error, ipv4_database}' if `Address' represents an IPv6 address and the database
-%%      only supports IPv4 addresses.</li>
-%% </ul>
+
+-ifdef(E48).
+-doc """
+Looks up info on IPv4 and IPv6 addresses.
+
+- `DatabaseId` must be an atom and refer to a database loader.
+- `Address` must be either a `t:inet:ip_address/0` tuple, or a string/binary
+  containing a valid representation of the address.
+
+Returns:
+
+- `{ok, Entry}` in case of success.
+- `not_found` if no data was found for this `Address`.
+- `{error, invalid_address}` if `Address` is not either a `t:inet:ip_address/0`
+  tuple or a valid textual representation of an IP address.
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
+- `{error, ipv4_database}` if `Address` represents an IPv6 address and the database
+  only supports IPv4 addresses.
+""".
+-endif.
+
 -spec lookup(DatabaseId, Address) -> {ok, Entry} | not_found | {error, Error} when
     DatabaseId :: atom(),
     Address :: inet:ip_address() | string() | binary(),
@@ -525,19 +525,24 @@ lookup(DatabaseId, Address) ->
             Error
     end.
 
-%% @doc Returns the properties of a currently loaded database.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, database_info()}' in case of success</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
-%% </ul>
-%% @see get_info/2
+
+-ifdef(E48).
+-doc """
+Returns the properties of a currently loaded database.
+
+- `DatabaseId` must be an atom and refer to a database loader.
+
+Returns:
+
+- `{ok, t:database_info/0}` in case of success.
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
+
+See also: `get_info/2`.
+""".
+-endif.
+
 -spec get_info(DatabaseId) -> {ok, Info} | {error, Error} when
     DatabaseId :: atom(),
     Info :: database_info(),
@@ -551,20 +556,25 @@ get_info(DatabaseId) ->
             Error
     end.
 
-%% @doc Returns a specific property of a currently loaded database.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% <li>`Property' must be either `metadata', `source' or `version'.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{ok, Value}' in case of success</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
-%% </ul>
-%% @see get_info/1
+
+-ifdef(E48).
+-doc """
+Returns a specific property of a currently loaded database.
+
+- `DatabaseId` must be an atom and refer to a database loader.
+- `Property` must be either `metadata`, `source` or `version`.
+
+Returns:
+
+- `{ok, Value}` in case of success.
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
+
+See also: `get_info/1`.
+""".
+-endif.
+
 -spec get_info(DatabaseId, Property) -> {ok, Value} | {error, Error} when
     DatabaseId :: atom(),
     Property :: metadata | source | version,
@@ -579,24 +589,26 @@ get_info(DatabaseId, Property) ->
             {error, Error}
     end.
 
-%% @doc Analyzes a loaded database for corruption or incompatibility.
 %%
-%% <ul>
-%% <li>`DatabaseId' must be an atom and refer to a database loader.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`ok' if the database is wholesome.</li>
-%% <li>`{error, database_unknown}' if the database loader for `DatabaseId' hasn't been started.</li>
-%% <li>`{error, database_not_loaded}' if the database hasn't yet been loaded.</li>
-%% <li>`{validation_warnings, [CheckWarning, ...]}' in case something smells within the database
-%%    (check the definitions in {@link locus_mmdb_check})
-%% </li>
-%% <li>`{validation_errors, [CheckError], [...]}' in case of corruption or incompatibility
-%%    (check the definitions in {@link locus_mmdb_check})
-%% </li>
-%% </ul>
+
+-ifdef(E48).
+-doc """
+Analyzes a loaded database for corruption or incompatibility.
+
+- `DatabaseId` must be an atom and refer to a database loader.
+
+Returns:
+
+- `ok` if the database is wholesome.
+- `{error, database_unknown}` if the database loader for `DatabaseId` hasn't been started.
+- `{error, database_not_loaded}` if the database hasn't yet been loaded.
+- `{validation_warnings, [CheckWarning, ...]}` in case something smells within the database
+  (check the definitions in `m:locus_mmdb_check`).
+- `{validation_errors, [CheckError], [...]}` in case of corruption or incompatibility
+  (check the definitions in `m:locus_mmdb_check`).
+""".
+-endif.
+
 -spec check(DatabaseId) ->
     ok
     | {error, Error}

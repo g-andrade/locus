@@ -21,9 +21,14 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Launches `locus_database_loader' and later shares the unpacked database,
-%% as well as any updates to it, through `persistent_term'.
 -module(locus_database).
+
+-ifdef(E48).
+-moduledoc """
+Launches the database loader and later shares the unpacked database,
+as well as any updates to it, through `m:persistent_term`.
+""".
+-endif.
 -behaviour(gen_server).
 
 -ifdef(TEST).
@@ -147,7 +152,10 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Returns the database version based on its build epoch (UNIX timestamp)
+-ifdef(E48).
+-doc "Returns the database version based on its build epoch (UNIX timestamp).".
+-endif.
+
 -spec version(BuildEpoch) -> Version when
     BuildEpoch :: non_neg_integer(),
     Version :: calendar:datetime().

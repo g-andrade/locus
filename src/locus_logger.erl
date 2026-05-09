@@ -21,9 +21,14 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Logging of `locus_database' events; can be adjusted in app config
-%% as well as at run time.
 -module(locus_logger).
+
+-ifdef(E48).
+-moduledoc """
+Logging of `m:locus_database` events; can be adjusted in app config
+as well as at run time.
+""".
+-endif.
 -behaviour(locus_event_subscriber).
 
 %% ------------------------------------------------------------------
@@ -103,9 +108,14 @@ on_app_start() ->
     _ = logger:set_application_level(locus, CurrentLevel),
     ok.
 
-%% @doc Changes the logging verbosity in runtime
-%%
-%% `Level' must be either `debug', `info', `warning', `error' or `none'.
+-ifdef(E48).
+-doc """
+Changes the logging verbosity in runtime.
+
+`Level` must be either `debug`, `info`, `warning`, `error` or `none`.
+""".
+-endif.
+
 -spec set_loglevel(debug | info | warning | error | none) -> ok.
 set_loglevel(Level) when ?is_loglevel(Level) ->
     application:set_env(locus, log_level, Level),

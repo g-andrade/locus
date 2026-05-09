@@ -21,11 +21,15 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
-%% MaxMind DB File Format Specification</a>
-
-%% @doc API for working with MMDB - data codec
 -module(locus_mmdb_data_codec).
+
+-ifdef(E48).
+-moduledoc """
+API for working with MMDB - data codec.
+
+See [MaxMind DB File Format Specification](https://maxmind.github.io/MaxMind-DB/).
+""".
+-endif.
 
 -hank([{unnecessary_function_arguments, [{just_the_value, 2, 1}]}]).
 
@@ -103,12 +107,16 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Attempts to parse either the `Value' or `RawValue'
-%% (depending on the `Raw' flag) at `Index' in `DataSection'.
-%%
-%% Will crash upon invalid/unrecognized data, invalid pointers
-%% or cyclic pointer chasing (i.e. loops.)
-%%
+-ifdef(E48).
+-doc """
+Attempts to parse either the `Value` or `RawValue`
+(depending on the `Raw` flag) at `Index` in `DataSection`.
+
+Will crash upon invalid/unrecognized data, invalid pointers
+or cyclic pointer chasing (i.e. loops.)
+""".
+-endif.
+
 -spec parse_on_index(Index, DataSection, Raw) ->
     {Value | RawValue, RemainingData}
 when

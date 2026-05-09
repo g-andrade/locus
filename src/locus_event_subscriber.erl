@@ -21,8 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Callback for implementing your own `locus_database' event subscribers
 -module(locus_event_subscriber).
+
+-ifdef(E48).
+-moduledoc "Callback for implementing your own `m:locus_database` event subscribers.".
+-endif.
 
 %% ------------------------------------------------------------------
 %% Callback Definitions

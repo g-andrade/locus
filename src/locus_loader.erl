@@ -21,9 +21,14 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Loads and unpacks databases while managing any associated assets
-%% (e.g. reading from and writing to cache)
 -module(locus_loader).
+
+-ifdef(E48).
+-moduledoc """
+Loads and unpacks databases while managing any associated assets
+(e.g. reading from and writing to cache).
+""".
+-endif.
 -behaviour(gen_server).
 
 -include_lib("stdlib/include/assert.hrl").

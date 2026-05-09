@@ -21,9 +21,14 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Downloads an unpacked database edition from MaxMind, as well as
-%% its checksum (which it then verifies), without blocking the caller.
 -module(locus_maxmind_download).
+
+-ifdef(E48).
+-moduledoc """
+Downloads an unpacked database edition from MaxMind, as well as its checksum
+(which it then verifies), without blocking the caller.
+""".
+-endif.
 -behaviour(gen_server).
 
 %% ------------------------------------------------------------------

@@ -21,8 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Downloads a file using HTTP(S) without blocking the caller
 -module(locus_http_download).
+
+-ifdef(E48).
+-moduledoc "Downloads a file using HTTP(S) without blocking the caller.".
+-endif.
 -behaviour(gen_server).
 
 %% ------------------------------------------------------------------

@@ -21,11 +21,15 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
-%% MaxMind DB File Format Specification</a>
-
-%% @doc API for working with MMDB
 -module(locus_mmdb).
+
+-ifdef(E48).
+-moduledoc """
+API for working with MMDB.
+
+See [MaxMind DB File Format Specification](https://maxmind.github.io/MaxMind-DB/).
+""".
+-endif.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -106,7 +110,10 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Unpacks an `EncodedDatabase' binary into a ready-to-use `Database'.
+-ifdef(E48).
+-doc "Unpacks an `EncodedDatabase` binary into a ready-to-use `Database`.".
+-endif.
+
 -spec unpack_database(EncodedDatabase) -> {ok, Database} | {error, ErrorReason} when
     EncodedDatabase :: binary(),
     Database :: database(),
@@ -119,20 +126,24 @@ unpack_database(<<EncodedDatabase/bytes>>) ->
             safer_raise(Class, Reason, Stacktrace)
     end.
 
-%% @doc Unpacks a single `TreeAndDataSection' binary into
-%% separate `TreeData' and `DataSection' binaries, leveraging
-%% `Metadata' to calculate the size of `TreeData'.
 %%
-%% You can then use `TreeData' on your own or leverage it
-%% to instantiate a new `locus_mmdb_tree:t()',
-%% through {@link locus_mmdb_tree:new/5}.
-%%
-%% As for `DataSection', you can also either use it on your own
-%% or pass it to the API defined under {@link locus_mmdb_data_codec}.
-%%
-%% For how to obtain `Metadata' and `TreeAndDataSection'
-%% in the first place, see {@link locus_mmdb_metadata:parse_and_validate/1}.
-%%
+
+-ifdef(E48).
+-doc """
+Unpacks a single `TreeAndDataSection` binary into separate `TreeData` and `DataSection`
+binaries, leveraging `Metadata` to calculate the size of `TreeData`.
+
+You can then use `TreeData` on your own or leverage it to instantiate a new
+`t:locus_mmdb_tree:t/0`, through `locus_mmdb_tree:new/5`.
+
+As for `DataSection`, you can also either use it on your own or pass it to the API
+defined under `m:locus_mmdb_data_codec`.
+
+For how to obtain `Metadata` and `TreeAndDataSection` in the first place,
+see `locus_mmdb_metadata:parse_and_validate/1`.
+""".
+-endif.
+
 -spec unpack_tree_data_and_data_section(Metadata, TreeAndDataSection) ->
     {ok, TreeData, DataSection} | {error, Reason}
 when
@@ -170,7 +181,12 @@ unpack_tree_data_and_data_section(Metadata, TreeAndDataSection) ->
                 }}}
     end.
 
-%% @doc Looks up for an entry matching `Address' within `Database'
+%%
+
+-ifdef(E48).
+-doc "Looks up for an entry matching `Address` within `Database`.".
+-endif.
+
 -spec lookup_address(Address, Database) -> {ok, Entry} | not_found | {error, ErrorReason} when
     Address :: inet:ip_address() | string() | unicode:unicode_binary(),
     Database :: database(),

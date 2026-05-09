@@ -21,11 +21,15 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
-%% MaxMind DB File Format Specification</a>
-
-%% @doc API for working with MMDB - tree section
 -module(locus_mmdb_tree).
+
+-ifdef(E48).
+-moduledoc """
+API for working with MMDB - tree section.
+
+See [MaxMind DB File Format Specification](https://maxmind.github.io/MaxMind-DB/).
+""".
+-endif.
 
 -include_lib("stdlib/include/assert.hrl").
 
@@ -104,8 +108,13 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Instantiates a new `Tree' out of `TreeData', a few
-%% metadata properties and `DataSectionSize'
+-ifdef(E48).
+-doc """
+Instantiates a new `Tree` out of `TreeData`, a few metadata properties
+and `DataSectionSize`.
+""".
+-endif.
+
 -spec new(TreeData, NodeCount, RecordSize, IpVersion, DataSectionSize) ->
     {ok, Tree} | {error, Reason}
 when
@@ -148,7 +157,12 @@ new(TreeData, NodeCount, RecordSize, IpVersion, DataSectionSize) ->
             Error
     end.
 
-%% @doc Looks up for a `DataIndex' for `Address' within `Tree'
+%%
+
+-ifdef(E48).
+-doc "Looks up for a `DataIndex` for `Address` within `Tree`.".
+-endif.
+
 -spec lookup(Address, Tree) -> {ok, DataIndex} | not_found | {error, Reason} when
     Address :: inet:ip_address(),
     Tree :: t(),

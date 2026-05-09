@@ -21,11 +21,15 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @reference <a target="_parent" href="https://maxmind.github.io/MaxMind-DB/">
-%% MaxMind DB File Format Specification</a>
-
-%% @doc API for working with MMDB - metadata
 -module(locus_mmdb_metadata).
+
+-ifdef(E48).
+-moduledoc """
+API for working with MMDB - metadata.
+
+See [MaxMind DB File Format Specification](https://maxmind.github.io/MaxMind-DB/).
+""".
+-endif.
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -98,11 +102,15 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-%% @doc Parses and validates `Metadata' out of `EncodedDatabase'
-%%
-%% To proceed further with `TreeAndDataSection',
-%% see {@link locus_mmdb:unpack_tree_data_and_data_section/2}.
-%%
+-ifdef(E48).
+-doc """
+Parses and validates `Metadata` out of `EncodedDatabase`.
+
+To proceed further with `TreeAndDataSection`,
+see `locus_mmdb:unpack_tree_data_and_data_section/2`.
+""".
+-endif.
+
 -spec parse_and_validate(EncodedDatabase) ->
     {ok, Metadata, TreeAndDataSection}
     | {error, Reason}

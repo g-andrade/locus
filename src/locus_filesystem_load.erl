@@ -21,8 +21,11 @@
 %% locus is an independent project and has not been authorized, sponsored,
 %% or otherwise approved by MaxMind.
 
-%% @doc Loads a file from the filesystem without blocking the caller
 -module(locus_filesystem_load).
+
+-ifdef(E48).
+-moduledoc "Loads a file from the filesystem without blocking the caller.".
+-endif.
 -behaviour(gen_server).
 
 -include_lib("kernel/include/file.hrl").
