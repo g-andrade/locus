@@ -1,12 +1,12 @@
 # locus
 
 [![Hex downloads](https://img.shields.io/hexpm/dt/locus.svg)](https://hex.pm/packages/locus)
-[![License](https://img.shields.io/hexpm/l/locus.svg)](https://github.com/g-andrade/locus/blob/master/LICENSE)
+[![License](https://img.shields.io/hexpm/l/locus.svg)](https://github.com/g-andrade/locus/blob/main/LICENSE)
 [![Erlang Versions](https://img.shields.io/badge/Erlang%2FOTP-24%20to%2028-blue)](https://www.erlang.org)
 [![CI status](https://github.com/g-andrade/locus/actions/workflows/ci.yml/badge.svg)](https://github.com/g-andrade/locus/actions/workflows/ci.yml)
 [![Latest version](https://img.shields.io/hexpm/v/locus.svg?style=flat)](https://hex.pm/packages/locus)
 [![API reference](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/locus/)
-[![Last commit](https://img.shields.io/github/last-commit/g-andrade/locus.svg)](https://github.com/g-andrade/locus/commits/master)
+[![Last commit](https://img.shields.io/github/last-commit/g-andrade/locus.svg)](https://github.com/g-andrade/locus/commits/main)
 
 `locus` is library for Erlang/OTP and Elixir that allows you to pinpoint
 the country, city or ASN of IP addresses using [MaxMind
@@ -398,4 +398,4 @@ sponsored, or otherwise approved by MaxMind.
 
 ### Upgrading from 1.x
 
-See [`MIGRATION.md`](https://github.com/g-andrade/locus/blob/master/MIGRATION.md).
+See [`MIGRATION.md`](https://github.com/g-andrade/locus/blob/main/MIGRATION.md).
