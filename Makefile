@@ -101,10 +101,28 @@ cli:
 	@rebar3 as escriptize escriptize
 	cp -p "$(CLI_ARTIFACT_PATH)" ./
 
+publish: doc-dry
+publish:
+	@rebar3 hex publish
+
+# FIXME go back to hex version once there's one with ExDoc 0.40+
+doc-dry: _checkouts/rebar3_ex_doc/priv/ex_doc_otp_27
 doc-dry:
 	@rebar3 hex build
 .PHONY: doc-dry
 
-publish:
-publish: doc
-	@rebar3 hex publish
+_checkouts/rebar3_ex_doc/priv/ex_doc_otp_27: | _checkouts/rebar3_ex_doc
+	pushd _checkouts/rebar3_ex_doc; \
+		./prepare.sh; \
+		popd;
+
+_checkouts/rebar3_ex_doc: | _checkouts
+	pushd _checkouts; \
+		git clone https://github.com/g-andrade/rebar3_ex_doc.git; \
+		pushd rebar3_ex_doc; \
+		git checkout "origin/temporary/run-using-git"; \
+		popd;
+		popd;
+
+_checkouts:
+	mkdir _checkouts
