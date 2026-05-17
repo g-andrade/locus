@@ -22,3 +22,6 @@ locus
 /doc/
 /.claude/settings.local.json
 /tmp/
+
+# asdf
+.tool-versions
