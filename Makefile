@@ -109,7 +109,7 @@ cli:
 doc: SOURCE_REF := $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)
 doc: tmp/ex_doc
 doc:
-	rebar3 as docs edoc; \
+	rebar3 edoc; \
 		./tmp/ex_doc "locus" "${SOURCE_REF}" \
 		_build/docs/lib/locus/ebin \
 		-c ex_doc.config \
