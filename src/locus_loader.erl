@@ -639,7 +639,7 @@ http_base_request_headers() ->
     ].
 
 join_http_header_values(Values) ->
-    string:join(Values, "; ").
+    string:join(Values, ", ").
 
 -spec handle_fetcher_msg(fetcher_msg(), state()) -> {noreply, state()}.
 handle_fetcher_msg({event, Event}, State) ->
@@ -1076,6 +1076,32 @@ notify_owner(Msg, State) ->
 %% Internal Function Definitions - Unit Tests
 %% ------------------------------------------------------------------
 -ifdef(TEST).
+
+accept_request_header_test() ->
+    Headers = http_request_headers(unknown),
+    ?assertEqual(
+        {"accept",
+            "application/gzip, application/x-gzip, application/x-gtar, "
+            "application/x-tgz, application/x-tar, application/octet-stream"},
+        lists:keyfind("accept", 1, Headers)
+    ).
+
+%% RFC 9110, section 12.5.1: media types in `Accept' are separated by commas,
+%% whereas a semicolon introduces the parameters of the preceding media type.
+%% Separating them with semicolons makes the whole list read as a single media
+%% type with invalid parameters, which strict intermediaries reject.
+accept_request_header_has_no_semicolons_test() ->
+    {"accept", Accept} = lists:keyfind("accept", 1, http_request_headers(unknown)),
+    ?assertEqual(nomatch, string:find(Accept, ";")).
+
+conditional_request_keeps_accept_header_test() ->
+    LastModified = {{2026, 9, 16}, {12, 0, 0}},
+    Headers = http_request_headers(LastModified),
+    ?assertMatch({"if-modified-since", [_ | _]}, lists:keyfind("if-modified-since", 1, Headers)),
+    ?assertEqual(
+        lists:keyfind("accept", 1, http_request_headers(unknown)),
+        lists:keyfind("accept", 1, Headers)
+    ).
 
 constant_error_backoff_test() ->
     lists:foreach(
