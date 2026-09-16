@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - OTP 29.0 to CI
 
+### Fixed
+
+- malformed `Accept` request header when downloading databases over HTTP(S):
+  media types were separated with semicolons rather than commas, which made
+  the header non-compliant with RFC 9110 and got requests rejected or flagged
+  by strict intermediaries
+
 ## [2.3.15] - 2026-05-09
 
 ### Changed
