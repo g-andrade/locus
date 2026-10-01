@@ -116,7 +116,7 @@ doc:
 		--source-ref "${SOURCE_REF}";
 .PHONY: doc
 
-tmp/ex_doc: EX_DOC_VER=0.40.2
+tmp/ex_doc: EX_DOC_VER=0.40.4
 tmp/ex_doc: OTP_VER := $(shell erl -noshell -eval 'io:fwrite("~s", [erlang:system_info(otp_release)]), init:stop().')
 tmp/ex_doc: | tmp
 tmp/ex_doc:
