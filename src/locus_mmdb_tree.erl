@@ -167,7 +167,7 @@ new(TreeData, NodeCount, RecordSize, IpVersion, DataSectionSize) ->
     Address :: inet:ip_address(),
     Tree :: t(),
     DataIndex :: locus_mmdb_data_codec:index(),
-    Reason :: ipv4_database | not_found.
+    Reason :: ipv4_database.
 lookup(Address, Tree) ->
     case ip_address_to_bitstring(Address, Tree) of
         {ok, BitAddress, RootIndex} ->
@@ -175,7 +175,9 @@ lookup(Address, Tree) ->
         {error, Reason} ->
             {error, Reason};
         {no_need, DataIndex} ->
-            {ok, DataIndex}
+            {ok, DataIndex};
+        no_ipv4_root_index ->
+            not_found
     end.
 
 %% ------------------------------------------------------------------
@@ -323,7 +325,7 @@ ip_address_to_bitstring({A, B, C, D}, Tree) ->
         {tree_index, RootIndex} ->
             {ok, <<A, B, C, D>>, RootIndex};
         none ->
-            {error, not_found};
+            no_ipv4_root_index;
         {data_index, DataIndex} ->
             {no_need, DataIndex}
     end;
